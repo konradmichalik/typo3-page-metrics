@@ -1,0 +1,13 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    KonradMichalik\Typo3PageMetrics\:
+        resource: '../Classes/*'
+
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Resolver\SlugLookup:
+        public: true
