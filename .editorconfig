@@ -1,0 +1,34 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.js]
+indent_size = 2
+
+[*.json]
+indent_style = tab
+
+[*.sql]
+indent_style = tab
+indent_size = 2
+
+[{*.yml,*.yaml}]
+indent_size = 2
+
+[*.xlf]
+indent_style = tab
+
+[*.neon]
+indent_style = tab
+
+[*.md]
+indent_style = unset
+indent_size = unset
+trim_trailing_whitespace = unset
+insert_final_newline = unset

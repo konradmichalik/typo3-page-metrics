@@ -1,0 +1,18 @@
+includes:
+	- %rootDir%/../../konradmichalik/phpstan-typo3-preset/phpstan.neon.dist
+	- phpstan-baseline.neon
+
+parameters:
+	level: 8
+
+	scanDirectories:
+		- ../../vendor
+	paths:
+		- ../../Classes
+		- ../../Configuration
+		- ../../Tests/Unit
+		- ../../Tests/Functional
+
+	typo3:
+		requestGetAttributeMapping:
+			id: 'string'

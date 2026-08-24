@@ -1,0 +1,10 @@
+.idea
+config
+public
+!Resources/Public
+vendor
+var
+.php-cs-fixer.cache
+.Build/
+.phpunit.result.cache
+.superpowers/
