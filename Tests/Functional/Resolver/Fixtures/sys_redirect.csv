@@ -1,0 +1,7 @@
+"sys_redirect"
+,"uid","pid","deleted","disabled","source_host","source_path","target","target_statuscode"
+,1,0,0,0,"*","/old-about","t3://page?uid=2",307
+,2,0,0,0,"example.com","/old-external","https://example.com/new-external",307
+,3,0,0,0,"*","/redirect-a","/redirect-b",307
+,4,0,0,0,"*","/redirect-b","/redirect-a",307
+,5,0,0,1,"*","/disabled-source","t3://page?uid=2",307

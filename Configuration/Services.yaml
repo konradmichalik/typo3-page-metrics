@@ -11,3 +11,8 @@ services:
     # any consuming service references it.
     KonradMichalik\Typo3PageMetrics\Resolver\SlugLookup:
         public: true
+
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Resolver\RedirectFollower:
+        public: true
