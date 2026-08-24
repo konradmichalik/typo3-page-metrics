@@ -46,8 +46,14 @@ final class LanguageMatcher
             $basePath = rtrim($base->getPath(), '/');
             $urlPath = (string) ($urlParts['path'] ?? '/');
 
-            if ('' !== $basePath && !str_starts_with($urlPath, $basePath)) {
-                continue;
+            if ('' !== $basePath) {
+                if (!str_starts_with($urlPath, $basePath)) {
+                    continue;
+                }
+
+                if (strlen($basePath) !== strlen($urlPath) && '/' !== $urlPath[strlen($basePath)]) {
+                    continue;
+                }
             }
 
             $length = strlen($basePath);

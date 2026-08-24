@@ -58,6 +58,14 @@ final class SiteMatcher
         $basePath = rtrim($base->getPath(), '/');
         $urlPath = (string) ($urlParts['path'] ?? '/');
 
-        return '' === $basePath || str_starts_with($urlPath, $basePath);
+        if ('' === $basePath) {
+            return true;
+        }
+
+        if (!str_starts_with($urlPath, $basePath)) {
+            return false;
+        }
+
+        return strlen($basePath) === strlen($urlPath) || '/' === $urlPath[strlen($basePath)];
     }
 }

@@ -92,4 +92,28 @@ final class LanguageMatcherTest extends TestCase
         self::assertNotNull($language);
         self::assertSame(0, $language->getLanguageId());
     }
+
+    public function testDoesNotMatchPathThatSharesPrefixButNotAtSegmentBoundary(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'languages' => [
+                [
+                    'languageId' => 0,
+                    'locale' => 'de_DE.UTF-8',
+                    'base' => '/',
+                ],
+                [
+                    'languageId' => 1,
+                    'locale' => 'en_US.UTF-8',
+                    'base' => '/en/',
+                ],
+            ],
+        ]);
+
+        $language = $this->matcher->match('https://example.com/english/page', $site);
+
+        self::assertNotNull($language);
+        self::assertSame(0, $language->getLanguageId());
+    }
 }

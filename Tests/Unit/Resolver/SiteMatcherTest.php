@@ -66,4 +66,11 @@ final class SiteMatcherTest extends TestCase
 
         self::assertSame($siteB, $this->matcher->match('https://b.example.com/foo', [$siteA, $siteB]));
     }
+
+    public function testReturnsNullWhenPathSharesPrefixButNotAtSegmentBoundary(): void
+    {
+        $site = new Site('main', 1, ['base' => 'https://example.com/sub/']);
+
+        self::assertNull($this->matcher->match('https://example.com/subfoo', [$site]));
+    }
 }
