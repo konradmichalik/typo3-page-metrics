@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Resolver;
 
+use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
@@ -30,19 +31,26 @@ final class RedirectFollower
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_redirect');
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
-        $row = $queryBuilder
-            ->select('target')
-            ->from('sys_redirect')
-            ->where(
-                $queryBuilder->expr()->or(
-                    $queryBuilder->expr()->eq('source_host', $queryBuilder->createNamedParameter('*')),
-                    $queryBuilder->expr()->eq('source_host', $queryBuilder->createNamedParameter($host)),
-                ),
-                $queryBuilder->expr()->eq('source_path', $queryBuilder->createNamedParameter($path)),
-                $queryBuilder->expr()->eq('disabled', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
-            )
-            ->executeQuery()
-            ->fetchAssociative();
+        try {
+            $row = $queryBuilder
+                ->select('target')
+                ->from('sys_redirect')
+                ->where(
+                    $queryBuilder->expr()->or(
+                        $queryBuilder->expr()->eq('source_host', $queryBuilder->createNamedParameter('*')),
+                        $queryBuilder->expr()->eq('source_host', $queryBuilder->createNamedParameter($host)),
+                    ),
+                    $queryBuilder->expr()->eq('source_path', $queryBuilder->createNamedParameter($path)),
+                    $queryBuilder->expr()->eq('disabled', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
+                )
+                ->executeQuery()
+                ->fetchAssociative();
+        } catch (DBALException) {
+            // typo3/cms-redirects is optional (require-dev only); installations
+            // without it have no sys_redirect table at all. From the Resolver's
+            // perspective that is indistinguishable from "no redirect found".
+            return null;
+        }
 
         if (false === $row || !is_string($row['target']) || '' === $row['target']) {
             return null;
