@@ -73,6 +73,10 @@ final class MatomoMetricSource implements MetricSourceInterface
                 'period' => 'day',
                 'date' => $day->format('Y-m-d'),
                 'flat' => 1,
+                // Matomo's Reporting API defaults filter_limit to 100; -1 is
+                // the documented "return all rows" value, without it any day
+                // with more than 100 distinct URLs silently loses the rest.
+                'filter_limit' => -1,
             ]);
 
             foreach ($rows as $row) {

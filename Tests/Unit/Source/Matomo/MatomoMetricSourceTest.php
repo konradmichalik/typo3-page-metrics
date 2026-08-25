@@ -19,13 +19,11 @@ use KonradMichalik\Typo3PageMetrics\Source\Matomo\{MatomoApiClient, MatomoConfig
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
-
 /**
  * MatomoMetricSourceTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class MatomoMetricSourceTest extends TestCase
 {
     /** @var MatomoConfigurationResolver&\PHPUnit\Framework\MockObject\MockObject */
@@ -143,5 +141,28 @@ final class MatomoMetricSourceTest extends TestCase
         self::assertSame('day', $calls[1]['period']);
         self::assertSame('2026-08-02', $calls[1]['date']);
         self::assertNotSame('range', $calls[0]['period']);
+    }
+
+    public function testFetchRequestsAllRowsInsteadOfMatomosDefaultTop100(): void
+    {
+        $configuration = new MatomoConfiguration('https://matomo.example.com/', 3, 'token');
+        $this->resolver->method('resolve')->willReturn($configuration);
+
+        $calls = [];
+        $this->apiClient->method('request')->willReturnCallback(static function (MatomoConfiguration $passedConfiguration, array $parameters) use (&$calls) {
+            $calls[] = $parameters;
+
+            return [];
+        });
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
+        iterator_to_array($this->subject->fetch($this->site, $range));
+
+        self::assertCount(2, $calls);
+
+        foreach ($calls as $call) {
+            self::assertArrayHasKey('filter_limit', $call);
+            self::assertSame(-1, $call['filter_limit']);
+        }
     }
 }
