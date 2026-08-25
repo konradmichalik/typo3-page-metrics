@@ -63,6 +63,72 @@ final class MatomoApiClientTest extends TestCase
         $this->subject->request($this->configuration, ['method' => 'Actions.getPageUrls']);
     }
 
+    public function testRequestNeverPutsTheAuthTokenInTheUrl(): void
+    {
+        $capturedUri = null;
+        $this->requestFactory->method('request')->willReturnCallback(
+            function (string $uri, string $method, array $options) use (&$capturedUri): ResponseInterface {
+                $capturedUri = $uri;
+
+                return $this->jsonResponse(200, ['value' => 'ok']);
+            }
+        );
+
+        $this->subject->request($this->configuration, ['method' => 'Actions.getPageUrls']);
+
+        self::assertIsString($capturedUri);
+        self::assertStringNotContainsString($this->configuration->token, $capturedUri);
+        self::assertSame('https://matomo.example.com/index.php', $capturedUri);
+    }
+
+    public function testRequestSendsTheAuthTokenInThePostBody(): void
+    {
+        $capturedOptions = null;
+        $this->requestFactory->method('request')->willReturnCallback(
+            function (string $uri, string $method, array $options) use (&$capturedOptions): ResponseInterface {
+                $capturedOptions = $options;
+
+                return $this->jsonResponse(200, ['value' => 'ok']);
+            }
+        );
+
+        $this->subject->request($this->configuration, ['method' => 'Actions.getPageUrls']);
+
+        self::assertIsArray($capturedOptions);
+        self::assertArrayHasKey('form_params', $capturedOptions);
+        self::assertSame($this->configuration->token, $capturedOptions['form_params']['token_auth'] ?? null);
+    }
+
+    public function testRequestBuildsExpectedUrlMethodAndFormBody(): void
+    {
+        $capturedUri = null;
+        $capturedMethod = null;
+        $capturedOptions = null;
+        $this->requestFactory->method('request')->willReturnCallback(
+            function (string $uri, string $method, array $options) use (&$capturedUri, &$capturedMethod, &$capturedOptions): ResponseInterface {
+                $capturedUri = $uri;
+                $capturedMethod = $method;
+                $capturedOptions = $options;
+
+                return $this->jsonResponse(200, ['value' => 'ok']);
+            }
+        );
+
+        $this->subject->request($this->configuration, ['method' => 'Actions.getPageUrls', 'period' => 'day']);
+
+        self::assertSame('https://matomo.example.com/index.php', $capturedUri);
+        self::assertSame('POST', $capturedMethod);
+        self::assertIsArray($capturedOptions);
+        self::assertSame([
+            'method' => 'Actions.getPageUrls',
+            'period' => 'day',
+            'module' => 'API',
+            'idSite' => 3,
+            'format' => 'JSON',
+            'token_auth' => 'token123',
+        ], $capturedOptions['form_params'] ?? null);
+    }
+
     /**
      * @param array<mixed> $payload
      */
