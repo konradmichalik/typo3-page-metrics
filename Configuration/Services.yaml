@@ -26,3 +26,8 @@ services:
     # any consuming service references it.
     KonradMichalik\Typo3PageMetrics\Source\Matomo\MatomoConfigurationResolver:
         public: true
+
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository:
+        public: true
