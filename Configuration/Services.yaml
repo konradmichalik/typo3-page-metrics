@@ -41,3 +41,15 @@ services:
     # any consuming service references it.
     KonradMichalik\Typo3PageMetrics\Persistence\ImportStateRepository:
         public: true
+
+    KonradMichalik\Typo3PageMetrics\Source\Matomo\MatomoMetricSource:
+        tags:
+            - name: page_metrics.metric_source
+
+    KonradMichalik\Typo3PageMetrics\Command\ImportCommand:
+        arguments:
+            $sources: !tagged_iterator page_metrics.metric_source
+        tags:
+            - name: console.command
+              command: 'page-metrics:import'
+              description: 'Import page metrics from configured sources'
