@@ -14,7 +14,11 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Domain\Enum;
 
 /**
+ * UnresolvedReason.
+ *
  * @api
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 enum UnresolvedReason: string
 {

@@ -13,9 +13,17 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Persistence;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
 use KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
+
+
+/**
+ * DailyMetricsRepositoryTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 final class DailyMetricsRepositoryTest extends FunctionalTestCase
 {
@@ -31,11 +39,11 @@ final class DailyMetricsRepositoryTest extends FunctionalTestCase
 
     public function testUpsertInsertsNewRow(): void
     {
-        $this->subject->upsert(2, 0, 'matomo', new \DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 42);
+        $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 42);
 
         $series = $this->subject->dailySeries(2, 0, 'matomo.pageviews', new DateRange(
-            new \DateTimeImmutable('2026-08-01'),
-            new \DateTimeImmutable('2026-08-01'),
+            new DateTimeImmutable('2026-08-01'),
+            new DateTimeImmutable('2026-08-01'),
         ));
 
         self::assertSame(['2026-08-01' => 42], $series);
@@ -43,7 +51,7 @@ final class DailyMetricsRepositoryTest extends FunctionalTestCase
 
     public function testUpsertUpdatesExistingRowInsteadOfDuplicating(): void
     {
-        $date = new \DateTimeImmutable('2026-08-01');
+        $date = new DateTimeImmutable('2026-08-01');
         $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.pageviews', 42);
         $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.pageviews', 99);
 
@@ -54,11 +62,11 @@ final class DailyMetricsRepositoryTest extends FunctionalTestCase
 
     public function testDailySeriesReturnsZeroForDaysWithoutARow(): void
     {
-        $this->subject->upsert(2, 0, 'matomo', new \DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 5);
+        $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 5);
 
         $series = $this->subject->dailySeries(2, 0, 'matomo.pageviews', new DateRange(
-            new \DateTimeImmutable('2026-08-01'),
-            new \DateTimeImmutable('2026-08-03'),
+            new DateTimeImmutable('2026-08-01'),
+            new DateTimeImmutable('2026-08-03'),
         ));
 
         self::assertSame(['2026-08-01' => 5, '2026-08-02' => 0, '2026-08-03' => 0], $series);
@@ -66,7 +74,7 @@ final class DailyMetricsRepositoryTest extends FunctionalTestCase
 
     public function testDistinguishesRowsByLanguageAndMetric(): void
     {
-        $date = new \DateTimeImmutable('2026-08-01');
+        $date = new DateTimeImmutable('2026-08-01');
         $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.pageviews', 10);
         $this->subject->upsert(2, 1, 'matomo', $date, 'matomo.pageviews', 20);
         $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.visits', 7);

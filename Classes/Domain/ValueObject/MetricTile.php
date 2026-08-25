@@ -13,6 +13,13 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
+
+/**
+ * MetricTile.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
 final readonly class MetricTile
 {
     /**

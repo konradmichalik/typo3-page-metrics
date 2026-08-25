@@ -16,9 +16,13 @@ namespace KonradMichalik\Typo3PageMetrics\Resolver;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
 
 /**
+ * PathClassifier.
+ *
  * Last-resort classifier: called only once SlugLookup and RedirectFollower
  * have both failed to find a page for the path, to give the unresolved
  * report a more actionable reason than a blanket "unknown".
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class PathClassifier
 {

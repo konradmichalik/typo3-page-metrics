@@ -13,18 +13,24 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
+use DateTimeImmutable;
+
 /**
+ * DateRange.
+ *
  * @api
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class DateRange
 {
     public function __construct(
-        public \DateTimeImmutable $from,
-        public \DateTimeImmutable $until,
+        public DateTimeImmutable $from,
+        public DateTimeImmutable $until,
     ) {}
 
     /**
-     * @return iterable<\DateTimeImmutable> one entry per calendar day, inclusive of both ends
+     * @return iterable<DateTimeImmutable> one entry per calendar day, inclusive of both ends
      */
     public function days(): iterable
     {

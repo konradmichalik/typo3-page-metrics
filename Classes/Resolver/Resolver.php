@@ -17,13 +17,20 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{ResolvedUrl, UnresolvedUrl};
 use TYPO3\CMS\Core\Site\SiteFinder;
 
+use function in_array;
+use function strlen;
+
 /**
+ * Resolver.
+ *
  * Orchestrates Normalizer -> SiteMatcher -> LanguageMatcher -> SlugLookup ->
  * RedirectFollower -> PathClassifier. Resolution happens only at import
  * time; callers persist the result, this class never re-resolves live or
  * retroactively.
  *
  * @api
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class Resolver
 {
@@ -87,8 +94,8 @@ final class Resolver
         }
 
         $urlParts = parse_url($normalizedUrl);
-        $host = (string) ($urlParts['host'] ?? '');
-        $path = (string) ($urlParts['path'] ?? '/');
+        $host = $urlParts['host'] ?? '';
+        $path = $urlParts['path'] ?? '/';
 
         $language = $this->languageMatcher->match($normalizedUrl, $site);
         $languageId = $language?->getLanguageId() ?? 0;

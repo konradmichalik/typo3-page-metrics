@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Command;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Command\ImportCommand;
 use KonradMichalik\Typo3PageMetrics\Configuration\SiteConfigurationReader;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, UrlMetric};
@@ -25,6 +26,13 @@ use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
+
+
+/**
+ * ImportCommandTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 final class ImportCommandTest extends FunctionalTestCase
 {
@@ -68,7 +76,7 @@ final class ImportCommandTest extends FunctionalTestCase
 
     public function testImportsResolvedMetricsIntoTheDailyTable(): void
     {
-        $today = new \DateTimeImmutable('today');
+        $today = new DateTimeImmutable('today');
         $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
 
         $exitCode = $this->runImport([$stub]);
@@ -80,7 +88,7 @@ final class ImportCommandTest extends FunctionalTestCase
 
     public function testRecordsUnresolvedUrlsSeparately(): void
     {
-        $today = new \DateTimeImmutable('today');
+        $today = new DateTimeImmutable('today');
         $stub = new StubMetricSource([new UrlMetric('https://example.com/gone-page', $today, 'stub.hits', 7)]);
 
         $this->runImport([$stub]);
@@ -97,7 +105,7 @@ final class ImportCommandTest extends FunctionalTestCase
 
     public function testSecondRunWithoutForceDoesNotReprocessTheSameDay(): void
     {
-        $today = new \DateTimeImmutable('today');
+        $today = new DateTimeImmutable('today');
         $firstStub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
         $this->runImport([$firstStub]);
 
@@ -110,7 +118,7 @@ final class ImportCommandTest extends FunctionalTestCase
 
     public function testForceReimportsEvenWhenAlreadyImportedToday(): void
     {
-        $today = new \DateTimeImmutable('today');
+        $today = new DateTimeImmutable('today');
         $firstStub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
         $this->runImport([$firstStub]);
 

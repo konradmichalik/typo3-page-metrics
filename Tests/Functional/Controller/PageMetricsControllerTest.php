@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Controller;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Controller\PageMetricsController;
 use TYPO3\CMS\Backend\Routing\Route;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -20,6 +21,13 @@ use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
 use TYPO3\CMS\Core\Http\{NormalizedParams, ServerRequest};
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
+
+
+/**
+ * PageMetricsControllerTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 final class PageMetricsControllerTest extends FunctionalTestCase
 {
@@ -51,7 +59,7 @@ final class PageMetricsControllerTest extends FunctionalTestCase
         $configuration['pageMetrics'] = ['sources' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]];
         $this->writeSiteConfiguration('main', $configuration);
         $dailyMetricsRepository = $this->get(\KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository::class);
-        $today = new \DateTimeImmutable('today');
+        $today = new DateTimeImmutable('today');
         $dailyMetricsRepository->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 42);
 
         $controller = $this->get(PageMetricsController::class);
@@ -70,7 +78,7 @@ final class PageMetricsControllerTest extends FunctionalTestCase
         $configuration['pageMetrics'] = ['sources' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]];
         $this->writeSiteConfiguration('main', $configuration);
         $dailyMetricsRepository = $this->get(\KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository::class);
-        $today = new \DateTimeImmutable('today');
+        $today = new DateTimeImmutable('today');
         $dailyMetricsRepository->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 5);
         $dailyMetricsRepository->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.pageviews', 100);
 
@@ -93,7 +101,7 @@ final class PageMetricsControllerTest extends FunctionalTestCase
         $this->writeSiteConfiguration('main', $this->buildSiteConfiguration(1, 'https://example.com/'));
         $this->get(\KonradMichalik\Typo3PageMetrics\Persistence\UnresolvedUrlRepository::class)->record(
             'matomo',
-            new \DateTimeImmutable('today'),
+            new DateTimeImmutable('today'),
             'https://example.com/gone',
             'matomo.pageviews',
             \KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason::Unknown,

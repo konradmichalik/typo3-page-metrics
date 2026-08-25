@@ -17,6 +17,13 @@ use KonradMichalik\Typo3PageMetrics\Resolver\SiteMatcher;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
+
+/**
+ * SiteMatcherTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
 final class SiteMatcherTest extends TestCase
 {
     private SiteMatcher $matcher;

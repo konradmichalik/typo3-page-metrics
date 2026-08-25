@@ -14,11 +14,15 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
 /**
+ * MetricDefinition.
+ *
  * Display and cardinality metadata for one metric identifier. The platform
  * never interprets what a metric means - only a source's MetricDefinition
  * does, via label/icon/unit.
  *
  * @api
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class MetricDefinition
 {

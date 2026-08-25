@@ -16,6 +16,13 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricDefinition;
 use PHPUnit\Framework\TestCase;
 
+
+/**
+ * MetricDefinitionTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
 final class MetricDefinitionTest extends TestCase
 {
     public function testConstructorAssignsAllProperties(): void

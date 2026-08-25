@@ -17,12 +17,16 @@ use KonradMichalik\Typo3PageMetrics\Resolver\RedirectFollower;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 /**
+ * RedirectFollowerWithoutRedirectsExtensionTest.
+ *
  * typo3/cms-redirects is a require-dev-only dependency (see composer.json):
  * resolver stages must stay swappable/optional, so RedirectFollower must not
  * force every installation to install the whole redirects system extension.
  * This test intentionally does NOT load the "redirects" core extension, so
  * the sys_redirect table genuinely does not exist in this test instance,
  * reproducing what a real installation without EXT:redirects looks like.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class RedirectFollowerWithoutRedirectsExtensionTest extends FunctionalTestCase
 {

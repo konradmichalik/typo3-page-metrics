@@ -13,9 +13,18 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Persistence;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
-use TYPO3\CMS\Core\Database\Connection;
-use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\{Connection, ConnectionPool};
+
+use function array_slice;
+
+
+/**
+ * UnresolvedUrlRepository.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 class UnresolvedUrlRepository
 {
@@ -25,7 +34,7 @@ class UnresolvedUrlRepository
         private readonly ConnectionPool $connectionPool,
     ) {}
 
-    public function record(string $source, \DateTimeImmutable $date, string $url, string $metric, UnresolvedReason $reason, int $value, int $capPerDay): void
+    public function record(string $source, DateTimeImmutable $date, string $url, string $metric, UnresolvedReason $reason, int $value, int $capPerDay): void
     {
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $dateString = $date->format('Y-m-d');
@@ -51,7 +60,7 @@ class UnresolvedUrlRepository
         $this->trimToCap($source, $dateString, $capPerDay);
     }
 
-    public function countForSite(string $host, \DateTimeImmutable $since): int
+    public function countForSite(string $host, DateTimeImmutable $since): int
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $likePattern = '%://'.$queryBuilder->escapeLikeWildcards($host).'/%';

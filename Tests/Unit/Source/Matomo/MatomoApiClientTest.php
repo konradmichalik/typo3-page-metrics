@@ -19,6 +19,13 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Core\Http\RequestFactory;
 
+
+/**
+ * MatomoApiClientTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
 final class MatomoApiClientTest extends TestCase
 {
     /** @var RequestFactory&\PHPUnit\Framework\MockObject\MockObject */
@@ -71,7 +78,7 @@ final class MatomoApiClientTest extends TestCase
                 $capturedUri = $uri;
 
                 return $this->jsonResponse(200, ['value' => 'ok']);
-            }
+            },
         );
 
         $this->subject->request($this->configuration, ['method' => 'Actions.getPageUrls']);
@@ -89,7 +96,7 @@ final class MatomoApiClientTest extends TestCase
                 $capturedOptions = $options;
 
                 return $this->jsonResponse(200, ['value' => 'ok']);
-            }
+            },
         );
 
         $this->subject->request($this->configuration, ['method' => 'Actions.getPageUrls']);
@@ -111,7 +118,7 @@ final class MatomoApiClientTest extends TestCase
                 $capturedOptions = $options;
 
                 return $this->jsonResponse(200, ['value' => 'ok']);
-            }
+            },
         );
 
         $this->subject->request($this->configuration, ['method' => 'Actions.getPageUrls', 'period' => 'day']);

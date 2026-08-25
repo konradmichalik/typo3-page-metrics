@@ -16,10 +16,14 @@ namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
 
 /**
+ * UnresolvedUrl.
+ *
  * A first-class result, not an error: "can't resolve" is an expected
  * outcome of Resolver::resolve(), never an exception.
  *
  * @api
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class UnresolvedUrl
 {

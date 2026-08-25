@@ -13,11 +13,20 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Resolver;
 
-use Doctrine\DBAL\Exception as DBALException;
-use Doctrine\DBAL\ParameterType;
+use Doctrine\DBAL\{Exception as DBALException, ParameterType};
+use Throwable;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Site\SiteFinder;
+
+use function is_string;
+
+
+/**
+ * RedirectFollower.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 final class RedirectFollower
 {
@@ -68,7 +77,7 @@ final class RedirectFollower
                 $site = $this->siteFinder->getSiteByPageId($pageUid);
 
                 return (string) $site->getRouter()->generateUri($pageUid);
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 return null;
             }
         }

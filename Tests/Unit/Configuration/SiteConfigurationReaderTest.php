@@ -18,6 +18,13 @@ use KonradMichalik\Typo3PageMetrics\Exception\InvalidSiteConfigurationException;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
+
+/**
+ * SiteConfigurationReaderTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
 final class SiteConfigurationReaderTest extends TestCase
 {
     private SiteConfigurationReader $subject;

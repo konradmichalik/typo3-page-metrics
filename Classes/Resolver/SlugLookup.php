@@ -15,14 +15,17 @@ namespace KonradMichalik\Typo3PageMetrics\Resolver;
 
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
+use TYPO3\CMS\Core\Database\Query\Restriction\{DeletedRestriction, HiddenRestriction};
 
 /**
+ * SlugLookup.
+ *
  * Language-aware slug lookup against the pages table. Returns the
  * default-language page uid even for a translated hit (via l10n_parent),
  * so tx_pagemetrics_daily's page_uid column identifies "the page" across
  * languages, with sys_language_uid carrying the language dimension.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class SlugLookup
 {

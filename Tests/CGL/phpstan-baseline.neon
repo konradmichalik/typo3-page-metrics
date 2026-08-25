@@ -1,2 +1,65 @@
 parameters:
-	ignoreErrors: []
+	ignoreErrors:
+		-
+			# typeCoverage.constantTypeCoverage only counts a class constant as
+			# "covered" when it uses a native typed constant declaration, which is a
+			# PHP 8.3+ feature. This project targets PHP 8.2 (see phpVersion in
+			# phpstan.neon and composer.json's require), so these constants use a
+			# docblock @var instead - the earliest fix that keeps PHP 8.2
+			# compatibility. Adding native typed constants here would reintroduce
+			# the PHP 8.2 parse-error bug this project fixed early in development.
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Command/ImportCommand.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 2
+			path: ../../Classes/Controller/PageMetricsController.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Persistence/DailyMetricsRepository.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Persistence/ImportStateRepository.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Persistence/UnresolvedUrlRepository.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Resolver/Normalizer.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 2
+			path: ../../Classes/Resolver/PathClassifier.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Resolver/Resolver.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 2
+			path: ../../Classes/Source/Matomo/MatomoApiClient.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Source/Matomo/MatomoMetricSource.php
+		-
+			# MetricDefinition and UrlMetric are `@api` value objects whose trailing
+			# nullable parameter (maxDimensions / dimension) means "not applicable"
+			# for the common case. Removing the default would force every call
+			# site (both production sources and their tests, several of which
+			# assert the "defaults to null" behaviour by name) to pass an explicit
+			# `null`, for no correctness benefit - the constructor is not
+			# ambiguous, it has a single obvious optional trailing field. Accepted
+			# as an intentional, already-tested API shape rather than a defect.
+			identifier: ergebnis.noConstructorParameterWithDefaultValue
+			count: 1
+			path: ../../Classes/Domain/ValueObject/MetricDefinition.php
+		-
+			identifier: ergebnis.noConstructorParameterWithDefaultValue
+			count: 1
+			path: ../../Classes/Domain/ValueObject/UrlMetric.php

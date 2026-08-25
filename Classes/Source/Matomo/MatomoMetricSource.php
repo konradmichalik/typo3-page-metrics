@@ -17,13 +17,20 @@ use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinit
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
+use function is_array;
+use function is_string;
+
 /**
+ * MatomoMetricSource.
+ *
  * Calls Actions.getPageUrls with period=day once per calendar day in the
  * range, never period=range: UrlMetric->date needs one concrete day per
  * row, and per-day granularity is worth the extra API round trips since
  * this runs from a scheduled import, not a live per-request call. Uses
  * flat=1 so Matomo returns an already-flattened page table instead of a
  * tree needing manual flattening.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class MatomoMetricSource implements MetricSourceInterface
 {

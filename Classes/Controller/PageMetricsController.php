@@ -13,15 +13,27 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Controller;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricTile};
-use KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository;
-use KonradMichalik\Typo3PageMetrics\Persistence\UnresolvedUrlRepository;
+use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
-use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
+use Psr\Http\Message\ResponseInterface;
+use Throwable;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
+use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
+
+use function in_array;
+use function sprintf;
+
+
+/**
+ * PageMetricsController.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 class PageMetricsController
 {
@@ -41,7 +53,7 @@ class PageMetricsController
         private readonly iterable $sources,
     ) {}
 
-    public function handleRequest(ServerRequestInterface $request): ResponseInterface
+    public function handleRequest(ServerRequest $request): ResponseInterface
     {
         $this->pageRenderer->addCssFile('EXT:page_metrics/Resources/Public/Css/page-metrics.css');
         $this->pageRenderer->loadJavaScriptModule('@konradmichalik/page-metrics/sparkline.js');
@@ -52,7 +64,7 @@ class PageMetricsController
         $periodDays = $this->resolvePeriodDays($request);
         $site = $this->resolveSite($pageId);
         $unresolvedCount = null !== $site
-            ? $this->unresolvedUrlRepository->countForSite($site->getBase()->getHost(), (new \DateTimeImmutable('today'))->modify('-30 days'))
+            ? $this->unresolvedUrlRepository->countForSite($site->getBase()->getHost(), (new DateTimeImmutable('today'))->modify('-30 days'))
             : 0;
 
         $moduleTemplate->assignMultiple([
@@ -68,7 +80,7 @@ class PageMetricsController
         return $moduleTemplate->renderResponse('PageMetrics/Index');
     }
 
-    private function resolvePeriodDays(ServerRequestInterface $request): int
+    private function resolvePeriodDays(ServerRequest $request): int
     {
         $requested = (int) ($request->getQueryParams()['period'] ?? 30);
 
@@ -96,7 +108,7 @@ class PageMetricsController
         $definitions = array_values($definitionsByIdentifier);
         usort($definitions, static fn (MetricDefinition $a, MetricDefinition $b): int => $a->sortOrder <=> $b->sortOrder);
 
-        $today = new \DateTimeImmutable('today');
+        $today = new DateTimeImmutable('today');
         $tileRange = new DateRange($today->modify(sprintf('-%d days', $periodDays - 1)), $today);
         $sparklineRange = new DateRange($today->modify(sprintf('-%d days', self::SPARKLINE_DAYS - 1)), $today);
 
@@ -120,7 +132,7 @@ class PageMetricsController
 
         try {
             return $this->siteFinder->getSiteByPageId($pageId);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     }

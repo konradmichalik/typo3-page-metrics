@@ -13,10 +13,18 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Persistence;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
 use KonradMichalik\Typo3PageMetrics\Persistence\UnresolvedUrlRepository;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
+
+
+/**
+ * UnresolvedUrlRepositoryTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 final class UnresolvedUrlRepositoryTest extends FunctionalTestCase
 {
@@ -32,14 +40,14 @@ final class UnresolvedUrlRepositoryTest extends FunctionalTestCase
 
     public function testRecordInsertsARow(): void
     {
-        $this->subject->record('matomo', new \DateTimeImmutable('2026-08-01'), 'https://example.com/gone', 'matomo.pageviews', UnresolvedReason::Unknown, 5, 100);
+        $this->subject->record('matomo', new DateTimeImmutable('2026-08-01'), 'https://example.com/gone', 'matomo.pageviews', UnresolvedReason::Unknown, 5, 100);
 
         self::assertSame(1, $this->countRows());
     }
 
     public function testRecordUpdatesInsteadOfDuplicatingSameUrlAndMetric(): void
     {
-        $date = new \DateTimeImmutable('2026-08-01');
+        $date = new DateTimeImmutable('2026-08-01');
         $this->subject->record('matomo', $date, 'https://example.com/gone', 'matomo.pageviews', UnresolvedReason::Unknown, 5, 100);
         $this->subject->record('matomo', $date, 'https://example.com/gone', 'matomo.pageviews', UnresolvedReason::Unknown, 9, 100);
 
@@ -48,7 +56,7 @@ final class UnresolvedUrlRepositoryTest extends FunctionalTestCase
 
     public function testTrimsToCapKeepingHighestValueRows(): void
     {
-        $date = new \DateTimeImmutable('2026-08-01');
+        $date = new DateTimeImmutable('2026-08-01');
         $this->subject->record('matomo', $date, 'https://example.com/a', 'matomo.pageviews', UnresolvedReason::Unknown, 10, 2);
         $this->subject->record('matomo', $date, 'https://example.com/b', 'matomo.pageviews', UnresolvedReason::Unknown, 30, 2);
         $this->subject->record('matomo', $date, 'https://example.com/c', 'matomo.pageviews', UnresolvedReason::Unknown, 20, 2);
@@ -68,7 +76,7 @@ final class UnresolvedUrlRepositoryTest extends FunctionalTestCase
 
     public function testCountForSiteCountsOnlyUrlsOnThatHost(): void
     {
-        $date = new \DateTimeImmutable('today');
+        $date = new DateTimeImmutable('today');
         $this->subject->record('matomo', $date, 'https://example.com/gone-a', 'matomo.pageviews', UnresolvedReason::Unknown, 1, 100);
         $this->subject->record('matomo', $date, 'https://example.com/gone-b', 'matomo.pageviews', UnresolvedReason::Unknown, 1, 100);
         $this->subject->record('matomo', $date, 'https://other-host.example/gone', 'matomo.pageviews', UnresolvedReason::Unknown, 1, 100);
@@ -78,9 +86,9 @@ final class UnresolvedUrlRepositoryTest extends FunctionalTestCase
 
     public function testCountForSiteExcludesEntriesBeforeSince(): void
     {
-        $this->subject->record('matomo', new \DateTimeImmutable('2026-01-01'), 'https://example.com/old', 'matomo.pageviews', UnresolvedReason::Unknown, 1, 100);
+        $this->subject->record('matomo', new DateTimeImmutable('2026-01-01'), 'https://example.com/old', 'matomo.pageviews', UnresolvedReason::Unknown, 1, 100);
 
-        self::assertSame(0, $this->subject->countForSite('example.com', new \DateTimeImmutable('2026-06-01')));
+        self::assertSame(0, $this->subject->countForSite('example.com', new DateTimeImmutable('2026-06-01')));
     }
 
     private function countRows(): int

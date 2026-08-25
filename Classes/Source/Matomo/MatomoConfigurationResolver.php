@@ -17,7 +17,12 @@ use KonradMichalik\Typo3PageMetrics\Configuration\SiteConfigurationReader;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 
+use function is_array;
+use function is_string;
+
 /**
+ * MatomoConfigurationResolver.
+ *
  * This extension's own "pageMetrics.sources.matomo" configuration wins;
  * brotkrueml/typo3-matomo-widgets' flat matomoWidgets* keys are a soft
  * fallback so both extensions can share one Matomo wiring per site - read
@@ -25,6 +30,8 @@ use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
  *
  * Not final: Task 11 mocks this as a MatomoMetricSource collaborator in a
  * pure unit test, and PHP cannot generate a test double for a final class.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 class MatomoConfigurationResolver
 {

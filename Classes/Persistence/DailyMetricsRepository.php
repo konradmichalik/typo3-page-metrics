@@ -13,15 +13,20 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Persistence;
 
+use DateTimeImmutable;
 use Doctrine\DBAL\ParameterType;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
 /**
+ * DailyMetricsRepository.
+ *
  * Upsert is select-then-insert-or-update rather than a platform-specific
  * "ON DUPLICATE KEY UPDATE" so this works unmodified on every DB platform
  * TYPO3 supports (MySQL/MariaDB/PostgreSQL/SQLite) - acceptable because
  * the import command runs single-threaded, never concurrently.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 class DailyMetricsRepository
 {
@@ -31,7 +36,7 @@ class DailyMetricsRepository
         private readonly ConnectionPool $connectionPool,
     ) {}
 
-    public function upsert(int $pageUid, int $languageUid, string $source, \DateTimeImmutable $date, string $metric, int $value, ?string $dimension = null): void
+    public function upsert(int $pageUid, int $languageUid, string $source, DateTimeImmutable $date, string $metric, int $value, ?string $dimension = null): void
     {
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $identity = [

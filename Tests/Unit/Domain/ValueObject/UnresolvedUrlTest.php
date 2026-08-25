@@ -17,6 +17,13 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\UnresolvedUrl;
 use PHPUnit\Framework\TestCase;
 
+
+/**
+ * UnresolvedUrlTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
 final class UnresolvedUrlTest extends TestCase
 {
     public function testConstructorAssignsAllProperties(): void

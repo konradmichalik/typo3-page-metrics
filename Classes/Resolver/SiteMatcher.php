@@ -16,12 +16,21 @@ namespace KonradMichalik\Typo3PageMetrics\Resolver;
 use Psr\Http\Message\UriInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
+use function strlen;
+
+
+/**
+ * SiteMatcher.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
 final class SiteMatcher
 {
     /**
-     * @param iterable<Site> $sites
+     * @param array<Site> $sites
      */
-    public function match(string $normalizedUrl, iterable $sites): ?Site
+    public function match(string $normalizedUrl, array $sites): ?Site
     {
         $urlParts = parse_url($normalizedUrl);
 

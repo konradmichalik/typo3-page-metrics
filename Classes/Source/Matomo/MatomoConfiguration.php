@@ -13,6 +13,13 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Source\Matomo;
 
+
+/**
+ * MatomoConfiguration.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
 final readonly class MatomoConfiguration
 {
     public function __construct(

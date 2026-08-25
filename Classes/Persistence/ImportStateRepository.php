@@ -13,7 +13,15 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Persistence;
 
+use DateTimeImmutable;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+
+
+/**
+ * ImportStateRepository.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 class ImportStateRepository
 {
@@ -23,7 +31,7 @@ class ImportStateRepository
         private readonly ConnectionPool $connectionPool,
     ) {}
 
-    public function getLastImportedDate(string $source, string $siteIdentifier): ?\DateTimeImmutable
+    public function getLastImportedDate(string $source, string $siteIdentifier): ?DateTimeImmutable
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $value = $queryBuilder
@@ -36,10 +44,10 @@ class ImportStateRepository
             ->executeQuery()
             ->fetchOne();
 
-        return false === $value ? null : new \DateTimeImmutable((string) $value);
+        return false === $value ? null : new DateTimeImmutable((string) $value);
     }
 
-    public function markImported(string $source, string $siteIdentifier, \DateTimeImmutable $date): void
+    public function markImported(string $source, string $siteIdentifier, DateTimeImmutable $date): void
     {
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $identity = ['source' => $source, 'site_identifier' => $siteIdentifier];

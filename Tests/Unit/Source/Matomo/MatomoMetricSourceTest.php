@@ -13,10 +13,18 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Source\Matomo;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
 use KonradMichalik\Typo3PageMetrics\Source\Matomo\{MatomoApiClient, MatomoConfiguration, MatomoConfigurationResolver, MatomoMetricSource};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
+
+
+/**
+ * MatomoMetricSourceTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 final class MatomoMetricSourceTest extends TestCase
 {
@@ -73,7 +81,7 @@ final class MatomoMetricSourceTest extends TestCase
             ['label' => '/bar', 'url' => 'https://example.com/bar', 'nb_hits' => 3, 'nb_visits' => 2],
         ]);
 
-        $range = new DateRange(new \DateTimeImmutable('2026-08-01'), new \DateTimeImmutable('2026-08-01'));
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
         $metrics = iterator_to_array($this->subject->fetch($this->site, $range), false);
 
         self::assertCount(4, $metrics);
@@ -92,7 +100,7 @@ final class MatomoMetricSourceTest extends TestCase
             ['label' => '/foo', 'url' => 'https://example.com/foo', 'nb_hits' => 1, 'nb_visits' => 1],
         ]);
 
-        $range = new DateRange(new \DateTimeImmutable('2026-08-01'), new \DateTimeImmutable('2026-08-02'));
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
         $metrics = iterator_to_array($this->subject->fetch($this->site, $range), false);
 
         self::assertCount(4, $metrics);
@@ -104,7 +112,7 @@ final class MatomoMetricSourceTest extends TestCase
     {
         $this->resolver->method('resolve')->willReturn(null);
 
-        $range = new DateRange(new \DateTimeImmutable('2026-08-01'), new \DateTimeImmutable('2026-08-01'));
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
 
         self::assertSame([], iterator_to_array($this->subject->fetch($this->site, $range)));
     }
@@ -117,14 +125,14 @@ final class MatomoMetricSourceTest extends TestCase
         $calls = [];
         $this->apiClient->expects(self::exactly(2))
             ->method('request')
-            ->willReturnCallback(function (MatomoConfiguration $passedConfiguration, array $parameters) use (&$calls, $configuration) {
+            ->willReturnCallback(static function (MatomoConfiguration $passedConfiguration, array $parameters) use (&$calls, $configuration) {
                 self::assertSame($configuration, $passedConfiguration);
                 $calls[] = $parameters;
 
                 return [];
             });
 
-        $range = new DateRange(new \DateTimeImmutable('2026-08-01'), new \DateTimeImmutable('2026-08-02'));
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
         iterator_to_array($this->subject->fetch($this->site, $range));
 
         self::assertCount(2, $calls);

@@ -13,15 +13,24 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Source\Matomo;
 
+use JsonException;
 use KonradMichalik\Typo3PageMetrics\Exception\MatomoRequestFailedException;
+use Throwable;
 use TYPO3\CMS\Core\Http\RequestFactory;
 
+use function is_array;
+use function sprintf;
+
 /**
+ * MatomoApiClient.
+ *
  * Thin hand-rolled Matomo Reporting API client. Requests are sent as POST so
  * the token never appears in URLs or access logs.
  *
  * Not final: Task 11 mocks this as a MatomoMetricSource collaborator in a
  * pure unit test, and PHP cannot generate a test double for a final class.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 class MatomoApiClient
 {
@@ -55,7 +64,7 @@ class MatomoApiClient
                 'form_params' => $body,
                 'headers' => ['Accept' => 'application/json'],
             ]);
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             throw new MatomoRequestFailedException(sprintf('Matomo request failed: %s', $exception->getMessage()), 1756000100, $exception);
         }
 
@@ -65,7 +74,7 @@ class MatomoApiClient
 
         try {
             $decoded = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR);
-        } catch (\JsonException $exception) {
+        } catch (JsonException $exception) {
             throw new MatomoRequestFailedException('Matomo returned a non-JSON response.', 1756000102, $exception);
         }
 

@@ -13,9 +13,17 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Persistence;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Persistence\ImportStateRepository;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
+
+
+/**
+ * ImportStateRepositoryTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 final class ImportStateRepositoryTest extends FunctionalTestCase
 {
@@ -36,7 +44,7 @@ final class ImportStateRepositoryTest extends FunctionalTestCase
 
     public function testMarkImportedThenGetLastImportedDateReturnsThatDate(): void
     {
-        $this->subject->markImported('matomo', 'main', new \DateTimeImmutable('2026-08-01'));
+        $this->subject->markImported('matomo', 'main', new DateTimeImmutable('2026-08-01'));
 
         $result = $this->subject->getLastImportedDate('matomo', 'main');
 
@@ -46,8 +54,8 @@ final class ImportStateRepositoryTest extends FunctionalTestCase
 
     public function testMarkImportedTwiceUpdatesInsteadOfDuplicating(): void
     {
-        $this->subject->markImported('matomo', 'main', new \DateTimeImmutable('2026-08-01'));
-        $this->subject->markImported('matomo', 'main', new \DateTimeImmutable('2026-08-05'));
+        $this->subject->markImported('matomo', 'main', new DateTimeImmutable('2026-08-01'));
+        $this->subject->markImported('matomo', 'main', new DateTimeImmutable('2026-08-05'));
 
         self::assertSame('2026-08-05', $this->subject->getLastImportedDate('matomo', 'main')?->format('Y-m-d'));
 
@@ -63,8 +71,8 @@ final class ImportStateRepositoryTest extends FunctionalTestCase
 
     public function testTracksStatePerSourceAndSiteIndependently(): void
     {
-        $this->subject->markImported('matomo', 'main', new \DateTimeImmutable('2026-08-01'));
-        $this->subject->markImported('accesslog', 'main', new \DateTimeImmutable('2026-08-02'));
+        $this->subject->markImported('matomo', 'main', new DateTimeImmutable('2026-08-01'));
+        $this->subject->markImported('accesslog', 'main', new DateTimeImmutable('2026-08-02'));
 
         self::assertSame('2026-08-01', $this->subject->getLastImportedDate('matomo', 'main')?->format('Y-m-d'));
         self::assertSame('2026-08-02', $this->subject->getLastImportedDate('accesslog', 'main')?->format('Y-m-d'));

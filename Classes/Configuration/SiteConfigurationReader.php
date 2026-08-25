@@ -16,10 +16,19 @@ namespace KonradMichalik\Typo3PageMetrics\Configuration;
 use KonradMichalik\Typo3PageMetrics\Exception\InvalidSiteConfigurationException;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
+use function is_array;
+use function is_bool;
+use function is_int;
+use function sprintf;
+
 /**
+ * SiteConfigurationReader.
+ *
  * Absence of the "pageMetrics" key means "not opted in" (a normal, expected
  * state) and returns a disabled default - only a malformed value under an
  * existing key is treated as a configuration error worth failing fast on.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class SiteConfigurationReader
 {
@@ -65,8 +74,8 @@ final class SiteConfigurationReader
             throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.retentionDays" must be a positive integer.', $site->getIdentifier()), 1756000006);
         }
 
-        /** @var array<string, array<string, mixed>> $sources */
-        /** @var list<string> $keepQueryParams */
+        /* @var array<string, array<string, mixed>> $sources */
+        /* @var list<string> $keepQueryParams */
         return new PageMetricsSiteConfiguration($enabled, $sources, $dropQueryString, $keepQueryParams, $retentionDays);
     }
 }

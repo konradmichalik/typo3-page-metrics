@@ -13,4 +13,13 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Exception;
 
-final class InvalidSiteConfigurationException extends \RuntimeException {}
+use RuntimeException;
+
+
+/**
+ * InvalidSiteConfigurationException.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
+final class InvalidSiteConfigurationException extends RuntimeException {}

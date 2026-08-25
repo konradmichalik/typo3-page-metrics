@@ -16,6 +16,13 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Resolver;
 use KonradMichalik\Typo3PageMetrics\Resolver\Normalizer;
 use PHPUnit\Framework\TestCase;
 
+
+/**
+ * NormalizerTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
 final class NormalizerTest extends TestCase
 {
     private Normalizer $normalizer;

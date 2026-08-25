@@ -13,10 +13,17 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Resolver;
 
+use function count;
+use function is_scalar;
+
 /**
+ * Normalizer.
+ *
  * First resolver stage: brings equivalent URLs to one canonical string
  * before anything else looks at them, so the in-memory resolution cache in
  * Resolver actually hits.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class Normalizer
 {
@@ -85,7 +92,7 @@ final class Normalizer
     }
 
     /**
-     * @param array<string, mixed> $allParams
+     * @param array<int|string, mixed> $allParams
      */
     private function extractByDottedKey(array $allParams, string $key): ?string
     {

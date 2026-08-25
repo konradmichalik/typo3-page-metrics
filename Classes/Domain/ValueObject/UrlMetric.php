@@ -13,18 +13,24 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
+use DateTimeImmutable;
+
 /**
+ * UrlMetric.
+ *
  * One (date, url, metric, value) fact yielded by a MetricSourceInterface,
  * before resolution. This is the deliberately narrow common denominator
  * every source must fit into.
  *
  * @api
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class UrlMetric
 {
     public function __construct(
         public string $url,
-        public \DateTimeImmutable $date,
+        public DateTimeImmutable $date,
         public string $metric,
         public int $value,
         public ?string $dimension = null,

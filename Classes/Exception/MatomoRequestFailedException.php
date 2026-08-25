@@ -13,4 +13,13 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Exception;
 
-final class MatomoRequestFailedException extends \RuntimeException {}
+use RuntimeException;
+
+
+/**
+ * MatomoRequestFailedException.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
+final class MatomoRequestFailedException extends RuntimeException {}

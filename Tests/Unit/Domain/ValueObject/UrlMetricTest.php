@@ -13,14 +13,22 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\UrlMetric;
 use PHPUnit\Framework\TestCase;
+
+
+/**
+ * UrlMetricTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 final class UrlMetricTest extends TestCase
 {
     public function testConstructorAssignsAllProperties(): void
     {
-        $date = new \DateTimeImmutable('2026-08-01');
+        $date = new DateTimeImmutable('2026-08-01');
         $metric = new UrlMetric('https://example.com/foo', $date, 'matomo.pageviews', 42, 'mobile');
 
         self::assertSame('https://example.com/foo', $metric->url);
@@ -32,7 +40,7 @@ final class UrlMetricTest extends TestCase
 
     public function testDimensionDefaultsToNull(): void
     {
-        $metric = new UrlMetric('https://example.com/foo', new \DateTimeImmutable(), 'matomo.pageviews', 1);
+        $metric = new UrlMetric('https://example.com/foo', new DateTimeImmutable(), 'matomo.pageviews', 1);
 
         self::assertNull($metric->dimension);
     }

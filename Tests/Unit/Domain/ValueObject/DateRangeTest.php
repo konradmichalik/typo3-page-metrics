@@ -13,14 +13,22 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
 use PHPUnit\Framework\TestCase;
+
+
+/**
+ * DateRangeTest.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 final class DateRangeTest extends TestCase
 {
     public function testDaysYieldsOneEntryPerDayInclusive(): void
     {
-        $range = new DateRange(new \DateTimeImmutable('2026-08-01'), new \DateTimeImmutable('2026-08-03'));
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-03'));
 
         $days = [];
         foreach ($range->days() as $day) {
@@ -32,7 +40,7 @@ final class DateRangeTest extends TestCase
 
     public function testDaysYieldsSingleEntryWhenFromEqualsUntil(): void
     {
-        $date = new \DateTimeImmutable('2026-08-01');
+        $date = new DateTimeImmutable('2026-08-01');
         $range = new DateRange($date, $date);
 
         self::assertSame(['2026-08-01'], iterator_to_array($this->formatted($range)));

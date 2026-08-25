@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Command;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Configuration\{PageMetricsSiteConfiguration, SiteConfigurationReader};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, ResolvedUrl};
 use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
@@ -23,6 +24,15 @@ use Symfony\Component\Console\Input\{InputInterface, InputOption};
 use Symfony\Component\Console\Output\OutputInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
+
+use function sprintf;
+
+
+/**
+ * ImportCommand.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
 
 final class ImportCommand extends Command
 {
@@ -80,7 +90,7 @@ final class ImportCommand extends Command
     private function importOneSourceForSite(Site $site, MetricSourceInterface $source, PageMetricsSiteConfiguration $configuration, bool $force, OutputInterface $output): void
     {
         $identifier = $source->getIdentifier();
-        $today = new \DateTimeImmutable('today');
+        $today = new DateTimeImmutable('today');
         $lastImported = $force ? null : $this->importStateRepository->getLastImportedDate($identifier, $site->getIdentifier());
         $from = null !== $lastImported ? $lastImported->modify('+1 day') : $today->modify(sprintf('-%d days', $configuration->retentionDays));
 

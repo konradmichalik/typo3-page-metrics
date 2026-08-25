@@ -13,6 +13,13 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Configuration;
 
+
+/**
+ * PageMetricsSiteConfiguration.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+
 final readonly class PageMetricsSiteConfiguration
 {
     /**

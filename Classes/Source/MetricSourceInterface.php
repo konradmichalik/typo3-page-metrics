@@ -17,7 +17,11 @@ use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinit
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 /**
+ * MetricSourceInterface.
+ *
  * @api
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 interface MetricSourceInterface
 {
