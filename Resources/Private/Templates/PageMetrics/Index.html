@@ -1,10 +1,28 @@
-<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
 <f:layout name="Module" />
 <f:section name="Content">
     <f:if condition="{hasPage}">
         <f:then>
+            <form class="pagemetrics-period" method="get">
+                <input type="hidden" name="id" value="{pageId}" />
+                <label for="pagemetrics-period-select">
+                    <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.label" default="Period" />
+                </label>
+                <select id="pagemetrics-period-select" name="period">
+                    <f:for each="{periodOptions}" as="option">
+                        <option value="{option}" selected="{f:if(condition: '{option} == {periodDays}', then: 'selected')}">{option} <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.days" default="days" /></option>
+                    </f:for>
+                </select>
+                <button type="submit"><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.apply" default="Apply" /></button>
+            </form>
             <div class="pagemetrics-tiles" data-page-id="{pageId}">
-                <!-- Task 17 replaces this with the metric tiles -->
+                <f:for each="{tiles}" as="tile">
+                    <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-sparkline="{f:format.json(value: tile.sparkline)}">
+                        <span class="pagemetrics-tile-icon"><core:icon identifier="{tile.icon}" /></span>
+                        <span class="pagemetrics-tile-value">{tile.value}</span>
+                        <span class="pagemetrics-tile-label">{tile.label}</span>
+                    </div>
+                </f:for>
             </div>
         </f:then>
         <f:else>

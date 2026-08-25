@@ -12,6 +12,15 @@
             <trans-unit id="noPageSelected" resname="noPageSelected">
                 <source>Select a page in the page tree to see its metrics.</source>
             </trans-unit>
+            <trans-unit id="period.label" resname="period.label">
+                <source>Period</source>
+            </trans-unit>
+            <trans-unit id="period.days" resname="period.days">
+                <source>days</source>
+            </trans-unit>
+            <trans-unit id="period.apply" resname="period.apply">
+                <source>Apply</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

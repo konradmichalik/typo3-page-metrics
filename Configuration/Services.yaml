@@ -45,6 +45,8 @@ services:
     # Public so functional tests can fetch it directly via $this->get() instead
     # of going through the backend module route dispatcher.
     KonradMichalik\Typo3PageMetrics\Controller\PageMetricsController:
+        arguments:
+            $sources: !tagged_iterator page_metrics.metric_source
         public: true
 
     KonradMichalik\Typo3PageMetrics\Source\Matomo\MatomoMetricSource:

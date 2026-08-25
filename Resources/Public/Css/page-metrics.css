@@ -1,0 +1,37 @@
+.pagemetrics-period {
+    display: flex;
+    align-items: center;
+    gap: var(--typo3-spacing, 8px);
+    margin-bottom: var(--typo3-spacing, 8px);
+}
+
+.pagemetrics-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--typo3-spacing, 12px);
+}
+
+.pagemetrics-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--typo3-spacing, 12px);
+    border: 1px solid var(--typo3-component-border-color, #cbcbcb);
+    border-radius: var(--typo3-component-border-radius, 4px);
+    background: var(--typo3-component-bg, #fff);
+    min-width: 140px;
+}
+
+.pagemetrics-tile-icon {
+    color: var(--typo3-state-info-color, #007bff);
+}
+
+.pagemetrics-tile-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--typo3-text-color-base, #14213d);
+}
+
+.pagemetrics-tile-label {
+    color: var(--typo3-text-color-variant, #6a7085);
+}
