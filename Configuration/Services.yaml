@@ -31,3 +31,8 @@ services:
     # any consuming service references it.
     KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository:
         public: true
+
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Persistence\UnresolvedUrlRepository:
+        public: true
