@@ -22,18 +22,17 @@ use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\{InputInterface, InputOption};
 use Symfony\Component\Console\Output\OutputInterface;
+use Throwable;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 
 use function sprintf;
-
 
 /**
  * ImportCommand.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class ImportCommand extends Command
 {
     private const UNRESOLVED_CAP_PER_DAY = 100;
@@ -62,6 +61,7 @@ final class ImportCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $force = (bool) $input->getOption('force');
+        $hasFailures = false;
 
         foreach ($this->siteFinder->getAllSites() as $site) {
             $configuration = $this->siteConfigurationReader->read($site);
@@ -78,13 +78,28 @@ final class ImportCommand extends Command
             $this->resolver->reset();
 
             foreach ($this->sources as $source) {
-                if ($source->supports($site)) {
+                if (!$source->supports($site)) {
+                    continue;
+                }
+
+                try {
                     $this->importOneSourceForSite($site, $source, $configuration, $force, $output);
+                } catch (Throwable $exception) {
+                    // One site/source failing (e.g. an unreachable Matomo
+                    // instance) must never abort the whole run: report it and
+                    // keep processing the remaining sites/sources.
+                    $hasFailures = true;
+                    $output->writeln(sprintf(
+                        '<error>Failed to import source "%s" for site "%s": %s</error>',
+                        $source->getIdentifier(),
+                        $site->getIdentifier(),
+                        $exception->getMessage(),
+                    ));
                 }
             }
         }
 
-        return Command::SUCCESS;
+        return $hasFailures ? Command::FAILURE : Command::SUCCESS;
     }
 
     private function importOneSourceForSite(Site $site, MetricSourceInterface $source, PageMetricsSiteConfiguration $configuration, bool $force, OutputInterface $output): void
@@ -112,7 +127,11 @@ final class ImportCommand extends Command
             $this->unresolvedUrlRepository->record($identifier, $urlMetric->date, $urlMetric->url, $urlMetric->metric, $result->reason, $urlMetric->value, self::UNRESOLVED_CAP_PER_DAY);
         }
 
-        $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $today);
+        // Mark yesterday, not today, as the last complete imported day: a
+        // scheduled run may only capture part of today's traffic, so today
+        // must always be revisited (and safely re-upserted) by the next run
+        // until it is genuinely a fully elapsed prior day.
+        $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $today->modify('-1 day'));
         $output->writeln(sprintf('Imported "%s" for site "%s" from %s to %s.', $identifier, $site->getIdentifier(), $from->format('Y-m-d'), $today->format('Y-m-d')));
     }
 }
