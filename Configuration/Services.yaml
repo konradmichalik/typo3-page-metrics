@@ -42,6 +42,11 @@ services:
     KonradMichalik\Typo3PageMetrics\Persistence\ImportStateRepository:
         public: true
 
+    # Public so functional tests can fetch it directly via $this->get() instead
+    # of going through the backend module route dispatcher.
+    KonradMichalik\Typo3PageMetrics\Controller\PageMetricsController:
+        public: true
+
     KonradMichalik\Typo3PageMetrics\Source\Matomo\MatomoMetricSource:
         tags:
             - name: page_metrics.metric_source
