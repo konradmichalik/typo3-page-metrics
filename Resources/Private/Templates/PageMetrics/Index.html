@@ -3,18 +3,11 @@
 <f:section name="Content">
     <f:if condition="{hasPage}">
         <f:then>
-            <form class="pagemetrics-period" method="get">
-                <input type="hidden" name="id" value="{pageId}" />
-                <label for="pagemetrics-period-select">
-                    <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.label" default="Period" />
-                </label>
-                <select id="pagemetrics-period-select" name="period">
-                    <f:for each="{periodOptions}" as="option">
-                        <option value="{option}" selected="{f:if(condition: '{option} == {periodDays}', then: 'selected')}">{option} <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.days" default="days" /></option>
-                    </f:for>
-                </select>
-                <button type="submit"><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.apply" default="Apply" /></button>
-            </form>
+            <nav class="pagemetrics-period" aria-label="{f:translate(key: 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.label', default: 'Period')}">
+                <f:for each="{periodOptions}" as="option">
+                    <f:be.link route="web_pagemetrics" parameters="{id: pageId, period: option}" class="pagemetrics-period-link{f:if(condition: '{option} == {periodDays}', then: ' pagemetrics-period-link-active')}">{option} <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.days" default="days" /></f:be.link>
+                </f:for>
+            </nav>
             <div class="pagemetrics-tiles" data-page-id="{pageId}">
                 <f:for each="{tiles}" as="tile">
                     <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-sparkline="{f:format.json(value: tile.sparkline)}" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">

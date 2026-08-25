@@ -5,6 +5,26 @@
     margin-bottom: var(--typo3-spacing, 8px);
 }
 
+.pagemetrics-period-link {
+    padding: 2px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--typo3-component-border-radius, 4px);
+    color: var(--typo3-text-color-base, #14213d);
+    text-decoration: none;
+}
+
+.pagemetrics-period-link:hover,
+.pagemetrics-period-link:focus {
+    border-color: var(--typo3-component-border-color, #cbcbcb);
+    text-decoration: underline;
+}
+
+.pagemetrics-period-link-active {
+    font-weight: 700;
+    background: var(--typo3-state-info-bg, #e5f1ff);
+    border-color: var(--typo3-state-info-color, #007bff);
+}
+
 .pagemetrics-tiles {
     display: flex;
     flex-wrap: wrap;
