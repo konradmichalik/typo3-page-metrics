@@ -21,6 +21,9 @@
             <trans-unit id="period.apply" resname="period.apply">
                 <source>Apply</source>
             </trans-unit>
+            <trans-unit id="unresolved.hint" resname="unresolved.hint">
+                <source>%1$d URLs from the last 30 days could not be matched to a page on this site.</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

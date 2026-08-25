@@ -17,13 +17,18 @@
             </form>
             <div class="pagemetrics-tiles" data-page-id="{pageId}">
                 <f:for each="{tiles}" as="tile">
-                    <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-sparkline="{f:format.json(value: tile.sparkline)}">
+                    <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-sparkline="{f:format.json(value: tile.sparkline)}" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">
                         <span class="pagemetrics-tile-icon"><core:icon identifier="{tile.icon}" /></span>
                         <span class="pagemetrics-tile-value">{tile.value}</span>
                         <span class="pagemetrics-tile-label">{tile.label}</span>
                     </div>
                 </f:for>
             </div>
+            <f:if condition="{unresolvedCount} > 0">
+                <p class="pagemetrics-unresolved-hint">
+                    <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:unresolved.hint" arguments="{0: unresolvedCount}" default="{unresolvedCount} URLs from the last 30 days could not be matched to a page on this site." />
+                </p>
+            </f:if>
         </f:then>
         <f:else>
             <p><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:noPageSelected" /></p>

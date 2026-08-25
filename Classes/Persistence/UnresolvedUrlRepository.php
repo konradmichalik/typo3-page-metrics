@@ -51,6 +51,22 @@ class UnresolvedUrlRepository
         $this->trimToCap($source, $dateString, $capPerDay);
     }
 
+    public function countForSite(string $host, \DateTimeImmutable $since): int
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $likePattern = '%://'.$queryBuilder->escapeLikeWildcards($host).'/%';
+
+        return (int) $queryBuilder
+            ->count('uid')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->like('url', $queryBuilder->createNamedParameter($likePattern)),
+                $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($since->format('Y-m-d'))),
+            )
+            ->executeQuery()
+            ->fetchOne();
+    }
+
     /**
      * Keeps the $capPerDay highest-value rows for the day, deletes the rest -
      * the lowest-value entries are the least actionable ones to lose.

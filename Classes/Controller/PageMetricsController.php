@@ -15,6 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Controller;
 
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricTile};
 use KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository;
+use KonradMichalik\Typo3PageMetrics\Persistence\UnresolvedUrlRepository;
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
@@ -35,6 +36,7 @@ class PageMetricsController
         private readonly ModuleTemplateFactory $moduleTemplateFactory,
         private readonly SiteFinder $siteFinder,
         private readonly DailyMetricsRepository $dailyMetricsRepository,
+        private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
         private readonly PageRenderer $pageRenderer,
         private readonly iterable $sources,
     ) {}
@@ -42,12 +44,16 @@ class PageMetricsController
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
     {
         $this->pageRenderer->addCssFile('EXT:page_metrics/Resources/Public/Css/page-metrics.css');
+        $this->pageRenderer->loadJavaScriptModule('@konradmichalik/page-metrics/sparkline.js');
 
         $moduleTemplate = $this->moduleTemplateFactory->create($request);
         $pageId = (int) ($request->getQueryParams()['id'] ?? 0);
         $languageId = (int) ($request->getQueryParams()['language'] ?? 0);
         $periodDays = $this->resolvePeriodDays($request);
         $site = $this->resolveSite($pageId);
+        $unresolvedCount = null !== $site
+            ? $this->unresolvedUrlRepository->countForSite($site->getBase()->getHost(), (new \DateTimeImmutable('today'))->modify('-30 days'))
+            : 0;
 
         $moduleTemplate->assignMultiple([
             'pageId' => $pageId,
@@ -55,6 +61,7 @@ class PageMetricsController
             'periodDays' => $periodDays,
             'periodOptions' => self::PERIOD_OPTIONS,
             'tiles' => null !== $site ? $this->buildTiles($site, $pageId, $languageId, $periodDays) : [],
+            'unresolvedCount' => $unresolvedCount,
         ]);
         $moduleTemplate->setTitle('Page Metrics');
 

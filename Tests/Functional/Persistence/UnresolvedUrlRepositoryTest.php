@@ -66,6 +66,23 @@ final class UnresolvedUrlRepositoryTest extends FunctionalTestCase
         self::assertSame(['https://example.com/b', 'https://example.com/c'], $remainingUrls);
     }
 
+    public function testCountForSiteCountsOnlyUrlsOnThatHost(): void
+    {
+        $date = new \DateTimeImmutable('today');
+        $this->subject->record('matomo', $date, 'https://example.com/gone-a', 'matomo.pageviews', UnresolvedReason::Unknown, 1, 100);
+        $this->subject->record('matomo', $date, 'https://example.com/gone-b', 'matomo.pageviews', UnresolvedReason::Unknown, 1, 100);
+        $this->subject->record('matomo', $date, 'https://other-host.example/gone', 'matomo.pageviews', UnresolvedReason::Unknown, 1, 100);
+
+        self::assertSame(2, $this->subject->countForSite('example.com', $date->modify('-30 days')));
+    }
+
+    public function testCountForSiteExcludesEntriesBeforeSince(): void
+    {
+        $this->subject->record('matomo', new \DateTimeImmutable('2026-01-01'), 'https://example.com/old', 'matomo.pageviews', UnresolvedReason::Unknown, 1, 100);
+
+        self::assertSame(0, $this->subject->countForSite('example.com', new \DateTimeImmutable('2026-06-01')));
+    }
+
     private function countRows(): int
     {
         return (int) $this->get(ConnectionPool::class)

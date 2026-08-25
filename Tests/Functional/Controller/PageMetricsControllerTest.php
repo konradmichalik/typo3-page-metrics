@@ -87,6 +87,32 @@ final class PageMetricsControllerTest extends FunctionalTestCase
         self::assertStringNotContainsString('pagemetrics-tile-value">105<', (string) $response->getBody());
     }
 
+    public function testShowsUnresolvedCountWhenUnresolvedUrlsExistForTheSite(): void
+    {
+        $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
+        $this->writeSiteConfiguration('main', $this->buildSiteConfiguration(1, 'https://example.com/'));
+        $this->get(\KonradMichalik\Typo3PageMetrics\Persistence\UnresolvedUrlRepository::class)->record(
+            'matomo',
+            new \DateTimeImmutable('today'),
+            'https://example.com/gone',
+            'matomo.pageviews',
+            \KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason::Unknown,
+            3,
+            100,
+        );
+
+        $controller = $this->get(PageMetricsController::class);
+        $request = $this->buildModuleRequest(['id' => '2']);
+
+        $response = $controller->handleRequest($request);
+
+        // A bare "1" substring check would be a false positive: the rendered
+        // module page already contains incidental "1" digits (page IDs, CSRF
+        // tokens) even without the unresolved-URL indicator implemented, so the
+        // assertion is scoped to the actual hint text instead.
+        self::assertStringContainsString('1 URLs from the last 30 days could not be matched to a page on this site.', (string) $response->getBody());
+    }
+
     /**
      * @param array<string, string> $queryParams
      */
