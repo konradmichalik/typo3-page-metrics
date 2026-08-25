@@ -17,20 +17,60 @@ without leaving the backend.
 > [!NOTE]
 > For dashboard-level Matomo reporting, use
 > [`brotkrueml/typo3-matomo-widgets`](https://extensions.typo3.org/extension/matomo_widgets)
-> instead. This extension is for page-level metrics, not dashboards.
+> instead. This extension is for page-level metrics, not dashboards — the
+> two are complementary, not competing.
 
 ## Features
 
-- URL → page resolver with redirect-chain and multilingual slug support
-- Source-agnostic metric storage (`MetricSourceInterface`), Matomo included
-- `page-metrics:import` command for scheduled or manual imports
-- Backend module with per-page metric tiles and a 30-day sparkline
+- URL → page resolver with redirect-chain and multilingual slug support,
+  persisted at import time (never resolved live, never retroactively)
+- Source-agnostic metric storage via `MetricSourceInterface` (`@api`) —
+  Matomo is included, more sources can register without touching the core
+- `page-metrics:import` console command for scheduled or manual imports,
+  idempotent by default, `--force` to re-import the full retention window
+- `Web > Page Metrics` backend module: per-page metric tiles with a period
+  switch, a 30-day sparkline popover, and an unresolved-URL indicator
+- Only aggregates are stored — no IPs, no user agents, no sub-day timestamps
 
 ## Installation
 
 ```bash
 composer require konradmichalik/typo3-page-metrics
 ```
+
+## Configuration
+
+Add to a site's `config/sites/<identifier>/config.yaml`:
+
+```yaml
+pageMetrics:
+  enabled: true
+  sources:
+    matomo:
+      endpoint: 'https://matomo.example.com/'
+      siteId: 3
+      tokenAuth: '%env(MATOMO_TOKEN)%'
+  resolution:
+    dropQueryString: true
+    keepQueryParams: ['tx_solr[q]']
+  retentionDays: 400
+```
+
+If `brotkrueml/typo3-matomo-widgets` is already installed and configured for
+the site, its `matomoWidgetsUrl`/`matomoWidgetsIdSite`/`matomoWidgetsTokenAuth`
+keys are used as a fallback when this extension's own `sources.matomo` is
+not set — no need to configure the same Matomo instance twice.
+
+## Usage
+
+Run the import (also schedulable via the TYPO3 Scheduler):
+
+```bash
+vendor/bin/typo3 page-metrics:import
+vendor/bin/typo3 page-metrics:import --force
+```
+
+Then open **Web → Page Metrics** and select a page in the page tree.
 
 ## Development
 
