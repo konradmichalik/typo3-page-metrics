@@ -22,13 +22,11 @@ use TYPO3\CMS\Core\Http\{NormalizedParams, ServerRequest};
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
-
 /**
  * PageMetricsControllerTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class PageMetricsControllerTest extends FunctionalTestCase
 {
     protected array $testExtensionsToLoad = ['konradmichalik/typo3-page-metrics'];
@@ -93,6 +91,24 @@ final class PageMetricsControllerTest extends FunctionalTestCase
         // coincidence, which would make this assertion flaky.
         self::assertStringContainsString('pagemetrics-tile-value">5<', (string) $response->getBody());
         self::assertStringNotContainsString('pagemetrics-tile-value">105<', (string) $response->getBody());
+    }
+
+    public function testRendersNeutralStateWhenBackendUserLacksPageAccess(): void
+    {
+        // Page 3 in the fixture has perms_everybody = 0 and perms_userid = 1,
+        // so a non-admin backend user (uid 2) has no PAGE_SHOW permission on
+        // it even though the site itself resolves the page just fine.
+        $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
+        $this->writeSiteConfiguration('main', $this->buildSiteConfiguration(1, 'https://example.com/'));
+        $backendUser = $this->setUpBackendUser(2);
+        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
+
+        $controller = $this->get(PageMetricsController::class);
+        $request = $this->buildModuleRequest(['id' => '3']);
+
+        $response = $controller->handleRequest($request);
+
+        self::assertStringContainsString('Select a page', (string) $response->getBody());
     }
 
     public function testShowsUnresolvedCountWhenUnresolvedUrlsExistForTheSite(): void

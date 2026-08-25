@@ -17,24 +17,24 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricTile};
 use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
-use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Throwable;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
-use TYPO3\CMS\Core\Http\ServerRequest;
+use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
+use TYPO3\CMS\Core\Type\Bitmask\Permission;
 
 use function in_array;
 use function sprintf;
-
 
 /**
  * PageMetricsController.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 class PageMetricsController
 {
     /** @var list<int> */
@@ -53,13 +53,22 @@ class PageMetricsController
         private readonly iterable $sources,
     ) {}
 
-    public function handleRequest(ServerRequest $request): ResponseInterface
+    public function handleRequest(ServerRequestInterface $request): ResponseInterface
     {
         $this->pageRenderer->addCssFile('EXT:page_metrics/Resources/Public/Css/page-metrics.css');
         $this->pageRenderer->loadJavaScriptModule('@konradmichalik/page-metrics/sparkline.js');
 
         $moduleTemplate = $this->moduleTemplateFactory->create($request);
         $pageId = (int) ($request->getQueryParams()['id'] ?? 0);
+
+        if ($pageId > 0 && false === BackendUtility::readPageAccess($pageId, $this->getBackendUser()->getPagePermsClause(Permission::PAGE_SHOW))) {
+            // Backend user has no PAGE_SHOW permission on this page (e.g. it
+            // sits outside their web mount) - degrade to the neutral "no page
+            // selected" state instead of leaking metrics for a page they
+            // cannot access.
+            $pageId = 0;
+        }
+
         $languageId = (int) ($request->getQueryParams()['language'] ?? 0);
         $periodDays = $this->resolvePeriodDays($request);
         $site = $this->resolveSite($pageId);
@@ -80,7 +89,7 @@ class PageMetricsController
         return $moduleTemplate->renderResponse('PageMetrics/Index');
     }
 
-    private function resolvePeriodDays(ServerRequest $request): int
+    private function resolvePeriodDays(ServerRequestInterface $request): int
     {
         $requested = (int) ($request->getQueryParams()['period'] ?? 30);
 
@@ -135,5 +144,10 @@ class PageMetricsController
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private function getBackendUser(): BackendUserAuthentication
+    {
+        return $GLOBALS['BE_USER'];
     }
 }
