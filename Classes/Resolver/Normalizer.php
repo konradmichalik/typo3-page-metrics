@@ -20,7 +20,8 @@ namespace KonradMichalik\Typo3PageMetrics\Resolver;
  */
 final class Normalizer
 {
-    private const array DEFAULT_PORTS = ['http' => 80, 'https' => 443];
+    /** @var array<string, int> */
+    private const DEFAULT_PORTS = ['http' => 80, 'https' => 443];
 
     /**
      * @param list<string> $keepQueryParams

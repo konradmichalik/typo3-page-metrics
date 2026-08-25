@@ -5,3 +5,14 @@
 ,3,0,0,0,"*","/redirect-a","/redirect-b",307
 ,4,0,0,0,"*","/redirect-b","/redirect-a",307
 ,5,0,0,1,"*","/disabled-source","t3://page?uid=2",307
+,6,0,0,0,"*","/five-hop-1","/five-hop-2",307
+,7,0,0,0,"*","/five-hop-2","/five-hop-3",307
+,8,0,0,0,"*","/five-hop-3","/five-hop-4",307
+,9,0,0,0,"*","/five-hop-4","/five-hop-5",307
+,10,0,0,0,"*","/five-hop-5","t3://page?uid=2",307
+,11,0,0,0,"*","/six-hop-1","/six-hop-2",307
+,12,0,0,0,"*","/six-hop-2","/six-hop-3",307
+,13,0,0,0,"*","/six-hop-3","/six-hop-4",307
+,14,0,0,0,"*","/six-hop-4","/six-hop-5",307
+,15,0,0,0,"*","/six-hop-5","/six-hop-6",307
+,16,0,0,0,"*","/six-hop-6","t3://page?uid=2",307

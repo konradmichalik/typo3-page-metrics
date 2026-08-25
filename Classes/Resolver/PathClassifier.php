@@ -23,10 +23,10 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
 final class PathClassifier
 {
     /** @var list<string> */
-    private const array FILE_PREFIXES = ['/fileadmin/', '/uploads/', '/_assets/'];
+    private const FILE_PREFIXES = ['/fileadmin/', '/uploads/', '/_assets/'];
 
     /** @var list<string> */
-    private const array NON_PAGE_PREFIXES = ['/api/', '/typo3/', '/typo3temp/'];
+    private const NON_PAGE_PREFIXES = ['/api/', '/typo3/', '/typo3temp/'];
 
     public function classify(string $path): UnresolvedReason
     {

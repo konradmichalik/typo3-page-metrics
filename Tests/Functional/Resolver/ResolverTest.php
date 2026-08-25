@@ -135,4 +135,62 @@ final class ResolverTest extends FunctionalTestCase
 
         self::assertSame($first, $second);
     }
+
+    public function testResetClearsTheCache(): void
+    {
+        $first = $this->subject->resolve('https://example.com/about');
+        $this->subject->reset();
+        $second = $this->subject->resolve('https://example.com/about');
+
+        self::assertNotSame($first, $second);
+    }
+
+    public function testReturnsNonPageForTypo3BackendPath(): void
+    {
+        $result = $this->subject->resolve('https://example.com/typo3/module/web/layout');
+
+        self::assertInstanceOf(UnresolvedUrl::class, $result);
+        self::assertSame(UnresolvedReason::NonPage, $result->reason);
+    }
+
+    public function testReportsOriginalUrlWhenRedirectTargetIsUnresolvable(): void
+    {
+        // /old-external redirects to https://example.com/new-external, which
+        // matches no page slug and no further redirect. The reported
+        // UnresolvedUrl must carry the URL that was actually imported
+        // (/old-external), not the intermediate redirect target, so later
+        // tasks can join the unresolved report back to source rows.
+        $result = $this->subject->resolve('https://example.com/old-external');
+
+        self::assertInstanceOf(UnresolvedUrl::class, $result);
+        self::assertSame('https://example.com/old-external', $result->url);
+        self::assertSame(UnresolvedReason::Unknown, $result->reason);
+    }
+
+    public function testFollowsExactlyFiveRedirectHopsToResolveAPage(): void
+    {
+        // /five-hop-1 -> ... -> /five-hop-5 -> t3://page?uid=2 is exactly
+        // 5 redirect hops. If the cap were off by one (as it was: comparing
+        // against the visited-URL count, which includes the un-hopped
+        // origin), this would incorrectly give up one hop early and never
+        // reach the page.
+        $result = $this->subject->resolve('https://example.com/five-hop-1');
+
+        self::assertInstanceOf(ResolvedUrl::class, $result);
+        self::assertSame(2, $result->pageUid);
+        self::assertTrue($result->viaRedirect);
+    }
+
+    public function testGivesUpAfterExceedingFiveRedirectHopCap(): void
+    {
+        // /six-hop-1 -> ... -> /six-hop-6 -> t3://page?uid=2 needs 6 hops,
+        // one more than the cap allows, so resolution must give up before
+        // reaching the page. The reported URL must still be the original
+        // /six-hop-1 URL, not whichever intermediate hop the cap was hit on.
+        $result = $this->subject->resolve('https://example.com/six-hop-1');
+
+        self::assertInstanceOf(UnresolvedUrl::class, $result);
+        self::assertSame('https://example.com/six-hop-1', $result->url);
+        self::assertSame(UnresolvedReason::Unknown, $result->reason);
+    }
 }

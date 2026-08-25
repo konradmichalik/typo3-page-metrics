@@ -27,7 +27,8 @@ use TYPO3\CMS\Core\Site\SiteFinder;
  */
 final class Resolver
 {
-    private const int MAX_REDIRECT_HOPS = 5;
+    /** @var int */
+    private const MAX_REDIRECT_HOPS = 5;
 
     /** @var array<string, ResolvedUrl|UnresolvedUrl> */
     private array $cache = [];
@@ -53,18 +54,28 @@ final class Resolver
             return $this->cache[$normalized];
         }
 
-        $result = $this->resolveNormalized($normalized, []);
+        $result = $this->resolveNormalized($normalized, $normalized, [], 0);
 
         return $this->cache[$normalized] = $result;
     }
 
     /**
+     * Clears the in-memory resolution cache. Callers running a fresh import
+     * run (e.g. Task 15's ImportCommand) call this between runs so cached
+     * results never leak across runs of a shared/long-lived instance.
+     */
+    public function reset(): void
+    {
+        $this->cache = [];
+    }
+
+    /**
      * @param list<string> $visited
      */
-    private function resolveNormalized(string $normalizedUrl, array $visited, bool $viaRedirect = false): ResolvedUrl|UnresolvedUrl
+    private function resolveNormalized(string $normalizedUrl, string $originalUrl, array $visited, int $hopCount, bool $viaRedirect = false): ResolvedUrl|UnresolvedUrl
     {
-        if (in_array($normalizedUrl, $visited, true) || count($visited) >= self::MAX_REDIRECT_HOPS) {
-            return new UnresolvedUrl($normalizedUrl, UnresolvedReason::Unknown);
+        if (in_array($normalizedUrl, $visited, true) || $hopCount > self::MAX_REDIRECT_HOPS) {
+            return new UnresolvedUrl($originalUrl, UnresolvedReason::Unknown);
         }
 
         $visited[] = $normalizedUrl;
@@ -72,7 +83,7 @@ final class Resolver
         $site = $this->siteMatcher->match($normalizedUrl, $this->siteFinder->getAllSites());
 
         if (null === $site) {
-            return new UnresolvedUrl($normalizedUrl, UnresolvedReason::ForeignHost);
+            return new UnresolvedUrl($originalUrl, UnresolvedReason::ForeignHost);
         }
 
         $urlParts = parse_url($normalizedUrl);
@@ -95,10 +106,10 @@ final class Resolver
             $absoluteTarget = str_starts_with($redirectTarget, '/') ? 'https://'.$host.$redirectTarget : $redirectTarget;
             $nextUrl = $this->normalizer->normalize($absoluteTarget, true, []);
 
-            return $this->resolveNormalized($nextUrl, $visited, true);
+            return $this->resolveNormalized($nextUrl, $originalUrl, $visited, $hopCount + 1, true);
         }
 
-        return new UnresolvedUrl($normalizedUrl, $this->pathClassifier->classify($path));
+        return new UnresolvedUrl($originalUrl, $this->pathClassifier->classify($path));
     }
 
     private function stripBasePath(string $path, string $basePath): string
