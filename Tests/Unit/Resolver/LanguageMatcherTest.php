@@ -17,13 +17,11 @@ use KonradMichalik\Typo3PageMetrics\Resolver\LanguageMatcher;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
-
 /**
  * LanguageMatcherTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class LanguageMatcherTest extends TestCase
 {
     private LanguageMatcher $matcher;

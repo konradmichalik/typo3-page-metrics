@@ -24,13 +24,11 @@ use function is_array;
 use function strlen;
 use function strtolower;
 
-
 /**
  * SiteMatcher.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class SiteMatcher
 {
     /**

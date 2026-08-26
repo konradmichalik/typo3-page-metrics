@@ -18,13 +18,11 @@ use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinit
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
-
 /**
  * StubMetricSource.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class StubMetricSource implements MetricSourceInterface
 {
     /**

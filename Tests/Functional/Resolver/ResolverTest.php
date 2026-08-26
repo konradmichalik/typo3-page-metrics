@@ -19,13 +19,11 @@ use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
-
 /**
  * ResolverTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class ResolverTest extends FunctionalTestCase
 {
     // typo3/cms-redirects provides the sys_redirect table; it is not part of

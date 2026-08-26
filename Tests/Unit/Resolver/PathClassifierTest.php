@@ -17,13 +17,11 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
 use KonradMichalik\Typo3PageMetrics\Resolver\PathClassifier;
 use PHPUnit\Framework\TestCase;
 
-
 /**
  * PathClassifierTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class PathClassifierTest extends TestCase
 {
     private PathClassifier $classifier;

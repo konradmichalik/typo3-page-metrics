@@ -17,13 +17,11 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\UrlMetric;
 use PHPUnit\Framework\TestCase;
 
-
 /**
  * UrlMetricTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class UrlMetricTest extends TestCase
 {
     public function testConstructorAssignsAllProperties(): void

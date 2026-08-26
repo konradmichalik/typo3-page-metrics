@@ -16,13 +16,11 @@ namespace KonradMichalik\Typo3PageMetrics\Persistence;
 use DateTimeImmutable;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
-
 /**
  * ImportStateRepository.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 class ImportStateRepository
 {
     private const TABLE = 'tx_pagemetrics_import';

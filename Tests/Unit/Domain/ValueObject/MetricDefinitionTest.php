@@ -17,13 +17,11 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricDefinition;
 use PHPUnit\Framework\TestCase;
 
-
 /**
  * MetricDefinitionTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class MetricDefinitionTest extends TestCase
 {
     public function testConstructorAssignsAllProperties(): void

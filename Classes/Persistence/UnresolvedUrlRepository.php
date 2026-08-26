@@ -19,13 +19,11 @@ use TYPO3\CMS\Core\Database\{Connection, ConnectionPool};
 
 use function array_slice;
 
-
 /**
  * UnresolvedUrlRepository.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 class UnresolvedUrlRepository
 {
     private const TABLE = 'tx_pagemetrics_unresolved';

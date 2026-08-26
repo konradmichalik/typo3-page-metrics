@@ -73,7 +73,7 @@ class Ga4ApiClient
         }
 
         try {
-            $decoded = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new Ga4RequestFailedException('GA4 returned a non-JSON response.', 1756200202, $exception);
         }

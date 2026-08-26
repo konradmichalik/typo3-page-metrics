@@ -15,11 +15,9 @@ namespace KonradMichalik\Typo3PageMetrics\Exception;
 
 use RuntimeException;
 
-
 /**
  * InvalidSiteConfigurationException.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class InvalidSiteConfigurationException extends RuntimeException {}

@@ -19,13 +19,11 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Core\Http\RequestFactory;
 
-
 /**
  * MatomoApiClientTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class MatomoApiClientTest extends TestCase
 {
     /** @var RequestFactory&\PHPUnit\Framework\MockObject\MockObject */

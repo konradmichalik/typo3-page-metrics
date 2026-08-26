@@ -17,13 +17,11 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
 use PHPUnit\Framework\TestCase;
 
-
 /**
  * DateRangeTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class DateRangeTest extends TestCase
 {
     public function testDaysYieldsOneEntryPerDayInclusive(): void

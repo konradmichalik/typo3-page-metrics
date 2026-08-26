@@ -16,13 +16,11 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Resolver;
 use KonradMichalik\Typo3PageMetrics\Resolver\SlugLookup;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
-
 /**
  * SlugLookupTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class SlugLookupTest extends FunctionalTestCase
 {
     protected array $testExtensionsToLoad = ['konradmichalik/typo3-page-metrics'];

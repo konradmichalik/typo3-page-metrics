@@ -51,7 +51,7 @@ final class Ga4ConfigurationResolverTest extends FunctionalTestCase
         file_put_contents($this->keyFilePath, json_encode([
             'client_email' => 'test@example.iam.gserviceaccount.com',
             'private_key' => "-----BEGIN PRIVATE KEY-----\nFAKE\n-----END PRIVATE KEY-----\n",
-        ], JSON_THROW_ON_ERROR));
+        ], \JSON_THROW_ON_ERROR));
 
         $site = new Site('main', 1, [
             'base' => 'https://example.com/',
@@ -123,7 +123,7 @@ final class Ga4ConfigurationResolverTest extends FunctionalTestCase
 
     public function testReturnsNullWhenKeyFileIsMissingRequiredFields(): void
     {
-        file_put_contents($this->keyFilePath, json_encode(['client_email' => 'test@example.com'], JSON_THROW_ON_ERROR));
+        file_put_contents($this->keyFilePath, json_encode(['client_email' => 'test@example.com'], \JSON_THROW_ON_ERROR));
 
         $site = new Site('main', 1, [
             'base' => 'https://example.com/',

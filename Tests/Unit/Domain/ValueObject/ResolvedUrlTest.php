@@ -16,13 +16,11 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\ResolvedUrl;
 use PHPUnit\Framework\TestCase;
 
-
 /**
  * ResolvedUrlTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class ResolvedUrlTest extends TestCase
 {
     public function testConstructorAssignsAllProperties(): void

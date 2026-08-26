@@ -21,13 +21,11 @@ use TYPO3\CMS\Core\Site\SiteFinder;
 
 use function is_string;
 
-
 /**
  * RedirectFollower.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class RedirectFollower
 {
     public function __construct(

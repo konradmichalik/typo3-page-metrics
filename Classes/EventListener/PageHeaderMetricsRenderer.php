@@ -54,7 +54,7 @@ final readonly class PageHeaderMetricsRenderer
         $this->pageRenderer->addCssFile('EXT:page_metrics/Resources/Public/Css/page-metrics.css');
         $this->pageRenderer->loadJavaScriptModule('@konradmichalik/page-metrics/sparkline.js');
 
-        $ajaxUrl = htmlspecialchars((string) $this->uriBuilder->buildUriFromRoute('ajax_page_metrics_tiles'), ENT_QUOTES);
+        $ajaxUrl = htmlspecialchars((string) $this->uriBuilder->buildUriFromRoute('ajax_page_metrics_tiles'), \ENT_QUOTES);
 
         $event->addHeaderContent(sprintf(
             '<div class="pagemetrics-header pagemetrics-header-placeholder" data-page-id="%d" data-period="30" data-ajax-url="%s"></div>',

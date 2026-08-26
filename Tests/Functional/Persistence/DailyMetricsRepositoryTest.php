@@ -18,13 +18,11 @@ use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
 use KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
-
 /**
  * DailyMetricsRepositoryTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class DailyMetricsRepositoryTest extends FunctionalTestCase
 {
     protected array $testExtensionsToLoad = ['konradmichalik/typo3-page-metrics'];

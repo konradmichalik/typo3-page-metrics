@@ -38,7 +38,7 @@ final class Ga4AuthTokenProviderTest extends TestCase
         $this->requestFactory = $this->createMock(RequestFactory::class);
         $this->subject = new Ga4AuthTokenProvider($this->requestFactory);
 
-        $keyPair = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        $keyPair = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => \OPENSSL_KEYTYPE_RSA]);
         self::assertNotFalse($keyPair);
         openssl_pkey_export($keyPair, $privateKeyPem);
         $details = openssl_pkey_get_details($keyPair);

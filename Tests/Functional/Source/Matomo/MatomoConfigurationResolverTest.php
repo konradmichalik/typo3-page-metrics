@@ -17,13 +17,11 @@ use KonradMichalik\Typo3PageMetrics\Source\Matomo\MatomoConfigurationResolver;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
-
 /**
  * MatomoConfigurationResolverTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class MatomoConfigurationResolverTest extends FunctionalTestCase
 {
     protected array $testExtensionsToLoad = ['konradmichalik/typo3-page-metrics'];

@@ -18,13 +18,11 @@ use KonradMichalik\Typo3PageMetrics\Persistence\ImportStateRepository;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
-
 /**
  * ImportStateRepositoryTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class ImportStateRepositoryTest extends FunctionalTestCase
 {
     protected array $testExtensionsToLoad = ['konradmichalik/typo3-page-metrics'];
