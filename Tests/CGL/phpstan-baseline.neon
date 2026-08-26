@@ -61,6 +61,25 @@ parameters:
 			count: 1
 			path: ../../Classes/Source/Matomo/MatomoMetricSource.php
 		-
+			# typeCoverage.constantTypeCoverage only counts a class constant as
+			# "covered" when it uses a native typed constant declaration, which is a
+			# PHP 8.3+ feature. This project targets PHP 8.2 (see phpVersion in
+			# phpstan.neon and composer.json's require), so these constants use a
+			# docblock @var instead - the earliest fix that keeps PHP 8.2
+			# compatibility. Adding native typed constants here would reintroduce
+			# the PHP 8.2 parse-error bug this project fixed early in development.
+			identifier: typeCoverage.constantTypeCoverage
+			count: 3
+			path: ../../Classes/Source/Ga4/Ga4ApiClient.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 5
+			path: ../../Classes/Source/Ga4/Ga4AuthTokenProvider.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Source/Ga4/Ga4MetricSource.php
+		-
 			# MetricDefinition and UrlMetric are `@api` value objects whose trailing
 			# nullable parameter (maxDimensions / dimension) means "not applicable"
 			# for the common case. Removing the default would force every call

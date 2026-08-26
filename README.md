@@ -61,6 +61,22 @@ the site, its `matomoWidgetsUrl`/`matomoWidgetsIdSite`/`matomoWidgetsTokenAuth`
 keys are used as a fallback when this extension's own `sources.matomo` is
 not set — no need to configure the same Matomo instance twice.
 
+GA4 is supported as an alternative source, for sites without Matomo:
+
+```yaml
+pageMetrics:
+  enabled: true
+  sources:
+    ga4:
+      propertyId: '123456789'
+      serviceAccountKeyFilePath: '%env(GA4_KEY_FILE_PATH)%'
+```
+
+The key file is a Google Cloud service-account JSON key (never inline
+credentials) with read access to the GA4 property's Data API. "Avg. time
+on page" and "bounce rate" are GA4 approximations, not the same
+definitions Matomo's tiles use - see each tile's own description text.
+
 ## Usage
 
 Run the import (also schedulable via the TYPO3 Scheduler):
