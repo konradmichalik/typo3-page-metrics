@@ -15,7 +15,9 @@ use TYPO3\CMS\Core\Imaging\IconProvider\SvgIconProvider;
 
 // Sourced from Tabler Icons (MIT, see Resources/Public/Icons/TABLER_LICENSE.txt).
 // tabler-robot, tabler-spider and tabler-world-search are not wired to a
-// metric tile yet - they are staged for a future bot/crawler-traffic metric.
+// metric tile yet - they are staged for a future bot/crawler-traffic metric,
+// contributed by a third-party listener (e.g. typo3_bot_inspect) via
+// ModifyMetricTilesEvent, not by this extension itself.
 return [
     'tabler-eye-search' => [
         'provider' => SvgIconProvider::class,
