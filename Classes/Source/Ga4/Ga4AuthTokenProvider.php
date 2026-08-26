@@ -75,13 +75,18 @@ class Ga4AuthTokenProvider
     private function requestNewToken(Ga4Configuration $configuration): array
     {
         $now = time();
-        $assertion = JWT::encode([
-            'iss' => $configuration->clientEmail,
-            'scope' => self::SCOPE,
-            'aud' => self::TOKEN_ENDPOINT,
-            'iat' => $now,
-            'exp' => $now + 3600,
-        ], $configuration->privateKey, 'RS256');
+
+        try {
+            $assertion = JWT::encode([
+                'iss' => $configuration->clientEmail,
+                'scope' => self::SCOPE,
+                'aud' => self::TOKEN_ENDPOINT,
+                'iat' => $now,
+                'exp' => $now + 3600,
+            ], $configuration->privateKey, 'RS256');
+        } catch (Throwable $exception) {
+            throw new Ga4RequestFailedException(sprintf('GA4 JWT assertion could not be signed: %s', $exception->getMessage()), 1756200099, $exception);
+        }
 
         try {
             $response = $this->requestFactory->request(self::TOKEN_ENDPOINT, 'POST', [

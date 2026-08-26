@@ -112,6 +112,15 @@ final class Ga4AuthTokenProviderTest extends TestCase
         $this->subject->getAccessToken($this->configuration);
     }
 
+    public function testGetAccessTokenThrowsWhenPrivateKeyIsMalformed(): void
+    {
+        $malformedConfiguration = new Ga4Configuration('123456789', 'test@example.iam.gserviceaccount.com', 'not-a-valid-pem-key');
+
+        $this->expectException(Ga4RequestFailedException::class);
+
+        $this->subject->getAccessToken($malformedConfiguration);
+    }
+
     /**
      * @param array<mixed> $payload
      */
