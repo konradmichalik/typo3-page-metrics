@@ -74,7 +74,7 @@ final class Ga4MetricSource implements MetricSourceInterface
             new RateMetricDefinition(
                 'ga4.avg_time_on_page',
                 'Avg. time on page',
-                'Approximation from GA4: total user engagement time on this page divided by sessions. Not the same definition as Matomo\'s avg. time on page.',
+                'Approximation from GA4: total user engagement time (GA4 userEngagementDuration) on this page divided by sessions. Not the same definition as Matomo\'s avg. time on page.',
                 'tabler-clock',
                 MetricUnit::Seconds,
                 30,
@@ -85,7 +85,7 @@ final class Ga4MetricSource implements MetricSourceInterface
             new RateMetricDefinition(
                 'ga4.bounce_rate',
                 'Bounce rate',
-                'Approximation from GA4: engagement-based bounce rate for sessions that landed on this page. Not the same definition as Matomo\'s bounce rate.',
+                'Approximation from GA4: engagement-based bounce rate (GA4 bounceRate, landingPage-scoped) for sessions that landed on this page. Not the same definition as Matomo\'s bounce rate.',
                 'tabler-door-exit',
                 MetricUnit::Percent,
                 40,
