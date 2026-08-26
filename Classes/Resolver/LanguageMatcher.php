@@ -15,7 +15,13 @@ namespace KonradMichalik\Typo3PageMetrics\Resolver;
 
 use TYPO3\CMS\Core\Site\Entity\{Site, SiteLanguage};
 
+use function array_filter;
+use function array_map;
+use function array_values;
+use function in_array;
+use function is_array;
 use function strlen;
+use function strtolower;
 
 /**
  * LanguageMatcher.
@@ -37,11 +43,12 @@ final class LanguageMatcher
             return null;
         }
 
+        $additionalHosts = $this->additionalHosts($site);
         $best = null;
         $bestLength = -1;
 
         foreach ($site->getLanguages() as $language) {
-            $length = $this->matchLength($urlParts, $language);
+            $length = $this->matchLength($urlParts, $language, $additionalHosts);
 
             if (null !== $length && $length > $bestLength) {
                 $best = $language;
@@ -54,13 +61,15 @@ final class LanguageMatcher
 
     /**
      * @param array<string, mixed> $urlParts
+     * @param list<string>         $additionalHosts
      */
-    private function matchLength(array $urlParts, SiteLanguage $language): ?int
+    private function matchLength(array $urlParts, SiteLanguage $language, array $additionalHosts): ?int
     {
         $base = $language->getBase();
         $baseHost = strtolower($base->getHost());
+        $urlHost = strtolower((string) $urlParts['host']);
 
-        if ('' !== $baseHost && strtolower((string) $urlParts['host']) !== $baseHost) {
+        if ('' !== $baseHost && $urlHost !== $baseHost && !in_array($urlHost, $additionalHosts, true)) {
             return null;
         }
 
@@ -80,5 +89,22 @@ final class LanguageMatcher
         }
 
         return strlen($basePath);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function additionalHosts(Site $site): array
+    {
+        $hosts = $site->getConfiguration()['pageMetrics']['resolution']['additionalHosts'] ?? [];
+
+        if (!is_array($hosts)) {
+            return [];
+        }
+
+        return array_values(array_map(
+            static fn (string $host): string => strtolower($host),
+            array_filter($hosts, 'is_string'),
+        ));
     }
 }

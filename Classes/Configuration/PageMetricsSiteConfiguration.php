@@ -25,6 +25,7 @@ final readonly class PageMetricsSiteConfiguration
     /**
      * @param array<string, array<string, mixed>> $sources
      * @param list<string>                        $keepQueryParams
+     * @param list<string>                        $additionalHosts
      */
     public function __construct(
         public bool $enabled,
@@ -32,5 +33,6 @@ final readonly class PageMetricsSiteConfiguration
         public bool $dropQueryString,
         public array $keepQueryParams,
         public int $retentionDays,
+        public array $additionalHosts,
     ) {}
 }

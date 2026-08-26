@@ -37,7 +37,7 @@ final class SiteConfigurationReader
         $raw = $site->getConfiguration()['pageMetrics'] ?? null;
 
         if (null === $raw) {
-            return new PageMetricsSiteConfiguration(false, [], true, [], 400);
+            return new PageMetricsSiteConfiguration(false, [], true, [], 400, []);
         }
 
         if (!is_array($raw)) {
@@ -74,8 +74,14 @@ final class SiteConfigurationReader
             throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.retentionDays" must be a positive integer.', $site->getIdentifier()), 1756000006);
         }
 
+        $additionalHosts = $resolution['additionalHosts'] ?? [];
+        if (!is_array($additionalHosts) || !array_is_list($additionalHosts)) {
+            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.resolution.additionalHosts" must be a list.', $site->getIdentifier()), 1756000007);
+        }
+
         /* @var array<string, array<string, mixed>> $sources */
         /* @var list<string> $keepQueryParams */
-        return new PageMetricsSiteConfiguration($enabled, $sources, $dropQueryString, $keepQueryParams, $retentionDays);
+        /* @var list<string> $additionalHosts */
+        return new PageMetricsSiteConfiguration($enabled, $sources, $dropQueryString, $keepQueryParams, $retentionDays, $additionalHosts);
     }
 }

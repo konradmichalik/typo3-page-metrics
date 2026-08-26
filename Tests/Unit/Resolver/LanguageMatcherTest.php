@@ -100,6 +100,26 @@ final class LanguageMatcherTest extends TestCase
         self::assertSame(0, $language->getLanguageId());
     }
 
+    public function testMatchesLanguageViaConfiguredAdditionalHost(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://site.ddev.site/',
+            'pageMetrics' => ['resolution' => ['additionalHosts' => ['www.live.example']]],
+            'languages' => [
+                [
+                    'languageId' => 0,
+                    'locale' => 'de_DE.UTF-8',
+                    'base' => '/',
+                ],
+            ],
+        ]);
+
+        $language = $this->matcher->match('https://www.live.example/foo', $site);
+
+        self::assertNotNull($language);
+        self::assertSame(0, $language->getLanguageId());
+    }
+
     public function testDoesNotMatchPathThatSharesPrefixButNotAtSegmentBoundary(): void
     {
         $site = new Site('main', 1, [

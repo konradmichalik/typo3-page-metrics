@@ -28,8 +28,12 @@ without leaving the backend.
   Matomo is included, more sources can register without touching the core
 - `page-metrics:import` console command for scheduled or manual imports,
   idempotent by default, `--force` to re-import the full retention window
-- `Web > Page Metrics` backend module: per-page metric tiles with a period
-  switch, a 30-day sparkline popover, and an unresolved-URL indicator
+- Metric tiles right in `Web > Page`, below the page title: page views,
+  visits, avg. time on page, bounce rate, a period switch, and a 30-day
+  sparkline popover per tile, loaded asynchronously so it never affects the
+  page module's own render time
+- `ModifyMetricTilesEvent` lets other extensions contribute additional
+  tiles without implementing the full `MetricSourceInterface`
 - Only aggregates are stored — no IPs, no user agents, no sub-day timestamps
 
 ## Installation
@@ -53,6 +57,7 @@ pageMetrics:
   resolution:
     dropQueryString: true
     keepQueryParams: ['tx_solr[q]']
+    additionalHosts: ['www.example.com']
   retentionDays: 400
 ```
 
@@ -60,6 +65,13 @@ If `brotkrueml/typo3-matomo-widgets` is already installed and configured for
 the site, its `matomoWidgetsUrl`/`matomoWidgetsIdSite`/`matomoWidgetsTokenAuth`
 keys are used as a fallback when this extension's own `sources.matomo` is
 not set — no need to configure the same Matomo instance twice.
+
+`resolution.additionalHosts` lets a site accept URLs reported under a host
+other than its own `base` (and each language's base) as belonging to it, the
+page lookup still uses the local page tree. This is for Dev/Stage instances
+whose `base` differs from production: the analytics source (e.g. Matomo)
+always reports the production domain, so importing on an environment with a
+different `base` would otherwise resolve nothing.
 
 ## Usage
 
@@ -70,7 +82,8 @@ vendor/bin/typo3 page-metrics:import
 vendor/bin/typo3 page-metrics:import --force
 ```
 
-Then open **Web → Page Metrics** and select a page in the page tree.
+Then open **Web → Page** and select a page in the page tree — the tiles
+appear directly below the page title.
 
 ## Development
 

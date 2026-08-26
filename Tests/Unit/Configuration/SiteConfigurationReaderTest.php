@@ -45,6 +45,7 @@ final class SiteConfigurationReaderTest extends TestCase
         self::assertTrue($configuration->dropQueryString);
         self::assertSame([], $configuration->keepQueryParams);
         self::assertSame(400, $configuration->retentionDays);
+        self::assertSame([], $configuration->additionalHosts);
     }
 
     public function testReadsFullyConfiguredSite(): void
@@ -70,6 +71,35 @@ final class SiteConfigurationReaderTest extends TestCase
         self::assertSame(['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 3]], $configuration->sources);
         self::assertSame(['tx_solr[q]'], $configuration->keepQueryParams);
         self::assertSame(90, $configuration->retentionDays);
+    }
+
+    public function testReadsAdditionalHosts(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://site.ddev.site/',
+            'pageMetrics' => [
+                'enabled' => true,
+                'resolution' => [
+                    'additionalHosts' => ['www.live.example'],
+                ],
+            ],
+        ]);
+
+        $configuration = $this->subject->read($site);
+
+        self::assertSame(['www.live.example'], $configuration->additionalHosts);
+    }
+
+    public function testThrowsWhenAdditionalHostsIsNotAList(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true, 'resolution' => ['additionalHosts' => ['key' => 'value']]],
+        ]);
+
+        $this->expectException(InvalidSiteConfigurationException::class);
+
+        $this->subject->read($site);
     }
 
     public function testThrowsWhenEnabledIsNotBoolean(): void
