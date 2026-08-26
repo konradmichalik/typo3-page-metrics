@@ -94,8 +94,8 @@ final class Ga4MetricSourceTest extends TestCase
     public function testFetchYieldsPageviewsSessionsAndEngagementTimeFromThePageReport(): void
     {
         $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
-        $this->apiClient->method('runReport')->willReturnCallback(function (Ga4Configuration $configuration, array $body): array {
-            if ((['name' => 'pagePath']) === ($body['dimensions'][1] ?? null)) {
+        $this->apiClient->method('runReport')->willReturnCallback(static function (Ga4Configuration $configuration, array $body): array {
+            if (['name' => 'pagePath'] === ($body['dimensions'][1] ?? null)) {
                 return [
                     'rows' => [
                         [
@@ -126,8 +126,8 @@ final class Ga4MetricSourceTest extends TestCase
     public function testFetchYieldsLandingSessionsAndDerivedBouncesFromTheLandingReport(): void
     {
         $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
-        $this->apiClient->method('runReport')->willReturnCallback(function (Ga4Configuration $configuration, array $body): array {
-            if ((['name' => 'landingPage']) === ($body['dimensions'][1] ?? null)) {
+        $this->apiClient->method('runReport')->willReturnCallback(static function (Ga4Configuration $configuration, array $body): array {
+            if (['name' => 'landingPage'] === ($body['dimensions'][1] ?? null)) {
                 return [
                     'rows' => [
                         [
@@ -149,5 +149,56 @@ final class Ga4MetricSourceTest extends TestCase
         self::assertSame(20, $metrics[0]->value);
         self::assertSame('ga4.landing_bounces', $metrics[1]->metric);
         self::assertSame(10, $metrics[1]->value);
+    }
+
+    public function testFetchBuildsUrlsFromOriginOnlyForSubdirectoryBasedSites(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+        $site = new Site('main', 1, ['base' => 'https://example.com/en/']);
+
+        $this->apiClient->method('runReport')->willReturnCallback(static function (Ga4Configuration $configuration, array $body): array {
+            if (['name' => 'pagePath'] === ($body['dimensions'][1] ?? null)) {
+                return [
+                    'rows' => [
+                        [
+                            'dimensionValues' => [['value' => '20260801'], ['value' => '/en/about']],
+                            'metricValues' => [['value' => '1'], ['value' => '1'], ['value' => '1']],
+                        ],
+                    ],
+                ];
+            }
+
+            return ['rows' => []];
+        });
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+        $metrics = iterator_to_array($this->subject->fetch($site, $range), false);
+
+        self::assertSame('https://example.com/en/about', $metrics[0]->url);
+    }
+
+    public function testFetchSkipsRowsWithNonRootRelativePathValues(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+
+        $this->apiClient->method('runReport')->willReturnCallback(static function (Ga4Configuration $configuration, array $body): array {
+            if (['name' => 'pagePath'] === ($body['dimensions'][1] ?? null)) {
+                return [
+                    'rows' => [
+                        [
+                            'dimensionValues' => [['value' => '20260801'], ['value' => '(not set)']],
+                            'metricValues' => [['value' => '1'], ['value' => '1'], ['value' => '1']],
+                        ],
+                    ],
+                ];
+            }
+
+            return ['rows' => []];
+        });
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+        $metrics = iterator_to_array($this->subject->fetch($this->site, $range), false);
+
+        self::assertSame([], $metrics);
     }
 }

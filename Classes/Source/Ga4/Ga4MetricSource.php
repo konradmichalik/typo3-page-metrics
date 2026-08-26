@@ -21,7 +21,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 
 use function is_array;
 use function is_string;
-use function rtrim;
+use function str_starts_with;
 
 /**
  * Ga4MetricSource.
@@ -110,7 +110,8 @@ final class Ga4MetricSource implements MetricSourceInterface
             return;
         }
 
-        $baseUrl = rtrim((string) $site->getBase(), '/');
+        $base = $site->getBase();
+        $baseUrl = $base->getScheme().'://'.$base->getAuthority();
         $dateRange = ['startDate' => $range->from->format('Y-m-d'), 'endDate' => $range->until->format('Y-m-d')];
 
         $pageReport = $this->apiClient->runReport($configuration, [
@@ -185,7 +186,7 @@ final class Ga4MetricSource implements MetricSourceInterface
         $dateValue = $dimensionValues[0]['value'] ?? null;
         $pathValue = $dimensionValues[1]['value'] ?? null;
 
-        if (!is_string($dateValue) || !is_string($pathValue) || '' === $pathValue) {
+        if (!is_string($dateValue) || !is_string($pathValue) || '' === $pathValue || !str_starts_with($pathValue, '/')) {
             return null;
         }
 
