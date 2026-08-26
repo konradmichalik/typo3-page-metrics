@@ -43,10 +43,15 @@ services:
         public: true
 
     # Public so functional tests can fetch it directly via $this->get() instead
-    # of going through the backend module route dispatcher.
-    KonradMichalik\Typo3PageMetrics\Controller\PageMetricsController:
+    # of dispatching a full ModifyPageLayoutContentEvent.
+    KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder:
         arguments:
             $sources: !tagged_iterator page_metrics.metric_source
+        public: true
+
+    # Public so functional tests can fetch it directly via $this->get() instead
+    # of dispatching a real AJAX route request.
+    KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsTilesController:
         public: true
 
     KonradMichalik\Typo3PageMetrics\Source\Matomo\MatomoMetricSource:
