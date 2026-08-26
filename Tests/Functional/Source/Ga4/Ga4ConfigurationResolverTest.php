@@ -39,7 +39,10 @@ final class Ga4ConfigurationResolverTest extends FunctionalTestCase
 
     protected function tearDown(): void
     {
-        @unlink($this->keyFilePath);
+        if (file_exists($this->keyFilePath)) {
+            unlink($this->keyFilePath);
+        }
+
         parent::tearDown();
     }
 
