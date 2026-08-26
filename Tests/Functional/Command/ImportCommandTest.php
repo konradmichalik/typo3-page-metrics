@@ -35,6 +35,7 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
  */
 final class ImportCommandTest extends FunctionalTestCase
 {
+    protected array $coreExtensionsToLoad = ['redirects'];
     protected array $testExtensionsToLoad = ['konradmichalik/typo3-page-metrics'];
 
     private DailyMetricsRepository $dailyMetricsRepository;
@@ -141,6 +142,45 @@ final class ImportCommandTest extends FunctionalTestCase
 
         $series = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today));
         self::assertSame([$today->format('Y-m-d') => 999], $series);
+    }
+
+    public function testTwoUrlsResolvingToTheSamePageAndDaySumInsteadOfOverwriting(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricSource([
+            new UrlMetric('https://example.com/about', $today, 'stub.hits', 10),
+            new UrlMetric('https://example.com/about?utm_source=x', $today, 'stub.hits', 7),
+        ]);
+
+        $this->runImport([$stub]);
+
+        $series = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today));
+        self::assertSame([$today->format('Y-m-d') => 17], $series);
+    }
+
+    public function testResolvingThroughARedirectAlsoWritesAViaRedirectDimensionRow(): void
+    {
+        $this->importCSVDataSet(__DIR__.'/Fixtures/sys_redirect.csv');
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricSource([new UrlMetric('https://example.com/old-about', $today, 'stub.hits', 15)]);
+
+        $this->runImport([$stub]);
+
+        $plain = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today));
+        $viaRedirect = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today), 'via_redirect');
+        self::assertSame([$today->format('Y-m-d') => 15], $plain);
+        self::assertSame([$today->format('Y-m-d') => 15], $viaRedirect);
+    }
+
+    public function testResolvingDirectlyDoesNotWriteAViaRedirectDimensionRow(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
+
+        $this->runImport([$stub]);
+
+        $viaRedirect = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today), 'via_redirect');
+        self::assertSame([$today->format('Y-m-d') => 0], $viaRedirect);
     }
 
     public function testOneSitesSourceFailureDoesNotAbortImportForOtherSites(): void

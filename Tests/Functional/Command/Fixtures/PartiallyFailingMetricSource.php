@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures;
 
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, UrlMetric};
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use RuntimeException;
@@ -51,7 +52,17 @@ final class PartiallyFailingMetricSource implements MetricSourceInterface
 
     public function getMetricDefinitions(): array
     {
-        return [new MetricDefinition('partial.hits', 'Hits', 'actions-view', 'count', 1)];
+        return [new MetricDefinition('partial.hits', 'Hits', 'Partial hits.', 'actions-view', MetricUnit::Count, 1, '#57606a')];
+    }
+
+    public function getRateMetricDefinitions(): array
+    {
+        return [];
+    }
+
+    public function getExternalLink(Site $site, string $pageUrl, DateRange $range): ?string
+    {
+        return null;
     }
 
     public function fetch(Site $site, DateRange $range): iterable

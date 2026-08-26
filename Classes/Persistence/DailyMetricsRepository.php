@@ -62,7 +62,7 @@ class DailyMetricsRepository
     /**
      * @return array<string, int> Y-m-d => value, zero-filled for days without a row
      */
-    public function dailySeries(int $pageUid, int $languageUid, string $metric, DateRange $range): array
+    public function dailySeries(int $pageUid, int $languageUid, string $metric, DateRange $range, string $dimension = ''): array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $rows = $queryBuilder
@@ -72,6 +72,7 @@ class DailyMetricsRepository
                 $queryBuilder->expr()->eq('page_uid', $queryBuilder->createNamedParameter($pageUid, ParameterType::INTEGER)),
                 $queryBuilder->expr()->eq('sys_language_uid', $queryBuilder->createNamedParameter($languageUid, ParameterType::INTEGER)),
                 $queryBuilder->expr()->eq('metric', $queryBuilder->createNamedParameter($metric)),
+                $queryBuilder->expr()->eq('dimension', $queryBuilder->createNamedParameter($dimension)),
                 $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($range->from->format('Y-m-d'))),
                 $queryBuilder->expr()->lte('date', $queryBuilder->createNamedParameter($range->until->format('Y-m-d'))),
             )

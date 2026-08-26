@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Source;
 
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, UrlMetric};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, RateMetricDefinition, UrlMetric};
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 /**
@@ -33,6 +33,18 @@ interface MetricSourceInterface
      * @return list<MetricDefinition>
      */
     public function getMetricDefinitions(): array;
+
+    /**
+     * @return list<RateMetricDefinition>
+     */
+    public function getRateMetricDefinitions(): array;
+
+    /**
+     * Optional deep link into this source's own external UI (e.g. Matomo),
+     * pre-filtered to $pageUrl and $range. Null when the source has no such
+     * external UI, or is not configured for $site.
+     */
+    public function getExternalLink(Site $site, string $pageUrl, DateRange $range): ?string;
 
     /**
      * @return iterable<UrlMetric>

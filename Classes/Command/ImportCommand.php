@@ -36,6 +36,7 @@ use function sprintf;
 final class ImportCommand extends Command
 {
     private const UNRESOLVED_CAP_PER_DAY = 100;
+    private const VIA_REDIRECT_DIMENSION = 'via_redirect';
 
     /**
      * @param iterable<MetricSourceInterface> $sources
@@ -115,16 +116,33 @@ final class ImportCommand extends Command
 
         $range = new DateRange($from, $today);
 
+        // Aggregated in memory, keyed by date|page|language|metric|dimension,
+        // before any upsert() call: two distinct source URLs (e.g. Matomo's
+        // own URL normalization differing from ours, or one direct hit plus
+        // one redirect both landing on the same page/day) must sum into one
+        // total rather than the second upsert() silently overwriting the
+        // first - upsert() is a set operation by design (see its own
+        // docblock), so summing has to happen before it, not in it.
+        $aggregated = [];
+
         foreach ($source->fetch($site, $range) as $urlMetric) {
             $result = $this->resolver->resolve($urlMetric->url, $configuration->dropQueryString, $configuration->keepQueryParams);
 
-            if ($result instanceof ResolvedUrl) {
-                $this->dailyMetricsRepository->upsert($result->pageUid, $result->languageUid, $identifier, $urlMetric->date, $urlMetric->metric, $urlMetric->value, $urlMetric->dimension);
+            if (!$result instanceof ResolvedUrl) {
+                $this->unresolvedUrlRepository->record($identifier, $urlMetric->date, $urlMetric->url, $urlMetric->metric, $result->reason, $urlMetric->value, self::UNRESOLVED_CAP_PER_DAY);
 
                 continue;
             }
 
-            $this->unresolvedUrlRepository->record($identifier, $urlMetric->date, $urlMetric->url, $urlMetric->metric, $result->reason, $urlMetric->value, self::UNRESOLVED_CAP_PER_DAY);
+            $aggregated = $this->accumulate($aggregated, $result->pageUid, $result->languageUid, $urlMetric->date, $urlMetric->metric, $urlMetric->dimension ?? '', $urlMetric->value);
+
+            if ($result->viaRedirect) {
+                $aggregated = $this->accumulate($aggregated, $result->pageUid, $result->languageUid, $urlMetric->date, $urlMetric->metric, self::VIA_REDIRECT_DIMENSION, $urlMetric->value);
+            }
+        }
+
+        foreach ($aggregated as $row) {
+            $this->dailyMetricsRepository->upsert($row['pageUid'], $row['languageUid'], $identifier, $row['date'], $row['metric'], $row['value'], $row['dimension']);
         }
 
         // Mark yesterday, not today, as the last complete imported day: a
@@ -133,5 +151,32 @@ final class ImportCommand extends Command
         // until it is genuinely a fully elapsed prior day.
         $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $today->modify('-1 day'));
         $output->writeln(sprintf('Imported "%s" for site "%s" from %s to %s.', $identifier, $site->getIdentifier(), $from->format('Y-m-d'), $today->format('Y-m-d')));
+    }
+
+    /**
+     * @param array<string, array{pageUid: int, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}> $aggregated
+     *
+     * @return array<string, array{pageUid: int, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}>
+     */
+    private function accumulate(array $aggregated, int $pageUid, int $languageUid, DateTimeImmutable $date, string $metric, string $dimension, int $value): array
+    {
+        $key = implode('|', [$date->format('Y-m-d'), $pageUid, $languageUid, $metric, $dimension]);
+
+        if (isset($aggregated[$key])) {
+            $aggregated[$key]['value'] += $value;
+
+            return $aggregated;
+        }
+
+        $aggregated[$key] = [
+            'pageUid' => $pageUid,
+            'languageUid' => $languageUid,
+            'date' => $date,
+            'metric' => $metric,
+            'dimension' => $dimension,
+            'value' => $value,
+        ];
+
+        return $aggregated;
     }
 }

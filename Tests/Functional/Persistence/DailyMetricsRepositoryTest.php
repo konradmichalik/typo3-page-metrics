@@ -83,4 +83,14 @@ final class DailyMetricsRepositoryTest extends FunctionalTestCase
         self::assertSame(['2026-08-01' => 20], $this->subject->dailySeries(2, 1, 'matomo.pageviews', new DateRange($date, $date)));
         self::assertSame(['2026-08-01' => 7], $this->subject->dailySeries(2, 0, 'matomo.visits', new DateRange($date, $date)));
     }
+
+    public function testDailySeriesFiltersByDimension(): void
+    {
+        $date = new DateTimeImmutable('2026-08-01');
+        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.pageviews', 30, '');
+        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.pageviews', 12, 'via_redirect');
+
+        self::assertSame(['2026-08-01' => 30], $this->subject->dailySeries(2, 0, 'matomo.pageviews', new DateRange($date, $date)));
+        self::assertSame(['2026-08-01' => 12], $this->subject->dailySeries(2, 0, 'matomo.pageviews', new DateRange($date, $date), 'via_redirect'));
+    }
 }

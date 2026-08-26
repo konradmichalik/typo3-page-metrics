@@ -13,12 +13,16 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Source\Matomo;
 
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, UrlMetric};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, RateMetricDefinition, UrlMetric};
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 use function is_array;
 use function is_string;
+use function rawurlencode;
+use function rtrim;
+use function sprintf;
 
 /**
  * MatomoMetricSource.
@@ -54,9 +58,59 @@ final class MatomoMetricSource implements MetricSourceInterface
     public function getMetricDefinitions(): array
     {
         return [
-            new MetricDefinition('matomo.pageviews', 'Page views', 'actions-view', 'count', 10),
-            new MetricDefinition('matomo.visits', 'Visits', 'actions-visit', 'count', 20),
+            new MetricDefinition('matomo.pageviews', 'Page views', 'The number of times this page was viewed in the selected period.', 'tabler-eye-search', MetricUnit::Count, 10, '#0969da'),
+            new MetricDefinition('matomo.visits', 'Visits', 'The number of visits that included this page in the selected period.', 'tabler-chart-dots', MetricUnit::Count, 20, '#8250df'),
         ];
+    }
+
+    public function getRateMetricDefinitions(): array
+    {
+        return [
+            new RateMetricDefinition(
+                'matomo.avg_time_on_page',
+                'Avg. time on page',
+                'The average time visitors spent on this page in the selected period.',
+                'tabler-clock',
+                MetricUnit::Seconds,
+                30,
+                '#bf8700',
+                'matomo.time_spent_seconds',
+                'matomo.visits',
+            ),
+            new RateMetricDefinition(
+                'matomo.bounce_rate',
+                'Bounce rate',
+                'The share of visits that started on this page and left without further interaction.',
+                'tabler-door-exit',
+                MetricUnit::Percent,
+                40,
+                '#cf222e',
+                'matomo.entry_bounces',
+                'matomo.entries',
+            ),
+        ];
+    }
+
+    public function getExternalLink(Site $site, string $pageUrl, DateRange $range): ?string
+    {
+        $configuration = $this->configurationResolver->resolve($site);
+
+        if (null === $configuration) {
+            return null;
+        }
+
+        $dateRange = sprintf('%s,%s', $range->from->format('Y-m-d'), $range->until->format('Y-m-d'));
+        $segment = rawurlencode(sprintf('pageUrl==%s', $pageUrl));
+
+        return sprintf(
+            '%s/index.php?module=CoreHome&action=index&idSite=%d&period=range&date=%s#?idSite=%d&period=range&date=%s&category=General_Actions&subcategory=General_Pages&segment=%s',
+            rtrim($configuration->instanceUrl, '/'),
+            $configuration->idSite,
+            $dateRange,
+            $configuration->idSite,
+            $dateRange,
+            $segment,
+        );
     }
 
     public function fetch(Site $site, DateRange $range): iterable
@@ -86,6 +140,12 @@ final class MatomoMetricSource implements MetricSourceInterface
 
                 yield new UrlMetric($row['url'], $day, 'matomo.pageviews', (int) ($row['nb_hits'] ?? 0));
                 yield new UrlMetric($row['url'], $day, 'matomo.visits', (int) ($row['nb_visits'] ?? 0));
+                // Raw components for the derived rate tiles above - a rate
+                // is not itself summable across days, so we store its
+                // numerator/denominator and divide sums at read time instead.
+                yield new UrlMetric($row['url'], $day, 'matomo.time_spent_seconds', (int) ($row['sum_time_spent'] ?? 0));
+                yield new UrlMetric($row['url'], $day, 'matomo.entries', (int) ($row['entry_nb_visits'] ?? 0));
+                yield new UrlMetric($row['url'], $day, 'matomo.entry_bounces', (int) ($row['entry_bounce_count'] ?? 0));
             }
         }
     }

@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
+
 /**
  * MetricDefinition.
  *
@@ -29,9 +31,11 @@ final readonly class MetricDefinition
     public function __construct(
         public string $identifier,
         public string $label,
+        public string $description,
         public string $icon,
-        public string $unit,
+        public MetricUnit $unit,
         public int $sortOrder,
+        public string $color,
         public ?int $maxDimensions = null,
     ) {}
 }

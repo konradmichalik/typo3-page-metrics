@@ -13,24 +13,34 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
 
 /**
  * MetricTile.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final readonly class MetricTile
 {
     /**
-     * @param array<string, int> $sparkline Y-m-d => value, fixed 30-day window regardless of the tile's own period
+     * @param array<string, int> $sparkline     Y-m-d => value, fixed 30-day window regardless of the tile's own period
+     * @param int|null           $deltaPercent  null when the previous period's total was zero and the current
+     *                                          period's is not - there is no meaningful percentage base, rendered
+     *                                          as "new" rather than a false infinite/undefined percentage
      */
     public function __construct(
         public string $identifier,
         public string $label,
+        public string $description,
         public string $icon,
-        public string $unit,
+        public string $color,
+        public MetricUnit $unit,
         public int $value,
+        public string $formattedValue,
         public array $sparkline,
+        public ?int $deltaPercent,
+        public TrendDirection $trend,
+        public int $redirectSharePercent,
+        public ?string $externalLink,
     ) {}
 }

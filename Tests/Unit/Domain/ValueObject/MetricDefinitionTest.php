@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricDefinition;
 use PHPUnit\Framework\TestCase;
 
@@ -27,19 +28,21 @@ final class MetricDefinitionTest extends TestCase
 {
     public function testConstructorAssignsAllProperties(): void
     {
-        $definition = new MetricDefinition('matomo.pageviews', 'Page views', 'actions-view', 'count', 10, 5);
+        $definition = new MetricDefinition('matomo.pageviews', 'Page views', 'The number of times this page was viewed.', 'actions-view', MetricUnit::Count, 10, '#0969da', 5);
 
         self::assertSame('matomo.pageviews', $definition->identifier);
         self::assertSame('Page views', $definition->label);
+        self::assertSame('The number of times this page was viewed.', $definition->description);
         self::assertSame('actions-view', $definition->icon);
-        self::assertSame('count', $definition->unit);
+        self::assertSame(MetricUnit::Count, $definition->unit);
         self::assertSame(10, $definition->sortOrder);
+        self::assertSame('#0969da', $definition->color);
         self::assertSame(5, $definition->maxDimensions);
     }
 
     public function testMaxDimensionsDefaultsToNull(): void
     {
-        $definition = new MetricDefinition('matomo.pageviews', 'Page views', 'actions-view', 'count', 10);
+        $definition = new MetricDefinition('matomo.pageviews', 'Page views', 'The number of times this page was viewed.', 'actions-view', MetricUnit::Count, 10, '#0969da');
 
         self::assertNull($definition->maxDimensions);
     }

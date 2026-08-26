@@ -57,6 +57,16 @@ final class MatomoMetricSourceTest extends TestCase
         self::assertSame(['matomo.pageviews', 'matomo.visits'], $identifiers);
     }
 
+    public function testGetRateMetricDefinitionsReturnsAvgTimeOnPageAndBounceRate(): void
+    {
+        $identifiers = array_map(
+            static fn ($definition) => $definition->identifier,
+            $this->subject->getRateMetricDefinitions(),
+        );
+
+        self::assertSame(['matomo.avg_time_on_page', 'matomo.bounce_rate'], $identifiers);
+    }
+
     public function testSupportsReturnsTrueWhenConfigurationResolves(): void
     {
         $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
@@ -71,6 +81,30 @@ final class MatomoMetricSourceTest extends TestCase
         self::assertFalse($this->subject->supports($this->site));
     }
 
+    public function testGetExternalLinkBuildsAMatomoDeepLinkFilteredByPageUrlAndRange(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+        $link = $this->subject->getExternalLink($this->site, 'https://example.com/about', $range);
+
+        self::assertNotNull($link);
+        self::assertStringStartsWith('https://matomo.example.com/index.php?', $link);
+        self::assertStringContainsString('idSite=3', $link);
+        self::assertStringContainsString('period=range', $link);
+        self::assertStringContainsString('date=2026-08-01,2026-08-07', $link);
+        self::assertStringContainsString(rawurlencode('pageUrl==https://example.com/about'), $link);
+    }
+
+    public function testGetExternalLinkReturnsNullWhenNotConfigured(): void
+    {
+        $this->resolver->method('resolve')->willReturn(null);
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+
+        self::assertNull($this->subject->getExternalLink($this->site, 'https://example.com/about', $range));
+    }
+
     public function testFetchYieldsPageviewsAndVisitsPerRowPerDay(): void
     {
         $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
@@ -82,16 +116,43 @@ final class MatomoMetricSourceTest extends TestCase
         $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
         $metrics = iterator_to_array($this->subject->fetch($this->site, $range), false);
 
-        self::assertCount(4, $metrics);
+        self::assertCount(10, $metrics);
         self::assertSame('https://example.com/foo', $metrics[0]->url);
         self::assertSame('matomo.pageviews', $metrics[0]->metric);
         self::assertSame(10, $metrics[0]->value);
         self::assertSame('matomo.visits', $metrics[1]->metric);
         self::assertSame(7, $metrics[1]->value);
-        self::assertSame('https://example.com/bar', $metrics[2]->url);
+        self::assertSame('https://example.com/bar', $metrics[5]->url);
     }
 
-    public function testFetchYieldsOneRowPairPerDayInTheRange(): void
+    public function testFetchYieldsTimeSpentEntriesAndBouncesFromTheSameRow(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
+        $this->apiClient->method('request')->willReturn([
+            [
+                'label' => '/foo',
+                'url' => 'https://example.com/foo',
+                'nb_hits' => 10,
+                'nb_visits' => 7,
+                'sum_time_spent' => 420,
+                'entry_nb_visits' => 5,
+                'entry_bounce_count' => 2,
+            ],
+        ]);
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+        $metrics = iterator_to_array($this->subject->fetch($this->site, $range), false);
+
+        self::assertCount(5, $metrics);
+        self::assertSame('matomo.time_spent_seconds', $metrics[2]->metric);
+        self::assertSame(420, $metrics[2]->value);
+        self::assertSame('matomo.entries', $metrics[3]->metric);
+        self::assertSame(5, $metrics[3]->value);
+        self::assertSame('matomo.entry_bounces', $metrics[4]->metric);
+        self::assertSame(2, $metrics[4]->value);
+    }
+
+    public function testFetchYieldsOneRowGroupPerDayInTheRange(): void
     {
         $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
         $this->apiClient->method('request')->willReturn([
@@ -101,9 +162,9 @@ final class MatomoMetricSourceTest extends TestCase
         $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
         $metrics = iterator_to_array($this->subject->fetch($this->site, $range), false);
 
-        self::assertCount(4, $metrics);
+        self::assertCount(10, $metrics);
         self::assertSame('2026-08-01', $metrics[0]->date->format('Y-m-d'));
-        self::assertSame('2026-08-02', $metrics[2]->date->format('Y-m-d'));
+        self::assertSame('2026-08-02', $metrics[5]->date->format('Y-m-d'));
     }
 
     public function testFetchYieldsNothingWhenNotConfigured(): void
