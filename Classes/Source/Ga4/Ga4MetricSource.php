@@ -160,37 +160,57 @@ final class Ga4MetricSource implements MetricSourceInterface
         }
 
         foreach ($rows as $row) {
-            if (!is_array($row)) {
-                continue;
+            $parsedRow = is_array($row) ? $this->parseRow($row) : null;
+
+            if (null !== $parsedRow) {
+                yield $parsedRow;
             }
-
-            $dimensionValues = $row['dimensionValues'] ?? [];
-            $metricValues = $row['metricValues'] ?? [];
-
-            if (!is_array($dimensionValues) || !is_array($metricValues)) {
-                continue;
-            }
-
-            $dateValue = $dimensionValues[0]['value'] ?? null;
-            $pathValue = $dimensionValues[1]['value'] ?? null;
-
-            if (!is_string($dateValue) || !is_string($pathValue) || '' === $pathValue) {
-                continue;
-            }
-
-            $day = DateTimeImmutable::createFromFormat('Ymd', $dateValue);
-
-            if (false === $day) {
-                continue;
-            }
-
-            $values = [];
-
-            foreach ($metricValues as $metricValue) {
-                $values[] = is_array($metricValue) && is_string($metricValue['value'] ?? null) ? $metricValue['value'] : '0';
-            }
-
-            yield [$day->setTime(0, 0), $pathValue, $values];
         }
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     *
+     * @return array{0: DateTimeImmutable, 1: string, 2: list<string>}|null
+     */
+    private function parseRow(array $row): ?array
+    {
+        $dimensionValues = $row['dimensionValues'] ?? [];
+        $metricValues = $row['metricValues'] ?? [];
+
+        if (!is_array($dimensionValues) || !is_array($metricValues)) {
+            return null;
+        }
+
+        $dateValue = $dimensionValues[0]['value'] ?? null;
+        $pathValue = $dimensionValues[1]['value'] ?? null;
+
+        if (!is_string($dateValue) || !is_string($pathValue) || '' === $pathValue) {
+            return null;
+        }
+
+        $day = DateTimeImmutable::createFromFormat('Ymd', $dateValue);
+
+        if (false === $day) {
+            return null;
+        }
+
+        return [$day->setTime(0, 0), $pathValue, $this->extractMetricValues($metricValues)];
+    }
+
+    /**
+     * @param array<mixed> $metricValues
+     *
+     * @return list<string>
+     */
+    private function extractMetricValues(array $metricValues): array
+    {
+        $values = [];
+
+        foreach ($metricValues as $metricValue) {
+            $values[] = is_array($metricValue) && is_string($metricValue['value'] ?? null) ? $metricValue['value'] : '0';
+        }
+
+        return $values;
     }
 }
