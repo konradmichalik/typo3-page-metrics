@@ -151,6 +151,63 @@ final class Ga4MetricSourceTest extends TestCase
         self::assertSame(10, $metrics[1]->value);
     }
 
+    public function testFetchPaginatesThroughAllRowsWhenRowCountExceedsASinglePage(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+
+        $offsetsSeen = [];
+
+        $this->apiClient->method('runReport')->willReturnCallback(static function (Ga4Configuration $configuration, array $body) use (&$offsetsSeen): array {
+            if (['name' => 'landingPage'] === ($body['dimensions'][1] ?? null)) {
+                return ['rows' => []];
+            }
+
+            $offset = $body['offset'] ?? 0;
+            $offsetsSeen[] = $offset;
+
+            if (0 === $offset) {
+                return [
+                    'rows' => [
+                        [
+                            'dimensionValues' => [['value' => '20260801'], ['value' => '/one']],
+                            'metricValues' => [['value' => '1'], ['value' => '1'], ['value' => '1']],
+                        ],
+                        [
+                            'dimensionValues' => [['value' => '20260801'], ['value' => '/two']],
+                            'metricValues' => [['value' => '2'], ['value' => '2'], ['value' => '2']],
+                        ],
+                    ],
+                    'rowCount' => 3,
+                ];
+            }
+
+            return [
+                'rows' => [
+                    [
+                        'dimensionValues' => [['value' => '20260801'], ['value' => '/three']],
+                        'metricValues' => [['value' => '3'], ['value' => '3'], ['value' => '3']],
+                    ],
+                ],
+                'rowCount' => 3,
+            ];
+        });
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+        $metrics = iterator_to_array($this->subject->fetch($this->site, $range), false);
+
+        self::assertSame([0, 2], $offsetsSeen);
+
+        $pageviewUrls = array_map(
+            static fn ($metric) => $metric->url,
+            array_values(array_filter($metrics, static fn ($metric) => 'ga4.pageviews' === $metric->metric)),
+        );
+
+        self::assertSame(
+            ['https://example.com/one', 'https://example.com/two', 'https://example.com/three'],
+            $pageviewUrls,
+        );
+    }
+
     public function testFetchBuildsUrlsFromOriginOnlyForSubdirectoryBasedSites(): void
     {
         $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));

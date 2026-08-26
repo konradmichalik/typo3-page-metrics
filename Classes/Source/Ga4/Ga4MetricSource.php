@@ -19,7 +19,9 @@ use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinit
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
+use function count;
 use function is_array;
+use function is_int;
 use function is_string;
 use function str_starts_with;
 
@@ -114,28 +116,28 @@ final class Ga4MetricSource implements MetricSourceInterface
         $baseUrl = $base->getScheme().'://'.$base->getAuthority();
         $dateRange = ['startDate' => $range->from->format('Y-m-d'), 'endDate' => $range->until->format('Y-m-d')];
 
-        $pageReport = $this->apiClient->runReport($configuration, [
+        $pageRows = $this->runReportAllPages($configuration, [
             'dateRanges' => [$dateRange],
             'dimensions' => [['name' => 'date'], ['name' => 'pagePath']],
             'metrics' => [['name' => 'screenPageViews'], ['name' => 'sessions'], ['name' => 'userEngagementDuration']],
             'limit' => 100000,
         ]);
 
-        foreach ($this->rows($pageReport) as [$day, $path, $values]) {
+        foreach ($this->rows($pageRows) as [$day, $path, $values]) {
             $url = $baseUrl.$path;
             yield new UrlMetric($url, $day, 'ga4.pageviews', (int) round((float) $values[0]));
             yield new UrlMetric($url, $day, 'ga4.sessions', (int) round((float) $values[1]));
             yield new UrlMetric($url, $day, 'ga4.engagement_time_seconds', (int) round((float) $values[2]));
         }
 
-        $landingReport = $this->apiClient->runReport($configuration, [
+        $landingRows = $this->runReportAllPages($configuration, [
             'dateRanges' => [$dateRange],
             'dimensions' => [['name' => 'date'], ['name' => 'landingPage']],
             'metrics' => [['name' => 'sessions'], ['name' => 'bounceRate']],
             'limit' => 100000,
         ]);
 
-        foreach ($this->rows($landingReport) as [$day, $path, $values]) {
+        foreach ($this->rows($landingRows) as [$day, $path, $values]) {
             $url = $baseUrl.$path;
             $sessions = (int) round((float) $values[0]);
             $bounceRate = (float) $values[1];
@@ -148,20 +150,51 @@ final class Ga4MetricSource implements MetricSourceInterface
     }
 
     /**
-     * @param array<string, mixed> $report
+     * Loops runReport() until all rows for the request have been fetched.
+     *
+     * GA4's Data API caps a single runReport response at the requested
+     * 'limit' and reports the true total in the response's 'rowCount'
+     * field, a sibling key to 'rows'. A missing/non-numeric 'rowCount' is
+     * treated as "no more pages", matching the same defensive assumption
+     * used for the rest of this API's response shape in this file.
+     *
+     * @param array<string, mixed> $body
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function runReportAllPages(Ga4Configuration $configuration, array $body): array
+    {
+        $allRows = [];
+        $offset = 0;
+
+        do {
+            $body['offset'] = $offset;
+            $report = $this->apiClient->runReport($configuration, $body);
+            $rows = $report['rows'] ?? [];
+            $rows = is_array($rows) ? $rows : [];
+
+            foreach ($rows as $row) {
+                if (is_array($row)) {
+                    $allRows[] = $row;
+                }
+            }
+
+            $offset += count($rows);
+            $rowCount = $report['rowCount'] ?? null;
+        } while (is_int($rowCount) && $offset < $rowCount && [] !== $rows);
+
+        return $allRows;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
      *
      * @return iterable<array{0: DateTimeImmutable, 1: string, 2: list<string>}>
      */
-    private function rows(array $report): iterable
+    private function rows(array $rows): iterable
     {
-        $rows = $report['rows'] ?? [];
-
-        if (!is_array($rows)) {
-            return;
-        }
-
         foreach ($rows as $row) {
-            $parsedRow = is_array($row) ? $this->parseRow($row) : null;
+            $parsedRow = $this->parseRow($row);
 
             if (null !== $parsedRow) {
                 yield $parsedRow;
