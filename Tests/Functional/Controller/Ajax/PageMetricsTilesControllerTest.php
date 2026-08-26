@@ -117,13 +117,37 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $body = (string) $response->getBody();
 
         self::assertStringContainsString('Avg. time on page', $body);
-        self::assertStringContainsString('1m 30s', $body);
+        self::assertStringContainsString('1:30', $body);
         self::assertStringContainsString('data-unit="seconds"', $body);
         self::assertStringContainsString('Bounce rate', $body);
         self::assertStringContainsString('75%', $body);
         self::assertStringContainsString('data-unit="percent"', $body);
         self::assertStringContainsString('tabler-clock', $body);
         self::assertStringContainsString('tabler-door-exit', $body);
+    }
+
+    public function testRendersTheTrendTooltipForAPercentTileWithoutCrashing(): void
+    {
+        // Regression test: the trend tooltip's title attribute is built via
+        // f:translate's sprintf-style `arguments`, and a percent-unit tile's
+        // formatted value contains a literal "%" (e.g. "20%") - if the
+        // translation ever falls back to its `default` text and that default
+        // was written with pre-resolved Fluid placeholders instead of %1$s
+        // style ones, TYPO3 core's vsprintf() call chokes on that trailing
+        // "%" with a ValueError. Both period's bounce rates must be real and
+        // different so deltaPercent is neither null nor zero.
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entry_bounces', 3);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entries', 4);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-10 days'), 'matomo.entry_bounces', 2);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-10 days'), 'matomo.entries', 10);
+
+        $response = $this->dispatch(['id' => '2', 'period' => '7']);
+        $body = (string) $response->getBody();
+
+        self::assertStringContainsString('Previous period', $body);
+        self::assertStringContainsString('20%', $body);
     }
 
     public function testRendersEmptyResponseWhenBackendUserLacksPageAccess(): void
@@ -152,7 +176,7 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
             ->withAttribute('applicationType', SystemEnvironmentBuilder::REQUESTTYPE_BE);
         $request = $request->withAttribute('normalizedParams', NormalizedParams::createFromRequest($request));
 
-        return ($this->get(PageMetricsTilesController::class))->handleRequest($request);
+        return $this->get(PageMetricsTilesController::class)->handleRequest($request);
     }
 
     private function writeSiteConfiguration(string $identifier, int $rootPageId, string $base): void

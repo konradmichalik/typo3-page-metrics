@@ -1,6 +1,10 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SPARKLINE_HEIGHT = 52;
-const SPARKLINE_STEP = 4;
+// Fixed total width regardless of how many days are plotted (7/30/90, per
+// the period selector): points get closer together for a longer period
+// rather than the popover growing wider. 29 * 4px matches the previous
+// fixed 30-day sparkline's width, so the 30-day case looks unchanged.
+const SPARKLINE_WIDTH = 29 * 4;
 const openTiles = new Set();
 
 const CHEVRON_LEFT_PATH = 'M15 6l-6 6l6 6';
@@ -15,7 +19,7 @@ function formatValueForUnit(value, unit) {
     return `${value}%`;
   }
   if (unit === 'seconds') {
-    return value < 60 ? `${value}s` : `${Math.floor(value / 60)}m ${value % 60}s`;
+    return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
   }
   return String(value);
 }
@@ -70,10 +74,11 @@ class PageMetricsTile {
 
     const values = entries.map(([, value]) => value);
     const max = Math.max(...values, 1);
-    const width = (entries.length - 1) * SPARKLINE_STEP;
+    const width = SPARKLINE_WIDTH;
+    const step = entries.length > 1 ? width / (entries.length - 1) : 0;
 
     const points = entries.map(([, value], index) => [
-      index * SPARKLINE_STEP,
+      index * step,
       SPARKLINE_HEIGHT - (value / max) * SPARKLINE_HEIGHT,
     ]);
 
@@ -114,7 +119,7 @@ class PageMetricsTile {
     svg.addEventListener('mousemove', (event) => {
       const rect = svg.getBoundingClientRect();
       const relativeX = ((event.clientX - rect.left) / rect.width) * width;
-      const index = Math.max(0, Math.min(entries.length - 1, Math.round(relativeX / SPARKLINE_STEP)));
+      const index = Math.max(0, Math.min(entries.length - 1, step > 0 ? Math.round(relativeX / step) : 0));
       const [date, value] = entries[index];
       const [x, y] = points[index];
 
@@ -161,6 +166,7 @@ class PageMetricsTile {
     const today = values.at(-1) ?? 0;
     const yesterday = values.at(-2) ?? 0;
     const peak = Math.max(...values, 0);
+    const average = values.length > 0 ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
     const redirectShare = parseInt(this.element.dataset.redirectShare || '0', 10);
     const unit = this.element.dataset.unit;
 
@@ -212,6 +218,12 @@ class PageMetricsTile {
       stat('Today', formatValueForUnit(today, unit)) +
       stat('Yesterday', formatValueForUnit(yesterday, unit)) +
       stat('Peak', formatValueForUnit(peak, unit)) +
+      // For a rate tile this is the simple mean of the daily rates, which
+      // can differ from the tile's own headline value (a weighted average:
+      // sum of numerator / sum of denominator over the period) on a page
+      // with uneven day-to-day traffic - that divergence is itself useful
+      // information, not redundant with the headline number.
+      stat('Average', formatValueForUnit(average, unit)) +
       (redirectShare > 0 ? stat('Via redirects', `${redirectShare}%`) : '');
     this.popover.appendChild(stats);
 
@@ -430,9 +442,13 @@ async function loadTiles(container, period) {
   const previousHtml = container.innerHTML;
   const tilesContainer = container.querySelector('.pagemetrics-tiles');
 
+  // closePopover() (not a bare openTiles.delete()) so the popover element -
+  // appended to <body>, detached from the tile itself - is actually removed
+  // instead of being orphaned once the tile underneath it is replaced by
+  // the loading skeleton below.
   openTiles.forEach((tile) => {
     if (container.contains(tile.element)) {
-      openTiles.delete(tile);
+      tile.closePopover();
     }
   });
 

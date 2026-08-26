@@ -29,9 +29,9 @@ without leaving the backend.
 - `page-metrics:import` console command for scheduled or manual imports,
   idempotent by default, `--force` to re-import the full retention window
 - Metric tiles right in `Web > Page`, below the page title: page views,
-  visits, avg. time on page, bounce rate, a period switch, and a 30-day
-  sparkline popover per tile, loaded asynchronously so it never affects the
-  page module's own render time
+  visits, avg. time on page, bounce rate, a period switch (7/30/90 days),
+  and a sparkline popover per tile covering that same period, loaded
+  asynchronously so it never affects the page module's own render time
 - `ModifyMetricTilesEvent` lets other extensions contribute additional
   tiles without implementing the full `MetricSourceInterface`
 - Only aggregates are stored — no IPs, no user agents, no sub-day timestamps

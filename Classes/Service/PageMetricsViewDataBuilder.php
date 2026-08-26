@@ -23,6 +23,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Throwable;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Routing\RouterInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -45,7 +46,20 @@ final class PageMetricsViewDataBuilder
 {
     /** @var list<int> */
     private const PERIOD_OPTIONS = [7, 30, 90];
-    private const SPARKLINE_DAYS = 30;
+
+    /**
+     * Page types with no frontend content of their own - a folder, an
+     * external URL/shortcut, or a spacer never receives visits, so metrics
+     * tiles have nothing to show for them.
+     *
+     * @var list<int>
+     */
+    private const EXCLUDED_DOKTYPES = [
+        PageRepository::DOKTYPE_LINK,
+        PageRepository::DOKTYPE_SHORTCUT,
+        PageRepository::DOKTYPE_SPACER,
+        PageRepository::DOKTYPE_SYSFOLDER,
+    ];
 
     /**
      * @param iterable<MetricSourceInterface> $sources
@@ -60,17 +74,24 @@ final class PageMetricsViewDataBuilder
 
     public function build(int $pageId, int $languageId, int $requestedPeriodDays): PageMetricsViewData
     {
-        if ($pageId > 0 && false === BackendUtility::readPageAccess($pageId, $this->getBackendUser()->getPagePermsClause(Permission::PAGE_SHOW))) {
-            // Backend user has no PAGE_SHOW permission on this page (e.g. it
-            // sits outside their web mount) - degrade to the neutral "no page
-            // selected" state instead of leaking metrics for a page they
-            // cannot access.
-            $pageId = 0;
+        if ($pageId > 0) {
+            $pageRow = BackendUtility::readPageAccess($pageId, $this->getBackendUser()->getPagePermsClause(Permission::PAGE_SHOW));
+
+            if (false === $pageRow) {
+                // Backend user has no PAGE_SHOW permission on this page (e.g.
+                // it sits outside their web mount) - degrade to the neutral
+                // "no page selected" state instead of leaking metrics for a
+                // page they cannot access.
+                $pageId = 0;
+            } elseif (in_array((int) $pageRow['doktype'], self::EXCLUDED_DOKTYPES, true)) {
+                $pageId = 0;
+            }
         }
 
         $periodDays = in_array($requestedPeriodDays, self::PERIOD_OPTIONS, true) ? $requestedPeriodDays : 30;
         $site = $this->resolveSite($pageId);
         $hasPage = $pageId > 0 && null !== $site;
+        [$tileRange, $previousRange] = $this->computeRanges($periodDays);
 
         $unresolvedCount = null !== $site
             ? $this->unresolvedUrlRepository->countForSite($site->getBase()->getHost(), (new DateTimeImmutable('today'))->modify('-30 days'))
@@ -79,24 +100,38 @@ final class PageMetricsViewDataBuilder
         return new PageMetricsViewData(
             $hasPage,
             $pageId,
-            null !== $site ? $this->buildTiles($site, $pageId, $languageId, $periodDays) : [],
+            null !== $site ? $this->buildTiles($site, $pageId, $languageId, $tileRange, $previousRange) : [],
             $unresolvedCount,
             $periodDays,
             self::PERIOD_OPTIONS,
+            $this->formatRangeLabel($tileRange),
+            $this->formatRangeLabel($previousRange),
         );
     }
 
     /**
-     * @return list<MetricTile>
+     * @return array{0: DateRange, 1: DateRange}
      */
-    private function buildTiles(Site $site, int $pageId, int $languageId, int $periodDays): array
+    private function computeRanges(int $periodDays): array
     {
         $today = new DateTimeImmutable('today');
         $tileRange = new DateRange($today->modify(sprintf('-%d days', $periodDays - 1)), $today);
         $previousRangeUntil = $tileRange->from->modify('-1 day');
         $previousRange = new DateRange($previousRangeUntil->modify(sprintf('-%d days', $periodDays - 1)), $previousRangeUntil);
-        $sparklineRange = new DateRange($today->modify(sprintf('-%d days', self::SPARKLINE_DAYS - 1)), $today);
 
+        return [$tileRange, $previousRange];
+    }
+
+    private function formatRangeLabel(DateRange $range): string
+    {
+        return sprintf('%s – %s', $range->from->format('Y-m-d'), $range->until->format('Y-m-d'));
+    }
+
+    /**
+     * @return list<MetricTile>
+     */
+    private function buildTiles(Site $site, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange): array
+    {
         $pageUrl = $this->resolvePageUrl($site, $pageId);
         [$definitions, $rateDefinitions, $externalLinkByIdentifier] = $this->collectDefinitions($site, $pageUrl, $tileRange);
 
@@ -106,14 +141,14 @@ final class PageMetricsViewDataBuilder
         foreach ($definitions as $definition) {
             $ordered[] = [
                 'sortOrder' => $definition->sortOrder,
-                'tile' => $this->buildCountTile($definition, $pageId, $languageId, $tileRange, $previousRange, $sparklineRange, $externalLinkByIdentifier[$definition->identifier] ?? null),
+                'tile' => $this->buildCountTile($definition, $pageId, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null),
             ];
         }
 
         foreach ($rateDefinitions as $rateDefinition) {
             $ordered[] = [
                 'sortOrder' => $rateDefinition->sortOrder,
-                'tile' => $this->buildRateTile($rateDefinition, $pageId, $languageId, $tileRange, $previousRange, $sparklineRange, $externalLinkByIdentifier[$rateDefinition->identifier] ?? null),
+                'tile' => $this->buildRateTile($rateDefinition, $pageId, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$rateDefinition->identifier] ?? null),
             ];
         }
 
@@ -125,7 +160,10 @@ final class PageMetricsViewDataBuilder
         // MetricSourceInterface contract - appended after the built-in tiles,
         // in listener registration order, rather than merged into the sort
         // above (a listener-added tile has no MetricDefinition::$sortOrder).
-        $event = new ModifyMetricTilesEvent($tiles, $site, $pageId, $languageId, $tileRange, $previousRange, $sparklineRange);
+        // sparklineRange is kept as its own event property for API stability,
+        // but its value is now always the same as tileRange: the sparkline
+        // shows exactly the selected period, not a fixed separate window.
+        $event = new ModifyMetricTilesEvent($tiles, $site, $pageId, $languageId, $tileRange, $previousRange, $tileRange);
         $this->eventDispatcher->dispatch($event);
 
         return $event->getTiles();
@@ -173,10 +211,10 @@ final class PageMetricsViewDataBuilder
         }
     }
 
-    private function buildCountTile(MetricDefinition $definition, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange, DateRange $sparklineRange, ?string $externalLink): MetricTile
+    private function buildCountTile(MetricDefinition $definition, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink): MetricTile
     {
-        $sparkline = $this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->identifier, $sparklineRange);
-        $value = array_sum($this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->identifier, $tileRange));
+        $sparkline = $this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->identifier, $tileRange);
+        $value = array_sum($sparkline);
         $previousValue = array_sum($this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->identifier, $previousRange));
         $redirectValue = array_sum($this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->identifier, $tileRange, 'via_redirect'));
 
@@ -197,6 +235,7 @@ final class PageMetricsViewDataBuilder
             $trend,
             $redirectSharePercent,
             $externalLink,
+            null !== $deltaPercent ? $this->formatValue($previousValue, $definition->unit) : '',
         );
     }
 
@@ -207,15 +246,15 @@ final class PageMetricsViewDataBuilder
      * over each range, for the sparkline's daily points as well as the
      * tile/previous period totals.
      */
-    private function buildRateTile(RateMetricDefinition $definition, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange, DateRange $sparklineRange, ?string $externalLink): MetricTile
+    private function buildRateTile(RateMetricDefinition $definition, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink): MetricTile
     {
-        $numeratorSparkline = $this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->numerator, $sparklineRange);
-        $denominatorSparkline = $this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->denominator, $sparklineRange);
+        $numeratorSparkline = $this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->numerator, $tileRange);
+        $denominatorSparkline = $this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->denominator, $tileRange);
         $sparkline = $this->buildRatioSeries($numeratorSparkline, $denominatorSparkline, $definition->unit);
 
         $value = $this->computeRatio(
-            array_sum($this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->numerator, $tileRange)),
-            array_sum($this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->denominator, $tileRange)),
+            array_sum($numeratorSparkline),
+            array_sum($denominatorSparkline),
             $definition->unit,
         );
         $previousValue = $this->computeRatio(
@@ -240,6 +279,7 @@ final class PageMetricsViewDataBuilder
             $trend,
             0,
             $externalLink,
+            null !== $deltaPercent ? $this->formatValue($previousValue, $definition->unit) : '',
         );
     }
 
@@ -282,11 +322,7 @@ final class PageMetricsViewDataBuilder
 
     private function formatDuration(int $seconds): string
     {
-        if ($seconds < 60) {
-            return sprintf('%ds', $seconds);
-        }
-
-        return sprintf('%dm %ds', intdiv($seconds, 60), $seconds % 60);
+        return sprintf('%d:%02d', intdiv($seconds, 60), $seconds % 60);
     }
 
     /**

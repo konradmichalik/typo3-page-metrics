@@ -118,11 +118,17 @@
     scroll-snap-align: start;
     box-sizing: border-box;
     width: 210px;
+    /* Matches .pagemetrics-skeleton-tile's height. */
+    min-height: 78px;
     padding: 12px 16px;
     border: 1px solid var(--typo3-component-border-color, #cbcbcb);
     border-radius: var(--typo3-component-border-radius, 4px);
     background: var(--typo3-component-bg, #fff);
     position: relative;
+    /* Lets the trend badge sit flush in the top-right corner (see
+       .pagemetrics-tile-delta) and have its own square outer corner clipped
+       to follow the tile's rounded corner, rather than poking past it. */
+    overflow: hidden;
     cursor: pointer;
 }
 
@@ -159,7 +165,10 @@
 .pagemetrics-tile-main {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    /* Reserves room so a wide value never renders underneath the trend
+       badge pinned to the tile's top-right corner - scoped to just this
+       line (not the whole head) so the label below can use the full width. */
+    padding-right: 28px;
 }
 
 .pagemetrics-tile-value {
@@ -170,17 +179,28 @@
 }
 
 .pagemetrics-tile-delta {
+    position: absolute;
+    top: 0;
+    right: 0;
     display: inline-flex;
     align-items: center;
-    gap: 2px;
-    font-size: 0.75rem;
+    gap: 1px;
+    padding: 2px 6px;
+    /* Square everywhere except the inner (bottom-left) corner, which softens
+       the transition into the tile content - the outer top-right corner is
+       clipped to the tile's own rounded corner by its overflow: hidden. */
+    border-radius: 0 0 0 6px;
+    /* currentColor picks up whichever -up/-down/-flat modifier is active,
+       so the pill background always matches the trend color. */
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    font-size: 0.6875rem;
     font-weight: 600;
     white-space: nowrap;
 }
 
 .pagemetrics-tile-delta svg {
-    width: 14px;
-    height: 14px;
+    width: 11px;
+    height: 11px;
 }
 
 .pagemetrics-tile-delta-up {
@@ -330,6 +350,7 @@
     flex-shrink: 0;
     gap: 12px;
     width: 210px;
+    /* Kept in sync with .pagemetrics-tile's min-height, see comment there. */
     height: 78px;
     padding: 12px 16px;
     box-sizing: border-box;

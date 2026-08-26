@@ -55,6 +55,45 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         self::assertFalse($viewData->hasPage);
     }
 
+    public function testReturnsNoPageForASysfolder(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(4, 0, 30);
+
+        self::assertFalse($viewData->hasPage);
+        self::assertSame([], $viewData->tiles);
+    }
+
+    public function testSparklineCoversTheSelectedPeriodInsteadOfAFixedWindow(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 1);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7), 'matomo.pageviews');
+        self::assertCount(7, $tile->sparkline);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 90), 'matomo.pageviews');
+        self::assertCount(90, $tile->sparkline);
+    }
+
+    public function testExposesTheCurrentAndPreviousPeriodAsDateRangeLabels(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7);
+
+        self::assertSame(
+            sprintf('%s – %s', $today->modify('-6 days')->format('Y-m-d'), $today->format('Y-m-d')),
+            $viewData->currentRangeLabel,
+        );
+        self::assertSame(
+            sprintf('%s – %s', $today->modify('-13 days')->format('Y-m-d'), $today->modify('-7 days')->format('Y-m-d')),
+            $viewData->previousRangeLabel,
+        );
+    }
+
     public function testReturnsTileTotalForConfiguredMetric(): void
     {
         $this->writeSiteConfiguration(1, 'https://example.com/');
@@ -81,6 +120,7 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         self::assertSame(20, $tile->value);
         self::assertSame(100, $tile->deltaPercent);
         self::assertSame(TrendDirection::Up, $tile->trend);
+        self::assertSame('10', $tile->previousFormattedValue);
     }
 
     public function testReportsNewInsteadOfAPercentWhenThePreviousPeriodHadNoData(): void
@@ -93,6 +133,7 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         $tile = $this->tileFor($viewData, 'matomo.pageviews');
         self::assertNull($tile->deltaPercent);
         self::assertSame(TrendDirection::Up, $tile->trend);
+        self::assertSame('', $tile->previousFormattedValue);
     }
 
     public function testReportsFlatTrendWhenBothPeriodsHaveNoData(): void
@@ -150,7 +191,7 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
 
         $tile = $this->tileFor($viewData, 'matomo.avg_time_on_page');
         self::assertSame(100, $tile->value);
-        self::assertSame('1m 40s', $tile->formattedValue);
+        self::assertSame('1:40', $tile->formattedValue);
     }
 
     public function testRateTilesHaveNoRedirectShare(): void

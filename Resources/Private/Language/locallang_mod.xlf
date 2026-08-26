@@ -15,6 +15,15 @@
             <trans-unit id="trend.new" resname="trend.new">
                 <source>new</source>
             </trans-unit>
+            <trans-unit id="trend.explanation.current" resname="trend.explanation.current">
+                <source>This period (%1$s): %2$s</source>
+            </trans-unit>
+            <trans-unit id="trend.explanation.previous" resname="trend.explanation.previous">
+                <source>Previous period (%1$s): %2$s</source>
+            </trans-unit>
+            <trans-unit id="trend.explanation.new" resname="trend.explanation.new">
+                <source>No data in the previous period (%1$s) to compare against</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

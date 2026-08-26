@@ -23,10 +23,14 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
 final readonly class MetricTile
 {
     /**
-     * @param array<string, int> $sparkline     Y-m-d => value, fixed 30-day window regardless of the tile's own period
-     * @param int|null           $deltaPercent  null when the previous period's total was zero and the current
-     *                                          period's is not - there is no meaningful percentage base, rendered
-     *                                          as "new" rather than a false infinite/undefined percentage
+     * @param array<string, int> $sparkline              Y-m-d => value, covers the same period as the tile itself
+     * @param int|null           $deltaPercent           null when the previous period's total was zero and the
+     *                                                   current period's is not - there is no meaningful percentage
+     *                                                   base, rendered as "new" rather than a false infinite/undefined
+     *                                                   percentage
+     * @param string             $previousFormattedValue the previous period's own value, formatted the same way as
+     *                                                   $formattedValue - empty when $deltaPercent is null, since
+     *                                                   there is nothing meaningful to show
      */
     public function __construct(
         public string $identifier,
@@ -42,5 +46,6 @@ final readonly class MetricTile
         public TrendDirection $trend,
         public int $redirectSharePercent,
         public ?string $externalLink,
+        public string $previousFormattedValue,
     ) {}
 }

@@ -54,6 +54,8 @@ final readonly class PageMetricsTilesController
             'unresolvedCount' => $viewData->unresolvedCount,
             'periodDays' => $viewData->periodDays,
             'periodOptions' => $viewData->periodOptions,
+            'currentRangeLabel' => $viewData->currentRangeLabel,
+            'previousRangeLabel' => $viewData->previousRangeLabel,
         ]);
 
         return new HtmlResponse($view->render('PageHeader/Metrics'));

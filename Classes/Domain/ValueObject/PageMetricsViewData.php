@@ -31,5 +31,7 @@ final readonly class PageMetricsViewData
         public int $unresolvedCount,
         public int $periodDays,
         public array $periodOptions,
+        public string $currentRangeLabel,
+        public string $previousRangeLabel,
     ) {}
 }
