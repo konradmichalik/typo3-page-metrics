@@ -12,15 +12,49 @@ declare(strict_types=1);
  */
 
 use TYPO3\CMS\Core\Imaging\IconProvider\SvgIconProvider;
-use TYPO3\CMS\Core\Information\Typo3Version;
 
-$moduleIcon = (new Typo3Version())->getMajorVersion() >= 14
-    ? 'EXT:page_metrics/Resources/Public/Icons/module-icon.svg'
-    : 'EXT:page_metrics/Resources/Public/Icons/Extension.svg';
-
+// Sourced from Tabler Icons (MIT, see Resources/Public/Icons/TABLER_LICENSE.txt).
+// tabler-robot, tabler-spider and tabler-world-search are not wired to a
+// metric tile yet - they are staged for a future bot/crawler-traffic metric.
 return [
-    'tx-pagemetrics-module' => [
+    'tabler-eye-search' => [
         'provider' => SvgIconProvider::class,
-        'source' => $moduleIcon,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-eye-search.svg',
+    ],
+    'tabler-chart-dots' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-chart-dots.svg',
+    ],
+    'tabler-trending-up' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-trending-up.svg',
+    ],
+    'tabler-trending-down' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-trending-down.svg',
+    ],
+    'tabler-minus' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-minus.svg',
+    ],
+    'tabler-clock' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-clock.svg',
+    ],
+    'tabler-door-exit' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-door-exit.svg',
+    ],
+    'tabler-robot' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-robot.svg',
+    ],
+    'tabler-spider' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-spider.svg',
+    ],
+    'tabler-world-search' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-world-search.svg',
     ],
 ];
