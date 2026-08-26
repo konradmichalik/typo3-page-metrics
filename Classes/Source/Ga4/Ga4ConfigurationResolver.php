@@ -31,6 +31,9 @@ use function json_decode;
  * place that reads the file, so Ga4AuthTokenProvider only ever sees the
  * already-parsed client_email/private_key pair.
  *
+ * Not final: Task 4 mocks this as a Ga4MetricSource collaborator in a
+ * pure unit test, and PHP cannot generate a test double for a final class.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 class Ga4ConfigurationResolver
