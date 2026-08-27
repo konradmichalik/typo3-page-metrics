@@ -633,6 +633,42 @@
     }
 }
 
+/* One large icon to the left of the Trend widget's whole table area,
+   signalling at a glance whether this widget instance is configured for
+   drops or gains - same colored-circle treatment as .pagemetrics-tile-icon,
+   scaled up and using the same red/green as .pagemetrics-trend-up/-down
+   (semantic, not tied to a metric's own --pm-accent). */
+.pagemetrics-widget-trend {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.pagemetrics-widget-trend-sites {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.pagemetrics-widget-trend-direction {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: var(--typo3-component-border-radius, 4px);
+}
+
+.pagemetrics-widget-trend-direction-up {
+    background: color-mix(in srgb, #1a7f37 14%, white);
+    color: #1a7f37;
+}
+
+.pagemetrics-widget-trend-direction-down {
+    background: color-mix(in srgb, #c92a2a 14%, white);
+    color: #c92a2a;
+}
+
 /* Value + trend badge sharing one table cell/column (Most viewed pages /
    Trend widgets), right-aligned as a unit so the badge sits directly next
    to the number it qualifies instead of its own separate column. */

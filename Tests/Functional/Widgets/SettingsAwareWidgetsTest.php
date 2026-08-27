@@ -171,6 +171,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('About', $content);
         self::assertStringContainsString('pagemetrics-trend-down', $content);
         self::assertStringNotContainsString('Restricted', $content);
+        self::assertStringContainsString('pagemetrics-widget-trend-direction-down', $content);
     }
 
     public function testTrendWidgetListsTheBiggestGainWhenConfigured(): void
@@ -187,11 +188,30 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('Restricted', $content);
         self::assertStringContainsString('pagemetrics-trend-up', $content);
         self::assertStringNotContainsString('About', $content);
+        self::assertStringContainsString('pagemetrics-widget-trend-direction-up', $content);
+        self::assertStringNotContainsString('pagemetrics-widget-trend-direction-down', $content);
     }
 
     public function testTrendWidgetRendersTheEmptyStateWhenNoSiteIsConfigured(): void
     {
-        self::assertStringContainsString('callout-info', $this->renderTrendWidget([]));
+        $result = $this->renderTrendWidgetResult([]);
+
+        self::assertStringContainsString('callout-info', $result->content);
+        self::assertNull($result->label);
+    }
+
+    public function testTrendWidgetLabelIncludesTheConfiguredDirectionAndPeriod(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.pageviews', 100);
+
+        $result = $this->renderTrendWidgetResult(['direction' => 'up', 'period' => 7]);
+
+        self::assertStringContainsString('Page metrics trend', (string) $result->label);
+        self::assertStringContainsString('Biggest gains', (string) $result->label);
+        self::assertStringContainsString('7 days', (string) $result->label);
     }
 
     /**
@@ -218,10 +238,18 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
      */
     private function renderTrendWidget(array $settings): string
     {
+        return $this->renderTrendWidgetResult($settings)->content;
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     */
+    private function renderTrendWidgetResult(array $settings): WidgetResult
+    {
         $widget = $this->get('dashboard.widget.pageMetricsTrend');
         self::assertInstanceOf(TrendWidget::class, $widget);
 
-        return $widget->renderWidget($this->buildContext('pageMetricsTrend', $widget->getSettingsDefinitions(), $settings))->content;
+        return $widget->renderWidget($this->buildContext('pageMetricsTrend', $widget->getSettingsDefinitions(), $settings));
     }
 
     /**
