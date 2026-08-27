@@ -3,52 +3,61 @@
 <f:section name="main">
     <f:if condition="{sites}">
         <f:then>
-            <f:for each="{sites}" as="overview" iteration="siteIteration">
-                <div class="pagemetrics-widget-site">
-                    <f:if condition="{siteIteration.total} > 1">
-                        <h3 class="pagemetrics-widget-site-title">{overview.site.identifier}</h3>
-                    </f:if>
-                    <f:if condition="{overview.unresolvedUrls}">
-                        <f:then>
-                            <div class="widget-table-wrapper">
-                                <table class="widget-table table table-striped table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.notFoundPages.column.url" default="URL" /></th>
-                                            <th><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.notFoundPages.column.reason" default="Reason" /></th>
-                                            <th class="text-end"><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.notFoundPages.column.hits" default="Hits" /></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <f:for each="{overview.unresolvedUrls}" as="unresolvedUrl">
-                                            <tr>
-                                                <td class="col-responsive">
-                                                    <a href="{unresolvedUrl.url}" target="_blank" rel="noopener noreferrer" title="{unresolvedUrl.url}">{unresolvedUrl.path}</a>
-                                                </td>
-                                                <td class="nowrap">
-                                                    <span class="badge badge-secondary" data-reason="{unresolvedUrl.reason.value}">
-                                                        <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:unresolved.reason.{unresolvedUrl.reason.value}" default="{unresolvedUrl.reason.value}" />
-                                                    </span>
-                                                </td>
-                                                <td class="text-end nowrap">{unresolvedUrl.value}</td>
-                                            </tr>
-                                        </f:for>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </f:then>
-                        <f:else>
-                            <div class="callout callout-info">
-                                <div class="callout-content">
-                                    <div class="callout-title">
-                                        <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.notFoundPages.empty" default="No unresolved URLs in the last 30 days." />
-                                    </div>
-                                </div>
-                            </div>
-                        </f:else>
-                    </f:if>
+            <div class="pagemetrics-widget-aside">
+                <div class="pagemetrics-widget-aside-icon-col">
+                    <span class="pagemetrics-widget-aside-icon" style="--pm-accent: #cf222e" aria-hidden="true">
+                        <core:icon identifier="{configuration.iconIdentifier}" size="large" alternativeMarkupIdentifier="inline" />
+                    </span>
                 </div>
-            </f:for>
+                <div class="pagemetrics-widget-aside-content">
+                    <f:for each="{sites}" as="overview" iteration="siteIteration">
+                        <div class="pagemetrics-widget-site">
+                            <f:if condition="{siteIteration.total} > 1">
+                                <h3 class="pagemetrics-widget-site-title">{overview.site.identifier}</h3>
+                            </f:if>
+                            <f:if condition="{overview.unresolvedUrls}">
+                                <f:then>
+                                    <div class="widget-table-wrapper">
+                                        <table class="widget-table table table-striped table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.notFoundPages.column.url" default="URL" /></th>
+                                                    <th><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.notFoundPages.column.reason" default="Reason" /></th>
+                                                    <th class="text-end"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.notFoundPages.column.hits" default="Hits" /></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <f:for each="{overview.unresolvedUrls}" as="unresolvedUrl">
+                                                    <tr>
+                                                        <td class="col-responsive">
+                                                            <a href="{unresolvedUrl.url}" target="_blank" rel="noopener noreferrer" title="{unresolvedUrl.url}">{unresolvedUrl.path}</a>
+                                                        </td>
+                                                        <td class="nowrap">
+                                                            <span class="badge badge-secondary" data-reason="{unresolvedUrl.reason.value}">
+                                                                <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:unresolved.reason.{unresolvedUrl.reason.value}" default="{unresolvedUrl.reason.value}" />
+                                                            </span>
+                                                        </td>
+                                                        <td class="text-end nowrap">{unresolvedUrl.value}</td>
+                                                    </tr>
+                                                </f:for>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </f:then>
+                                <f:else>
+                                    <div class="callout callout-info">
+                                        <div class="callout-content">
+                                            <div class="callout-title">
+                                                <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.notFoundPages.empty" default="No unresolved URLs in the last 30 days." />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </f:else>
+                            </f:if>
+                        </div>
+                    </f:for>
+                </div>
+            </div>
         </f:then>
         <f:else>
             <div class="callout callout-info">
@@ -57,7 +66,7 @@
                 </div>
                 <div class="callout-content">
                     <div class="callout-title">
-                        <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." />
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." />
                     </div>
                 </div>
             </div>

@@ -3,14 +3,16 @@
 <f:section name="main">
     <f:if condition="{sites}">
         <f:then>
-            <div class="pagemetrics-widget-trend">
-                <div class="pagemetrics-widget-trend-direction pagemetrics-widget-trend-direction-{direction}" aria-hidden="true">
-                    <f:if condition="{direction} == 'up'">
-                        <f:then><core:icon identifier="tabler-trending-up" size="large" alternativeMarkupIdentifier="inline" /></f:then>
-                        <f:else><core:icon identifier="tabler-trending-down" size="large" alternativeMarkupIdentifier="inline" /></f:else>
-                    </f:if>
+            <div class="pagemetrics-widget-aside">
+                <div class="pagemetrics-widget-aside-icon-col">
+                    <span class="pagemetrics-widget-aside-icon pagemetrics-widget-trend-direction-{direction}" aria-hidden="true">
+                        <f:if condition="{direction} == 'up'">
+                            <f:then><core:icon identifier="tabler-trending-up" size="large" alternativeMarkupIdentifier="inline" /></f:then>
+                            <f:else><core:icon identifier="tabler-trending-down" size="large" alternativeMarkupIdentifier="inline" /></f:else>
+                        </f:if>
+                    </span>
                 </div>
-                <div class="pagemetrics-widget-trend-sites">
+                <div class="pagemetrics-widget-aside-content">
                     <f:for each="{sites}" as="siteTrend" iteration="siteIteration">
                         <div class="pagemetrics-widget-site">
                             <f:if condition="{siteIteration.total} > 1">
@@ -22,8 +24,8 @@
                                         <table class="widget-table table table-striped table-hover">
                                             <thead>
                                                 <tr>
-                                                    <th><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.page" default="Page" /></th>
-                                                    <th class="text-end"><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.views" default="Views" /></th>
+                                                    <th><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.page" default="Page" /></th>
+                                                    <th class="text-end"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.views" default="Views" /></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -34,7 +36,7 @@
                                                             <div class="pagemetrics-widget-value-trend">
                                                                 {topPage.formattedValue}
                                                                 <f:if condition="{topPage.isNew}">
-                                                                    <f:then><f:variable name="deltaText"><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable></f:then>
+                                                                    <f:then><f:variable name="deltaText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable></f:then>
                                                                     <f:else><f:variable name="deltaText">{topPage.deltaPercent}%</f:variable></f:else>
                                                                 </f:if>
                                                                 <f:render partial="Widget/TrendBadge" arguments="{trend: topPage.trend, deltaText: deltaText}" />
@@ -50,7 +52,7 @@
                                     <div class="callout callout-info">
                                         <div class="callout-content">
                                             <div class="callout-title">
-                                                <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.empty" default="No trending pages in this period." />
+                                                <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.empty" default="No trending pages in this period." />
                                             </div>
                                         </div>
                                     </div>
@@ -68,7 +70,7 @@
                 </div>
                 <div class="callout-content">
                     <div class="callout-title">
-                        <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." />
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." />
                     </div>
                 </div>
             </div>
