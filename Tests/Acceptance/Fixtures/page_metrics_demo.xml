@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<T3RecordDocument>
+	<header type="array">
+		<XMLversion>1.0</XMLversion>
+		<charset>utf-8</charset>
+		<meta type="array">
+			<title>PageMetricsDemo</title>
+			<packager_username>_cli_</packager_username>
+			<TYPO3_version>14.3.6</TYPO3_version>
+			<created>Thu 27. August 2026</created>
+		</meta>
+		<pagetree type="array">
+			<node index="1" type="array">
+				<uid>1</uid>
+				<node index="subrow" type="array">
+					<node index="2" type="array">
+						<uid>2</uid>
+					</node>
+					<node index="3" type="array">
+						<uid>3</uid>
+					</node>
+					<node index="4" type="array">
+						<uid>4</uid>
+					</node>
+					<node index="5" type="array">
+						<uid>5</uid>
+					</node>
+				</node>
+			</node>
+		</pagetree>
+		<records type="array">
+			<table index="pages" type="array">
+				<rec index="1" type="array">
+					<uid>1</uid>
+					<pid>0</pid>
+					<title>Home</title>
+				</rec>
+				<rec index="5" type="array">
+					<uid>5</uid>
+					<pid>1</pid>
+					<title>Contact</title>
+				</rec>
+				<rec index="4" type="array">
+					<uid>4</uid>
+					<pid>1</pid>
+					<title>Blog</title>
+				</rec>
+				<rec index="3" type="array">
+					<uid>3</uid>
+					<pid>1</pid>
+					<title>Services</title>
+				</rec>
+				<rec index="2" type="array">
+					<uid>2</uid>
+					<pid>1</pid>
+					<title>About</title>
+				</rec>
+			</table>
+			<table index="tt_content" type="array">
+				<rec index="1" type="array">
+					<uid>1</uid>
+					<pid>1</pid>
+					<title>Welcome to your default website</title>
+					<softrefs type="array">
+						<softref_element index="bodytext:typolink_tag:1" type="array">
+							<field>bodytext</field>
+							<spKey>typolink_tag</spKey>
+							<matchString>&lt;a href=&quot;https://typo3.org&quot; target=&quot;_blank&quot;&gt;</matchString>
+							<subst type="array">
+								<type>external</type>
+								<tokenID>363dcd56e89c2b9130f23c64fee73631</tokenID>
+								<tokenValue>https://typo3.org</tokenValue>
+							</subst>
+						</softref_element>
+					</softrefs>
+				</rec>
+			</table>
+		</records>
+		<pid_lookup type="array">
+			<page_contents index="0" type="array">
+				<table index="pages" type="array">
+					<item index="1">1</item>
+				</table>
+			</page_contents>
+			<page_contents index="1" type="array">
+				<table index="tt_content" type="array">
+					<item index="1">1</item>
+				</table>
+				<table index="pages" type="array">
+					<item index="5">1</item>
+					<item index="4">1</item>
+					<item index="3">1</item>
+					<item index="2">1</item>
+				</table>
+			</page_contents>
+		</pid_lookup>
+	</header>
+	<records type="array">
+		<tablerow index="pages:1" type="array">
+			<fieldlist index="data" type="array">
+				<field index="uid" type="integer">1</field>
+				<field index="pid" type="integer">0</field>
+				<field index="hidden" type="integer">0</field>
+				<field index="sys_language_uid" type="integer">0</field>
+				<field index="l10n_parent" type="integer">0</field>
+				<field index="l10n_source" type="integer">0</field>
+				<field index="l10n_diffsource" type="NULL"></field>
+				<field index="perms_userid" type="integer">1</field>
+				<field index="perms_groupid" type="integer">1</field>
+				<field index="perms_user" type="integer">31</field>
+				<field index="perms_group" type="integer">31</field>
+				<field index="perms_everybody" type="integer">1</field>
+				<field index="doktype" type="integer">1</field>
+				<field index="title">Home</field>
+				<field index="slug">/</field>
+				<field index="is_siteroot" type="integer">1</field>
+			</fieldlist>
+		</tablerow>
+		<tablerow index="tt_content:1" type="array">
+			<fieldlist index="data" type="array">
+				<field index="uid" type="integer">1</field>
+				<field index="pid" type="integer">1</field>
+				<field index="hidden" type="integer">0</field>
+				<field index="sys_language_uid" type="integer">0</field>
+				<field index="l18n_parent" type="integer">0</field>
+				<field index="l10n_source" type="integer">0</field>
+				<field index="l18n_diffsource" type="NULL"></field>
+				<field index="CType">text</field>
+				<field index="header">Welcome to your default website</field>
+				<field index="bodytext">&lt;p&gt;This website is made with &lt;a href=&quot;https://typo3.org&quot; target=&quot;_blank&quot;&gt;TYPO3&lt;/a&gt;.&lt;/p&gt;</field>
+			</fieldlist>
+			<related index="rels" type="array">
+				<field index="bodytext" type="array">
+					<softrefs type="array">
+						<keys type="array">
+							<softref_key index="typolink_tag" type="array">
+								<softref_element index="1" type="array">
+									<matchString>&lt;a href=&quot;https://typo3.org&quot; target=&quot;_blank&quot;&gt;</matchString>
+									<subst type="array">
+										<type>external</type>
+										<tokenID>363dcd56e89c2b9130f23c64fee73631</tokenID>
+										<tokenValue>https://typo3.org</tokenValue>
+									</subst>
+								</softref_element>
+							</softref_key>
+						</keys>
+						<tokenizedContent>&lt;p&gt;This website is made with &lt;a href=&quot;{softref:363dcd56e89c2b9130f23c64fee73631}&quot; target=&quot;_blank&quot;&gt;TYPO3&lt;/a&gt;.&lt;/p&gt;</tokenizedContent>
+					</softrefs>
+				</field>
+			</related>
+		</tablerow>
+		<tablerow index="pages:5" type="array">
+			<fieldlist index="data" type="array">
+				<field index="uid" type="integer">5</field>
+				<field index="pid" type="integer">1</field>
+				<field index="hidden" type="integer">0</field>
+				<field index="sorting" type="integer">1024</field>
+				<field index="sys_language_uid" type="integer">0</field>
+				<field index="l10n_parent" type="integer">0</field>
+				<field index="l10n_source" type="integer">0</field>
+				<field index="l10n_diffsource" type="NULL"></field>
+				<field index="perms_user" type="integer">31</field>
+				<field index="perms_group" type="integer">27</field>
+				<field index="perms_everybody" type="integer">1</field>
+				<field index="doktype" type="integer">1</field>
+				<field index="title">Contact</field>
+				<field index="slug">/contact</field>
+			</fieldlist>
+		</tablerow>
+		<tablerow index="pages:4" type="array">
+			<fieldlist index="data" type="array">
+				<field index="uid" type="integer">4</field>
+				<field index="pid" type="integer">1</field>
+				<field index="hidden" type="integer">0</field>
+				<field index="sorting" type="integer">768</field>
+				<field index="sys_language_uid" type="integer">0</field>
+				<field index="l10n_parent" type="integer">0</field>
+				<field index="l10n_source" type="integer">0</field>
+				<field index="l10n_diffsource" type="NULL"></field>
+				<field index="perms_user" type="integer">31</field>
+				<field index="perms_group" type="integer">27</field>
+				<field index="perms_everybody" type="integer">1</field>
+				<field index="doktype" type="integer">1</field>
+				<field index="title">Blog</field>
+				<field index="slug">/blog</field>
+			</fieldlist>
+		</tablerow>
+		<tablerow index="pages:3" type="array">
+			<fieldlist index="data" type="array">
+				<field index="uid" type="integer">3</field>
+				<field index="pid" type="integer">1</field>
+				<field index="hidden" type="integer">0</field>
+				<field index="sorting" type="integer">512</field>
+				<field index="sys_language_uid" type="integer">0</field>
+				<field index="l10n_parent" type="integer">0</field>
+				<field index="l10n_source" type="integer">0</field>
+				<field index="l10n_diffsource" type="NULL"></field>
+				<field index="perms_user" type="integer">31</field>
+				<field index="perms_group" type="integer">27</field>
+				<field index="perms_everybody" type="integer">1</field>
+				<field index="doktype" type="integer">1</field>
+				<field index="title">Services</field>
+				<field index="slug">/services</field>
+			</fieldlist>
+		</tablerow>
+		<tablerow index="pages:2" type="array">
+			<fieldlist index="data" type="array">
+				<field index="uid" type="integer">2</field>
+				<field index="pid" type="integer">1</field>
+				<field index="hidden" type="integer">0</field>
+				<field index="sorting" type="integer">256</field>
+				<field index="sys_language_uid" type="integer">0</field>
+				<field index="l10n_parent" type="integer">0</field>
+				<field index="l10n_source" type="integer">0</field>
+				<field index="l10n_diffsource" type="NULL"></field>
+				<field index="perms_user" type="integer">31</field>
+				<field index="perms_group" type="integer">27</field>
+				<field index="perms_everybody" type="integer">1</field>
+				<field index="doktype" type="integer">1</field>
+				<field index="title">About</field>
+				<field index="slug">/about</field>
+			</fieldlist>
+		</tablerow>
+	</records>
+</T3RecordDocument>

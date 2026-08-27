@@ -1,0 +1,26 @@
+base: 'https://__VERSION__.__SITENAME__.ddev.site/'
+dependencies:
+  - typo3/fluid-styled-content
+  - typo3/fluid-styled-content-css
+errorHandling: {  }
+languages:
+  -
+    title: English
+    enabled: true
+    languageId: 0
+    base: /
+    locale: en_US.UTF-8
+    navigationTitle: English
+    flag: us
+rootPageId: 1
+routes: {  }
+pageMetrics:
+  enabled: true
+  sources:
+    matomo:
+      # Never-resolving TLD by design - the demo data below is seeded
+      # directly into tx_pagemetrics_daily/tx_pagemetrics_annotation, no
+      # Matomo API call is ever meant to happen against this endpoint.
+      endpoint: 'https://matomo.example.invalid/'
+      siteId: 1
+      tokenAuth: 'dev-placeholder-token'
