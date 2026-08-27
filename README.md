@@ -1,9 +1,9 @@
 <div align="center">
 
-# TYPO3 extension `page_metrics`
+# TYPO3 extension `typo3_page_metrics`
 
 [![License](https://poser.pugx.org/konradmichalik/typo3-page-metrics/license)](LICENSE.md)
-[![Supported TYPO3 versions](https://badgen.net/badge/TYPO3/13%20%26%2014/orange)](https://extensions.typo3.org/extension/page_metrics)
+[![Supported TYPO3 versions](https://badgen.net/badge/TYPO3/13.4%20%7C%2014.3/orange)](https://extensions.typo3.org/extension/typo3_page_metrics)
 
 </div>
 
@@ -14,48 +14,40 @@ TYPO3 page UID — including redirect chains and multilingual slugs — then
 stores per-page daily aggregates so editors can see "how is this page doing"
 without leaving the backend.
 
-> [!NOTE]
-> For dashboard-level Matomo reporting, use
-> [`brotkrueml/typo3-matomo-widgets`](https://extensions.typo3.org/extension/matomo_widgets)
-> instead. This extension is for page-level metrics, not dashboards — the
-> two are complementary, not competing.
+![Page metrics tiles below the page title, with the period switch above them](docs/img/page-tiles.png)
 
 ## ✨ Features
 
-- URL → page resolver with redirect-chain and multilingual slug support,
-  persisted at import time (never resolved live, never retroactively)
-- Source-agnostic metric storage via `MetricSourceInterface` (`@api`) —
-  Matomo is included, more sources can register without touching the core
-- `page-metrics:import` console command for scheduled or manual imports,
-  idempotent by default, `--force` to re-import the full retention window
 - Metric tiles right in `Web > Page`, below the page title: page views,
   visits, avg. time on page, bounce rate, a period switch (7/30/90 days),
-  and a sparkline popover per tile covering that same period, loaded
-  asynchronously so it never affects the page module's own render time
-- An options menu on the tiles to include subpages in the aggregated
-  numbers, shown whenever the current page has any — see
-  [Page module tiles](docs/page-tiles.md)
-- Matomo annotations imported as a site-wide, extensible data source
-  (`AnnotationSourceInterface`) and marked on every sparkline — see
-  [Page module tiles](docs/page-tiles.md#annotations)
+  and a sparkline popover per tile — see [Page module tiles](docs/page-tiles.md)
 - Site-wide [EXT:dashboard](https://docs.typo3.org/permanent/typo3/cms-dashboard/main/en-us/)
-  widgets (tiles, chart, top pages, trend, not-found pages, annotations)
-  plus a ready-made dashboard preset — see
+  widgets plus a ready-made dashboard preset — see
   [Dashboard widgets](docs/dashboard-widgets.md)
-- `ModifyMetricTilesEvent` lets other extensions contribute additional
-  tiles without implementing the full `MetricSourceInterface`
-- Only aggregates are stored — no IPs, no user agents, no sub-day timestamps
-- Tiles can be turned off per backend user group via User TSconfig
+- Matomo and GA4 as pluggable data sources
 
 ## 🔥 Installation
+
+### Requirements
+
+- PHP 8.2, 8.3, 8.4 or 8.5
+- TYPO3 13.4 or 14.0+
+- A Matomo instance with API access, and/or a GA4 property with a
+  service-account key
+
+### Composer setup
 
 ```bash
 composer require konradmichalik/typo3-page-metrics
 ```
 
+Then configure a metric source for the site, see [Configuration](#configuration).
+
 ## ⚙️ Configuration
 
-Add to a site's `config/sites/<identifier>/config.yaml`:
+Add to a site's `config/sites/<identifier>/config.yaml`.
+
+### Matomo
 
 ```yaml
 pageMetrics:
@@ -72,17 +64,18 @@ pageMetrics:
   retentionDays: 400
 ```
 
-If `brotkrueml/typo3-matomo-widgets` is already installed and configured for
-the site, its `matomoWidgetsUrl`/`matomoWidgetsIdSite`/`matomoWidgetsTokenAuth`
-keys are used as a fallback when this extension's own `sources.matomo` is
-not set — no need to configure the same Matomo instance twice.
-
 `resolution.additionalHosts` lets a site accept URLs reported under a host
 other than its own `base` (and each language's base) as belonging to it, the
 page lookup still uses the local page tree. This is for Dev/Stage instances
 whose `base` differs from production: the analytics source (e.g. Matomo)
 always reports the production domain, so importing on an environment with a
 different `base` would otherwise resolve nothing.
+
+### GA4
+
+> [!WARNING]
+> GA4 support is untested against a live GA4 property. Please report issues
+> if you run into any.
 
 GA4 is supported as an alternative source, for sites without Matomo:
 
@@ -103,20 +96,6 @@ definitions Matomo's tiles use: see each tile's own description text.
 GA4's Data API can take 24-48 hours to finalize a day's data, so its most
 recently imported days may be understated. Periodically re-run the import
 with `--force` (see [Usage](#usage)) to pick up corrections to those days.
-
-## 🔒 Security
-
-The page-metrics tiles are visible to every backend user by default. To hide
-them for a user group (or an individual user), set in that group's/user's
-**User TSconfig**:
-
-```
-tx_pagemetrics.disabled = 1
-```
-
-This is enforced both where the tiles are injected into the page module and
-on the AJAX route that loads them, so a user without access cannot reach the
-data by calling that route directly either.
 
 ## ⚡ Usage
 
@@ -142,14 +121,16 @@ widgets.
 | --- | --- |
 | [Dashboard widgets](docs/dashboard-widgets.md) | The full EXT:dashboard widget catalog, their settings and the bundled preset |
 | [Page module tiles](docs/page-tiles.md) | The period switch, the subpages toggle, sparkline popovers and annotations |
+| [Security](docs/security.md) | Restricting tile visibility per backend user group |
+| [Registering custom tiles](docs/extending.md) | Contributing an additional tile via `ModifyMetricTilesEvent`, without implementing `MetricSourceInterface` |
 
-## 🛠️ Development
+## 🧑‍💻 Contributing
 
-```bash
-composer install
-composer test
-composer cgl sca
-```
+Please have a look at [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## 🏅 Credits
+
+Tile icons are from [Tabler Icons](https://tabler.io/icons), MIT licensed.
 
 ## ⭐ License
 

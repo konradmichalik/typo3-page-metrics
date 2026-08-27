@@ -1,0 +1,70 @@
+# Contributing
+
+Thank you for considering contributing to this project! Every contribution is welcome and helps improve the quality of the project. To ensure a smooth process and maintain high code quality, please follow the steps below.
+
+## Requirements
+
+- [DDEV](https://ddev.readthedocs.io/en/stable/)
+
+## Preparation
+
+```bash
+# Clone repository
+git clone https://github.com/konradmichalik/typo3-page-metrics.git
+cd typo3-page-metrics
+
+# Start the project with DDEV
+ddev start
+
+# Install dependencies
+ddev composer install
+```
+
+## Run linters and static code analysis
+
+```bash
+# Everything
+ddev composer cgl
+
+# Specific tools
+ddev composer cgl lint:php
+ddev composer cgl fix:php
+ddev composer cgl sca:php
+```
+
+## Run tests
+
+```bash
+# Unit tests
+ddev composer test:unit
+
+# Functional tests
+ddev composer test:functional
+
+# All tests with code coverage
+ddev composer test:coverage
+```
+
+## TYPO3 setup
+
+For testing the extension against a real backend, you need to set up the TYPO3 instances.
+
+```bash
+# Install all TYPO3 versions supported by the extension
+ddev install all
+
+# Or install a specific version
+ddev install 13
+ddev install 14
+
+# Open the overview page
+ddev launch
+
+# Run TYPO3-specific commands
+ddev 13 typo3 cache:flush
+ddev all typo3 database:updateschema
+```
+
+## Submit a pull request
+
+After completing your work, **open a pull request** and provide a description of your changes. Ideally, your PR should reference an issue that explains the problem you are addressing.
