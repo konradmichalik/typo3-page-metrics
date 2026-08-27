@@ -47,6 +47,11 @@ services:
     KonradMichalik\Typo3PageMetrics\Persistence\ImportStateRepository:
         public: true
 
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Persistence\AnnotationRepository:
+        public: true
+
     # Public so functional tests can fetch it directly via $this->get() instead
     # of dispatching a full ModifyPageLayoutContentEvent.
     KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder:
@@ -67,9 +72,14 @@ services:
         tags:
             - name: page_metrics.metric_source
 
+    KonradMichalik\Typo3PageMetrics\Source\Matomo\MatomoAnnotationSource:
+        tags:
+            - name: page_metrics.annotation_source
+
     KonradMichalik\Typo3PageMetrics\Command\ImportCommand:
         arguments:
             $sources: !tagged_iterator page_metrics.metric_source
+            $annotationSources: !tagged_iterator page_metrics.annotation_source
         tags:
             - name: console.command
               command: 'page-metrics:import'

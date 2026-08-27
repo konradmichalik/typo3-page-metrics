@@ -38,3 +38,16 @@ CREATE TABLE tx_pagemetrics_import (
 	PRIMARY KEY (uid),
 	UNIQUE KEY source_site (source,site_identifier)
 );
+
+CREATE TABLE tx_pagemetrics_annotation (
+	uid int(11) unsigned NOT NULL auto_increment,
+	date date NOT NULL,
+	site_identifier varchar(255) DEFAULT '' NOT NULL,
+	source varchar(32) DEFAULT '' NOT NULL,
+	annotation_id varchar(32) DEFAULT '' NOT NULL,
+	text varchar(1024) DEFAULT '' NOT NULL,
+
+	PRIMARY KEY (uid),
+	KEY site_date (site_identifier,date),
+	UNIQUE KEY fact (source,site_identifier,annotation_id)
+);

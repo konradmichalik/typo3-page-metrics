@@ -16,11 +16,11 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Command;
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Command\ImportCommand;
 use KonradMichalik\Typo3PageMetrics\Configuration\SiteConfigurationReader;
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, UrlMetric};
-use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, UrlMetric};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
-use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
-use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{PartiallyFailingMetricSource, StubMetricSource};
+use KonradMichalik\Typo3PageMetrics\Source\{AnnotationSourceInterface, MetricSourceInterface};
+use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{PartiallyFailingAnnotationSource, PartiallyFailingMetricSource, StubAnnotationSource, StubMetricSource};
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -41,6 +41,7 @@ final class ImportCommandTest extends FunctionalTestCase
     private DailyMetricsRepository $dailyMetricsRepository;
     private UnresolvedUrlRepository $unresolvedUrlRepository;
     private ImportStateRepository $importStateRepository;
+    private AnnotationRepository $annotationRepository;
 
     protected function setUp(): void
     {
@@ -72,6 +73,7 @@ final class ImportCommandTest extends FunctionalTestCase
         $this->dailyMetricsRepository = $this->get(DailyMetricsRepository::class);
         $this->unresolvedUrlRepository = $this->get(UnresolvedUrlRepository::class);
         $this->importStateRepository = $this->get(ImportStateRepository::class);
+        $this->annotationRepository = $this->get(AnnotationRepository::class);
     }
 
     public function testImportsResolvedMetricsIntoTheDailyTable(): void
@@ -214,10 +216,39 @@ final class ImportCommandTest extends FunctionalTestCase
         self::assertSame([$today->format('Y-m-d') => 5], $series);
     }
 
+    public function testImportsAnnotationsForTheSiteRegardlessOfMetricSources(): void
+    {
+        $annotation = new Annotation('1', new DateTimeImmutable('today'), 'Release 2.0');
+        $annotationSource = new StubAnnotationSource([$annotation]);
+
+        $exitCode = $this->runImport([], false, [$annotationSource]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $stored = $this->annotationRepository->forSiteAndRange('main', new DateRange(
+            (new DateTimeImmutable('today'))->modify('-5 days'),
+            new DateTimeImmutable('today'),
+        ));
+        self::assertCount(1, $stored);
+        self::assertSame('Release 2.0', $stored[0]->text);
+    }
+
+    public function testAFailingAnnotationSourceDoesNotAbortMetricImportForTheSameSite(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
+
+        $exitCode = $this->runImport([$stub], false, [new PartiallyFailingAnnotationSource()]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        $series = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today));
+        self::assertSame([$today->format('Y-m-d') => 10], $series);
+    }
+
     /**
-     * @param list<MetricSourceInterface> $sources
+     * @param list<MetricSourceInterface>     $sources
+     * @param list<AnnotationSourceInterface> $annotationSources
      */
-    private function runImport(array $sources, bool $force = false): int
+    private function runImport(array $sources, bool $force = false, array $annotationSources = []): int
     {
         $command = new ImportCommand(
             $this->get(SiteFinder::class),
@@ -226,7 +257,9 @@ final class ImportCommandTest extends FunctionalTestCase
             $this->dailyMetricsRepository,
             $this->unresolvedUrlRepository,
             $this->importStateRepository,
+            $this->annotationRepository,
             $sources,
+            $annotationSources,
         );
 
         $tester = new CommandTester($command);

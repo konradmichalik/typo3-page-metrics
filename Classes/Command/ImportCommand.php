@@ -16,9 +16,9 @@ namespace KonradMichalik\Typo3PageMetrics\Command;
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Configuration\{PageMetricsSiteConfiguration, SiteConfigurationReader};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, ResolvedUrl};
-use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
-use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
+use KonradMichalik\Typo3PageMetrics\Source\{AnnotationSourceInterface, MetricSourceInterface};
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\{InputInterface, InputOption};
 use Symfony\Component\Console\Output\OutputInterface;
@@ -39,7 +39,8 @@ final class ImportCommand extends Command
     private const VIA_REDIRECT_DIMENSION = 'via_redirect';
 
     /**
-     * @param iterable<MetricSourceInterface> $sources
+     * @param iterable<MetricSourceInterface>     $sources
+     * @param iterable<AnnotationSourceInterface> $annotationSources
      */
     public function __construct(
         private readonly SiteFinder $siteFinder,
@@ -48,7 +49,9 @@ final class ImportCommand extends Command
         private readonly DailyMetricsRepository $dailyMetricsRepository,
         private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
         private readonly ImportStateRepository $importStateRepository,
+        private readonly AnnotationRepository $annotationRepository,
         private readonly iterable $sources,
+        private readonly iterable $annotationSources,
     ) {
         parent::__construct();
     }
@@ -98,9 +101,56 @@ final class ImportCommand extends Command
                     ));
                 }
             }
+
+            $hasFailures = $this->importAnnotationsForAllSources($site, $configuration, $output) || $hasFailures;
         }
 
         return $hasFailures ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    private function importAnnotationsForAllSources(Site $site, PageMetricsSiteConfiguration $configuration, OutputInterface $output): bool
+    {
+        $hasFailures = false;
+
+        foreach ($this->annotationSources as $annotationSource) {
+            if (!$annotationSource->supports($site)) {
+                continue;
+            }
+
+            try {
+                $this->importAnnotationsForSite($site, $annotationSource, $configuration, $output);
+            } catch (Throwable $exception) {
+                $hasFailures = true;
+                $output->writeln(sprintf(
+                    '<error>Failed to import annotations for site "%s": %s</error>',
+                    $site->getIdentifier(),
+                    $exception->getMessage(),
+                ));
+            }
+        }
+
+        return $hasFailures;
+    }
+
+    /**
+     * Unlike importOneSourceForSite(), always re-fetches the full retention
+     * window rather than tracking incremental import state: annotations are
+     * one cheap API call regardless of range length, and upsert() is
+     * idempotent on Matomo's own annotation id, so re-fetching the same
+     * range on every run is simpler than tracking a separate cursor for it.
+     */
+    private function importAnnotationsForSite(Site $site, AnnotationSourceInterface $annotationSource, PageMetricsSiteConfiguration $configuration, OutputInterface $output): void
+    {
+        $today = new DateTimeImmutable('today');
+        $range = new DateRange($today->modify(sprintf('-%d days', $configuration->retentionDays)), $today);
+
+        $count = 0;
+        foreach ($annotationSource->fetch($site, $range) as $annotation) {
+            $this->annotationRepository->upsert($site->getIdentifier(), $annotationSource->getIdentifier(), $annotation->id, $annotation->date, $annotation->text);
+            ++$count;
+        }
+
+        $output->writeln(sprintf('Imported %d annotation(s) for site "%s".', $count, $site->getIdentifier()));
     }
 
     private function importOneSourceForSite(Site $site, MetricSourceInterface $source, PageMetricsSiteConfiguration $configuration, bool $force, OutputInterface $output): void

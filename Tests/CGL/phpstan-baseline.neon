@@ -31,6 +31,10 @@ parameters:
 		-
 			identifier: typeCoverage.constantTypeCoverage
 			count: 1
+			path: ../../Classes/Persistence/AnnotationRepository.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
 			path: ../../Classes/Persistence/DailyMetricsRepository.php
 		-
 			identifier: typeCoverage.constantTypeCoverage
@@ -56,6 +60,10 @@ parameters:
 			identifier: typeCoverage.constantTypeCoverage
 			count: 2
 			path: ../../Classes/Source/Matomo/MatomoApiClient.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Source/Matomo/MatomoAnnotationSource.php
 		-
 			identifier: typeCoverage.constantTypeCoverage
 			count: 1
