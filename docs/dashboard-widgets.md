@@ -1,6 +1,6 @@
 # Dashboard widgets
 
-`page_metrics` registers a set of [EXT:dashboard](https://docs.typo3.org/permanent/typo3/cms-dashboard/main/en-us/)
+`typo3_page_metrics` registers a set of [EXT:dashboard](https://docs.typo3.org/permanent/typo3/cms-dashboard/main/en-us/)
 widgets once that extension is installed, so page-level metrics are also
 visible site-wide, without opening the page module. Registration is
 conditional: on installations without EXT:dashboard, none of this loads (see
@@ -34,8 +34,13 @@ for any site whose source doesn't support the configured one.
 
 ## Dashboard preset
 
-A ready-made **Page Metrics** dashboard preset bundles the tiles, chart, top
-pages, trend, not-found-pages and annotations widgets (everything except the
-compact chart variant). It appears in the dashboard creation wizard once
-EXT:dashboard is installed, so a new dashboard covering every site's metrics
-is one click away.
+A ready-made **Page Metrics** dashboard preset bundles every widget above. It
+appears in the dashboard creation wizard once EXT:dashboard is installed, so
+a new dashboard covering every site's metrics is one click away.
+
+Below the tiles and the large chart, it places two compact charts (Visits,
+Bounce rate), then two trend widgets (Biggest gains, Biggest drops), then
+Most viewed pages and Not found pages, with the annotations widget last.
+The compact chart and trend widgets can each appear more than once with
+different settings pre-configured, see
+[Configuration/Backend/DashboardPresets.php](../Configuration/Backend/DashboardPresets.php).

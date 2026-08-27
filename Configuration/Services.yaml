@@ -4,8 +4,16 @@ services:
         autoconfigure: true
         public: false
 
+    # Widgets/ is excluded here: those classes implement EXT:dashboard
+    # interfaces (WidgetRendererInterface etc.), which don't exist on
+    # installations without that optional extension. Autodiscovering them
+    # unconditionally would fail to even reflect the classes in that case.
+    # Configuration/Services.php registers them instead, gated on
+    # EXT:dashboard's presence.
     KonradMichalik\Typo3PageMetrics\:
         resource: '../Classes/*'
+        exclude:
+            - '../Classes/Widgets/*'
 
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming service references it.
