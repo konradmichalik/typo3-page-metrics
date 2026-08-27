@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -15,7 +15,6 @@ namespace KonradMichalik\Typo3PageMetrics\Source\Matomo;
 
 use KonradMichalik\Typo3PageMetrics\Configuration\SiteConfigurationReader;
 use TYPO3\CMS\Core\Site\Entity\Site;
-use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 
 use function is_array;
 use function is_string;
@@ -23,10 +22,7 @@ use function is_string;
 /**
  * MatomoConfigurationResolver.
  *
- * This extension's own "pageMetrics.sources.matomo" configuration wins;
- * brotkrueml/typo3-matomo-widgets' flat matomoWidgets* keys are a soft
- * fallback so both extensions can share one Matomo wiring per site - read
- * only, no hard composer dependency on that extension.
+ * Reads this extension's own "pageMetrics.sources.matomo" configuration.
  *
  * Not final: Task 11 mocks this as a MatomoMetricSource collaborator in a
  * pure unit test, and PHP cannot generate a test double for a final class.
@@ -51,7 +47,7 @@ class MatomoConfigurationResolver
             );
         }
 
-        return $this->resolveFromMatomoWidgets($site);
+        return null;
     }
 
     /**
@@ -63,23 +59,5 @@ class MatomoConfigurationResolver
             && is_string($config['endpoint']) && '' !== $config['endpoint']
             && is_string($config['tokenAuth']) && '' !== $config['tokenAuth']
             && is_numeric($config['siteId']);
-    }
-
-    private function resolveFromMatomoWidgets(Site $site): ?MatomoConfiguration
-    {
-        if (!ExtensionManagementUtility::isLoaded('matomo_widgets')) {
-            return null;
-        }
-
-        $raw = $site->getConfiguration();
-        $url = $raw['matomoWidgetsUrl'] ?? null;
-        $siteId = $raw['matomoWidgetsIdSite'] ?? null;
-        $token = $raw['matomoWidgetsTokenAuth'] ?? null;
-
-        if (!is_string($url) || '' === $url || !is_string($token) || '' === $token || !is_numeric($siteId)) {
-            return null;
-        }
-
-        return new MatomoConfiguration($url, (int) $siteId, $token);
     }
 }

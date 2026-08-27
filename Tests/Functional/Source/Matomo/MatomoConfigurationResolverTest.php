@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -53,14 +53,14 @@ final class MatomoConfigurationResolverTest extends FunctionalTestCase
         self::assertSame('abc123', $configuration->token);
     }
 
-    public function testReturnsNullWhenNothingIsConfiguredAndMatomoWidgetsIsNotLoaded(): void
+    public function testReturnsNullWhenNothingIsConfigured(): void
     {
         $site = new Site('main', 1, ['base' => 'https://example.com/']);
 
         self::assertNull($this->subject->resolve($site));
     }
 
-    public function testIgnoresIncompleteOwnConfigurationAndFallsThrough(): void
+    public function testReturnsNullForIncompleteOwnConfiguration(): void
     {
         $site = new Site('main', 1, [
             'base' => 'https://example.com/',
