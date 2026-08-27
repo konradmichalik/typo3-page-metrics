@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Widgets;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository};
-use KonradMichalik\Typo3PageMetrics\Widgets\{PageMetricsChartWidget, TrendWidget};
+use KonradMichalik\Typo3PageMetrics\Widgets\{PageMetricsChartWidget, TopPagesWidget, TrendWidget};
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
 use TYPO3\CMS\Core\Http\{NormalizedParams, ServerRequest};
@@ -28,9 +28,9 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 /**
  * SettingsAwareWidgetsTest.
  *
- * Covers the chart and trend widgets, both implementing
+ * Covers the chart, trend and top-pages widgets, all implementing
  * WidgetRendererInterface for a per-instance settings UI - a different
- * rendering contract than the other three site-metrics widgets (see
+ * rendering contract than the other two site-metrics widgets (see
  * SiteMetricsWidgetsTest), so they need their own WidgetContext-based
  * render helper instead of setRequest()/renderWidgetContent().
  *
@@ -214,6 +214,74 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('7 days', (string) $result->label);
     }
 
+    public function testTopPagesWidgetOffersALevelSetting(): void
+    {
+        $widget = $this->get('dashboard.widget.pageMetricsTopPages');
+        self::assertInstanceOf(TopPagesWidget::class, $widget);
+
+        $definitions = $widget->getSettingsDefinitions();
+        self::assertCount(1, $definitions);
+        self::assertSame('level', $definitions[0]->key);
+        self::assertArrayHasKey('', $definitions[0]->enum);
+        self::assertArrayHasKey('1', $definitions[0]->enum);
+        self::assertArrayHasKey('2', $definitions[0]->enum);
+        self::assertArrayHasKey('3', $definitions[0]->enum);
+    }
+
+    public function testTopPagesWidgetRanksAcrossTheWholeSiteByDefault(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 20);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.pageviews', 10);
+        // Page 5 ("Team") is a level-2 page (child of "About") - still
+        // included when no level restriction is configured.
+        $this->get(DailyMetricsRepository::class)->upsert(5, 0, 'matomo', $today, 'matomo.pageviews', 5);
+
+        $content = $this->renderTopPagesWidget([]);
+
+        self::assertStringContainsString('About', $content);
+        self::assertStringContainsString('Team', $content);
+        self::assertStringContainsString('&amp;id=2', $content);
+        self::assertStringContainsString('pagemetrics-trend-up', $content);
+        self::assertStringContainsString('100%', $content);
+    }
+
+    public function testTopPagesWidgetRestrictsToTheConfiguredLevel(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 20);
+        $this->get(DailyMetricsRepository::class)->upsert(5, 0, 'matomo', $today, 'matomo.pageviews', 8);
+
+        $levelOne = $this->renderTopPagesWidget(['level' => '1']);
+        $levelTwo = $this->renderTopPagesWidget(['level' => '2']);
+
+        self::assertStringContainsString('About', $levelOne);
+        self::assertStringNotContainsString('Team', $levelOne);
+        self::assertStringContainsString('Team', $levelTwo);
+        self::assertStringNotContainsString('About', $levelTwo);
+    }
+
+    public function testTopPagesWidgetLabelIncludesTheConfiguredLevel(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 20);
+
+        $result = $this->renderTopPagesWidgetResult(['level' => '1']);
+
+        self::assertStringContainsString('Most viewed pages', (string) $result->label);
+        self::assertStringContainsString('Level 1', (string) $result->label);
+    }
+
+    public function testTopPagesWidgetRendersTheEmptyStateWhenNoSiteIsConfigured(): void
+    {
+        $result = $this->renderTopPagesWidgetResult([]);
+
+        self::assertStringContainsString('callout-info', $result->content);
+        self::assertNull($result->label);
+    }
+
     /**
      * @param array<string, mixed> $settings
      */
@@ -250,6 +318,25 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertInstanceOf(TrendWidget::class, $widget);
 
         return $widget->renderWidget($this->buildContext('pageMetricsTrend', $widget->getSettingsDefinitions(), $settings));
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     */
+    private function renderTopPagesWidget(array $settings): string
+    {
+        return $this->renderTopPagesWidgetResult($settings)->content;
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     */
+    private function renderTopPagesWidgetResult(array $settings): WidgetResult
+    {
+        $widget = $this->get('dashboard.widget.pageMetricsTopPages');
+        self::assertInstanceOf(TopPagesWidget::class, $widget);
+
+        return $widget->renderWidget($this->buildContext('pageMetricsTopPages', $widget->getSettingsDefinitions(), $settings));
     }
 
     /**

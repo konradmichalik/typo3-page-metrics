@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -15,8 +15,8 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Widgets;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, UnresolvedUrlRepository};
-use KonradMichalik\Typo3PageMetrics\Widgets\{AbstractSiteMetricsWidget, AnnotationsWidget, NotFoundPagesWidget, TopPagesWidget};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Widgets\{AbstractSiteMetricsWidget, AnnotationsWidget, NotFoundPagesWidget};
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
 use TYPO3\CMS\Core\Http\{NormalizedParams, ServerRequest};
@@ -26,11 +26,11 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 /**
  * SiteMetricsWidgetsTest.
  *
- * Covers the three site-wide dashboard widgets still built on
- * AbstractSiteMetricsWidget (top pages, not-found pages, annotations)
- * together: same DI registration shape, same "one row per site" rendering,
- * so one test class per widget would mostly duplicate this exact setup.
- * The chart and trend widgets have their own settings-aware contract, see
+ * Covers the two site-wide dashboard widgets still built on
+ * AbstractSiteMetricsWidget (not-found pages, annotations) together: same
+ * DI registration shape, same "one row per site" rendering, so one test
+ * class per widget would mostly duplicate this exact setup. The chart,
+ * trend and top-pages widgets have their own settings-aware contract, see
  * SettingsAwareWidgetsTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
@@ -47,21 +47,6 @@ final class SiteMetricsWidgetsTest extends FunctionalTestCase
         $this->importCSVDataSet(__DIR__.'/../Service/Fixtures/be_users.csv');
         $backendUser = $this->setUpBackendUser(1);
         $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
-    }
-
-    public function testTopPagesWidgetLinksTheHighestTrafficPageIntoThePageModuleAndShowsItsTrend(): void
-    {
-        $this->writeSiteConfiguration();
-        $today = new DateTimeImmutable('today');
-        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 20);
-        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.pageviews', 10);
-
-        $content = $this->renderWidget('dashboard.widget.pageMetricsTopPages', TopPagesWidget::class);
-
-        self::assertStringContainsString('About', $content);
-        self::assertStringContainsString('&amp;id=2', $content);
-        self::assertStringContainsString('pagemetrics-trend-up', $content);
-        self::assertStringContainsString('100%', $content);
     }
 
     public function testNotFoundPagesWidgetLinksTheFullUrlButOnlyDisplaysThePath(): void
@@ -88,7 +73,6 @@ final class SiteMetricsWidgetsTest extends FunctionalTestCase
 
     public function testEveryWidgetRendersTheEmptyStateWhenNoSiteIsConfigured(): void
     {
-        self::assertStringContainsString('callout-info', $this->renderWidget('dashboard.widget.pageMetricsTopPages', TopPagesWidget::class));
         self::assertStringContainsString('callout-info', $this->renderWidget('dashboard.widget.pageMetricsNotFoundPages', NotFoundPagesWidget::class));
         self::assertStringContainsString('callout-info', $this->renderWidget('dashboard.widget.pageMetricsAnnotations', AnnotationsWidget::class));
     }

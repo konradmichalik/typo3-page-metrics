@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xliff version="1.0">
-    <file source-language="en" datatype="plaintext" original="messages" date="2026-08-24T00:00:00Z" product-name="page_metrics">
+    <file source-language="en" datatype="plaintext" original="messages" date="2026-08-24T00:00:00Z" product-name="typo3_page_metrics">
         <header/>
         <body>
             <trans-unit id="period.label" resname="period.label">
@@ -89,6 +89,24 @@
             </trans-unit>
             <trans-unit id="widget.topPages.column.views" resname="widget.topPages.column.views">
                 <source>Views</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.setting.level.label" resname="widget.topPages.setting.level.label">
+                <source>Page level</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.setting.level.description" resname="widget.topPages.setting.level.description">
+                <source>Restrict the ranking to pages at an exact depth below the site root, instead of the whole site.</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.setting.level.all" resname="widget.topPages.setting.level.all">
+                <source>All levels</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.setting.level.1" resname="widget.topPages.setting.level.1">
+                <source>Level 1</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.setting.level.2" resname="widget.topPages.setting.level.2">
+                <source>Level 2</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.setting.level.3" resname="widget.topPages.setting.level.3">
+                <source>Level 3</source>
             </trans-unit>
             <trans-unit id="widget.trend.title" resname="widget.trend.title">
                 <source>Page metrics trend</source>

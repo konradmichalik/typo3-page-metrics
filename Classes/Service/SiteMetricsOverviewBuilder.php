@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -113,6 +113,33 @@ final class SiteMetricsOverviewBuilder
         );
 
         return $this->toTopPages(array_slice($trends, 0, $limit), $primary->unit);
+    }
+
+    /**
+     * The highest-traffic pages for one site, restricted to pages at an
+     * exact depth below the site root (level 1 = direct children) instead
+     * of the whole subtree when $level is given - used by the standalone
+     * "most viewed pages" widget, which is user-configurable for this
+     * independent of the combined build() used by the other site-metrics
+     * widgets.
+     *
+     * @return ?list<TopPage> null when no source supports $site
+     */
+    public function buildTopPagesForSite(Site $site, int $languageId, int $periodDays, ?int $level = null): ?array
+    {
+        $source = $this->resolveSource($site);
+
+        if (null === $source) {
+            return null;
+        }
+
+        $primary = $this->primaryDefinition($source);
+        [$currentRange, $previousRange] = $this->computeRanges($periodDays);
+        $pageUids = null !== $level
+            ? $this->pageUidRepository->descendantsAtLevel($site->getRootPageId(), $level)
+            : $this->pageUidRepository->descendantsOf($site->getRootPageId());
+
+        return $this->buildTopPages($pageUids, $languageId, $primary, $currentRange, $previousRange);
     }
 
     /**

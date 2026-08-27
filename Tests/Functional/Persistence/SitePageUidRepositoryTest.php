@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -47,5 +47,25 @@ final class SitePageUidRepositoryTest extends FunctionalTestCase
     public function testHasChildrenIgnoresDeletedChildren(): void
     {
         self::assertFalse($this->subject->hasChildren(3));
+    }
+
+    public function testDescendantsAtLevelReturnsDirectChildrenAtLevelOne(): void
+    {
+        self::assertSame([2, 5], $this->subject->descendantsAtLevel(1, 1));
+    }
+
+    public function testDescendantsAtLevelReturnsGrandchildrenAtLevelTwo(): void
+    {
+        self::assertSame([6], $this->subject->descendantsAtLevel(1, 2));
+    }
+
+    public function testDescendantsAtLevelReturnsEmptyArrayBeyondTheTreesDepth(): void
+    {
+        self::assertSame([], $this->subject->descendantsAtLevel(1, 3));
+    }
+
+    public function testDescendantsAtLevelIgnoresDeletedChildren(): void
+    {
+        self::assertSame([], $this->subject->descendantsAtLevel(3, 1));
     }
 }

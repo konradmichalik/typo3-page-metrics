@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -86,6 +86,37 @@ final class SitePageUidRepository
         }
 
         return $uids;
+    }
+
+    /**
+     * Pages exactly $level steps below $rootPageId - level 1 is $rootPageId's
+     * direct children, level 2 their children, and so on - rather than the
+     * cumulative subtree descendantsOf() returns. Used where a widget needs
+     * to rank pages at one specific depth (e.g. a site's top-level sections)
+     * instead of the whole site.
+     *
+     * @return list<int>
+     */
+    public function descendantsAtLevel(int $rootPageId, int $level): array
+    {
+        $frontier = [$rootPageId];
+
+        for ($i = 0; $i < $level && [] !== $frontier; ++$i) {
+            $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+            $children = $queryBuilder
+                ->select('uid')
+                ->from(self::TABLE)
+                ->where(
+                    $queryBuilder->expr()->in('pid', $queryBuilder->createNamedParameter($frontier, Connection::PARAM_INT_ARRAY)),
+                    $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
+                )
+                ->executeQuery()
+                ->fetchFirstColumn();
+
+            $frontier = array_map('intval', $children);
+        }
+
+        return $frontier;
     }
 
     /**

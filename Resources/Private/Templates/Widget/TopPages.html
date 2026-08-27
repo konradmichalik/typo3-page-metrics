@@ -3,53 +3,62 @@
 <f:section name="main">
     <f:if condition="{sites}">
         <f:then>
-            <f:for each="{sites}" as="overview" iteration="siteIteration">
-                <div class="pagemetrics-widget-site">
-                    <f:if condition="{siteIteration.total} > 1">
-                        <h3 class="pagemetrics-widget-site-title">{overview.site.identifier}</h3>
-                    </f:if>
-                    <f:if condition="{overview.topPages}">
-                        <f:then>
-                            <div class="widget-table-wrapper">
-                                <table class="widget-table table table-striped table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.page" default="Page" /></th>
-                                            <th class="text-end"><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.views" default="Views" /></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <f:for each="{overview.topPages}" as="topPage">
-                                            <tr>
-                                                <td><f:be.link route="web_layout" parameters="{id: topPage.pageUid}">{topPage.title}</f:be.link></td>
-                                                <td class="text-end">
-                                                    <div class="pagemetrics-widget-value-trend">
-                                                        {topPage.formattedValue}
-                                                        <f:if condition="{topPage.isNew}">
-                                                            <f:then><f:variable name="deltaText"><f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable></f:then>
-                                                            <f:else><f:variable name="deltaText">{topPage.deltaPercent}%</f:variable></f:else>
-                                                        </f:if>
-                                                        <f:render partial="Widget/TrendBadge" arguments="{trend: topPage.trend, deltaText: deltaText}" />
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </f:for>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </f:then>
-                        <f:else>
-                            <div class="callout callout-info">
-                                <div class="callout-content">
-                                    <div class="callout-title">
-                                        <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.empty" default="No page views recorded yet." />
-                                    </div>
-                                </div>
-                            </div>
-                        </f:else>
-                    </f:if>
+            <div class="pagemetrics-widget-aside">
+                <div class="pagemetrics-widget-aside-icon-col">
+                    <span class="pagemetrics-widget-aside-icon" style="--pm-accent: #0969da" aria-hidden="true">
+                        <core:icon identifier="tabler-eye-search" size="large" alternativeMarkupIdentifier="inline" />
+                    </span>
                 </div>
-            </f:for>
+                <div class="pagemetrics-widget-aside-content">
+                    <f:for each="{sites}" as="siteTopPages" iteration="siteIteration">
+                        <div class="pagemetrics-widget-site">
+                            <f:if condition="{siteIteration.total} > 1">
+                                <h3 class="pagemetrics-widget-site-title">{siteTopPages.site.identifier}</h3>
+                            </f:if>
+                            <f:if condition="{siteTopPages.topPages}">
+                                <f:then>
+                                    <div class="widget-table-wrapper">
+                                        <table class="widget-table table table-striped table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.page" default="Page" /></th>
+                                                    <th class="text-end"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.views" default="Views" /></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <f:for each="{siteTopPages.topPages}" as="topPage">
+                                                    <tr>
+                                                        <td><f:be.link route="web_layout" parameters="{id: topPage.pageUid}">{topPage.title}</f:be.link></td>
+                                                        <td class="text-end">
+                                                            <div class="pagemetrics-widget-value-trend">
+                                                                {topPage.formattedValue}
+                                                                <f:if condition="{topPage.isNew}">
+                                                                    <f:then><f:variable name="deltaText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable></f:then>
+                                                                    <f:else><f:variable name="deltaText">{topPage.deltaPercent}%</f:variable></f:else>
+                                                                </f:if>
+                                                                <f:render partial="Widget/TrendBadge" arguments="{trend: topPage.trend, deltaText: deltaText}" />
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </f:for>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </f:then>
+                                <f:else>
+                                    <div class="callout callout-info">
+                                        <div class="callout-content">
+                                            <div class="callout-title">
+                                                <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.empty" default="No page views recorded yet." />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </f:else>
+                            </f:if>
+                        </div>
+                    </f:for>
+                </div>
+            </div>
         </f:then>
         <f:else>
             <div class="callout callout-info">
@@ -58,7 +67,7 @@
                 </div>
                 <div class="callout-content">
                     <div class="callout-title">
-                        <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." />
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." />
                     </div>
                 </div>
             </div>
