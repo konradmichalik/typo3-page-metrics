@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\EventListener;
 
+use KonradMichalik\Typo3PageMetrics\Service\PageMetricsAccessChecker;
 use TYPO3\CMS\Backend\Controller\Event\ModifyPageLayoutContentEvent;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
@@ -39,6 +40,7 @@ final readonly class PageHeaderMetricsRenderer
     public function __construct(
         private UriBuilder $uriBuilder,
         private PageRenderer $pageRenderer,
+        private PageMetricsAccessChecker $accessChecker,
     ) {}
 
     #[AsEventListener('page-metrics-header')]
@@ -47,7 +49,7 @@ final readonly class PageHeaderMetricsRenderer
         $request = $event->getRequest();
         $pageId = (int) ($request->getQueryParams()['id'] ?? 0);
 
-        if ($pageId <= 0) {
+        if ($pageId <= 0 || !$this->accessChecker->hasAccess()) {
             return;
         }
 

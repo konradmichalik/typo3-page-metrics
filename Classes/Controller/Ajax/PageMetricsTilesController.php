@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Controller\Ajax;
 
-use KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder;
+use KonradMichalik\Typo3PageMetrics\Service\{PageMetricsAccessChecker, PageMetricsViewDataBuilder};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Http\HtmlResponse;
@@ -34,10 +34,19 @@ final readonly class PageMetricsTilesController
     public function __construct(
         private PageMetricsViewDataBuilder $viewDataBuilder,
         private BackendViewFactory $backendViewFactory,
+        private PageMetricsAccessChecker $accessChecker,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
     {
+        if (!$this->accessChecker->hasAccess()) {
+            // Mirrors PageHeaderMetricsRenderer's own check - that one stops
+            // the placeholder from ever loading this route via JS, but the
+            // route itself is reachable directly, so the same access
+            // decision has to be enforced here too, not just left to the UI.
+            return new HtmlResponse('');
+        }
+
         $pageId = (int) ($request->getQueryParams()['id'] ?? 0);
         $periodDays = (int) ($request->getQueryParams()['period'] ?? 30);
         $includeSubpages = '1' === ($request->getQueryParams()['includeSubpages'] ?? '0');

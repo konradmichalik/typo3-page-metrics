@@ -61,6 +61,16 @@ final class PageHeaderMetricsRendererTest extends FunctionalTestCase
         self::assertStringContainsString('ajax/page-metrics/tiles', $event->getHeaderContent());
     }
 
+    public function testAddsNothingWhenTheBackendUsersTsConfigDisablesAccess(): void
+    {
+        $backendUser = $this->setUpBackendUser(3);
+        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
+
+        $event = $this->dispatch(['id' => '2']);
+
+        self::assertSame('', $event->getHeaderContent());
+    }
+
     /**
      * @param array<string, string> $queryParams
      */

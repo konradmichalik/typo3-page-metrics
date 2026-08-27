@@ -233,6 +233,21 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         self::assertSame('', (string) $response->getBody());
     }
 
+    public function testRendersEmptyResponseWhenTheBackendUsersTsConfigDisablesAccess(): void
+    {
+        // Defense in depth: PageHeaderMetricsRendererTest covers the same
+        // TSconfig flag stopping the placeholder from loading this route in
+        // the first place, but the route itself is reachable directly, so
+        // it has to enforce the same access decision independently.
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $backendUser = $this->setUpBackendUser(3);
+        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
+
+        $response = $this->dispatch(['id' => '2']);
+
+        self::assertSame('', (string) $response->getBody());
+    }
+
     /**
      * @param array<string, string> $queryParams
      */
