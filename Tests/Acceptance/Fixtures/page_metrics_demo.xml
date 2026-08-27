@@ -115,6 +115,7 @@
 				<field index="slug">/</field>
 				<field index="is_siteroot" type="integer">1</field>
 			</fieldlist>
+			<related index="rels" type="array"></related>
 		</tablerow>
 		<tablerow index="tt_content:1" type="array">
 			<fieldlist index="data" type="array">
@@ -166,6 +167,7 @@
 				<field index="title">Contact</field>
 				<field index="slug">/contact</field>
 			</fieldlist>
+			<related index="rels" type="array"></related>
 		</tablerow>
 		<tablerow index="pages:4" type="array">
 			<fieldlist index="data" type="array">
@@ -184,6 +186,7 @@
 				<field index="title">Blog</field>
 				<field index="slug">/blog</field>
 			</fieldlist>
+			<related index="rels" type="array"></related>
 		</tablerow>
 		<tablerow index="pages:3" type="array">
 			<fieldlist index="data" type="array">
@@ -202,6 +205,7 @@
 				<field index="title">Services</field>
 				<field index="slug">/services</field>
 			</fieldlist>
+			<related index="rels" type="array"></related>
 		</tablerow>
 		<tablerow index="pages:2" type="array">
 			<fieldlist index="data" type="array">
@@ -220,6 +224,7 @@
 				<field index="title">About</field>
 				<field index="slug">/about</field>
 			</fieldlist>
+			<related index="rels" type="array"></related>
 		</tablerow>
 	</records>
 </T3RecordDocument>

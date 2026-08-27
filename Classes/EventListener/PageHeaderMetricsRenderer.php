@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -53,7 +53,7 @@ final readonly class PageHeaderMetricsRenderer
             return;
         }
 
-        $this->pageRenderer->addCssFile('EXT:page_metrics/Resources/Public/Css/page-metrics.css');
+        $this->pageRenderer->addCssFile('EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css');
         $this->pageRenderer->loadJavaScriptModule('@konradmichalik/page-metrics/sparkline.js');
 
         $ajaxUrl = htmlspecialchars((string) $this->uriBuilder->buildUriFromRoute('ajax_page_metrics_tiles'), \ENT_QUOTES);

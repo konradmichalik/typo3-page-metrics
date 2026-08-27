@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -59,25 +59,25 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
                 'direction',
                 'string',
                 TrendDirection::Down->value,
-                'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.direction.label',
-                'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.direction.description',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.direction.label',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.direction.description',
                 false,
                 [
-                    TrendDirection::Down->value => 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.direction.down',
-                    TrendDirection::Up->value => 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.direction.up',
+                    TrendDirection::Down->value => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.direction.down',
+                    TrendDirection::Up->value => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.direction.up',
                 ],
             ),
             new SettingDefinition(
                 'period',
                 'int',
                 30,
-                'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.label',
-                'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.description',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.label',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.description',
                 false,
                 [
-                    7 => 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.7',
-                    30 => 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.30',
-                    90 => 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.90',
+                    7 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.7',
+                    30 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.30',
+                    90 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.90',
                 ],
             ),
         ];
@@ -106,7 +106,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
      */
     public function getCssFiles(): array
     {
-        return ['EXT:page_metrics/Resources/Public/Css/page-metrics.css'];
+        return ['EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css'];
     }
 
     /**
@@ -125,8 +125,8 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
 
         return implode(' · ', [
             $languageService->sL($this->configuration->getTitle()),
-            $languageService->sL('LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:'.$directionKey),
-            $languageService->sL('LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period),
+            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:'.$directionKey),
+            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period),
         ]);
     }
 

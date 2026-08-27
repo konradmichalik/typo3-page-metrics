@@ -1,4 +1,4 @@
-CREATE TABLE tx_pagemetrics_daily (
+CREATE TABLE tx_typo3pagemetrics_daily (
 	uid int(11) unsigned NOT NULL auto_increment,
 	date date NOT NULL,
 	page_uid int(11) unsigned DEFAULT '0' NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE tx_pagemetrics_daily (
 	UNIQUE KEY fact (date,page_uid,sys_language_uid,source,metric,dimension)
 );
 
-CREATE TABLE tx_pagemetrics_unresolved (
+CREATE TABLE tx_typo3pagemetrics_unresolved (
 	uid int(11) unsigned NOT NULL auto_increment,
 	date date NOT NULL,
 	source varchar(32) DEFAULT '' NOT NULL,
@@ -28,7 +28,7 @@ CREATE TABLE tx_pagemetrics_unresolved (
 	UNIQUE KEY fact (date,source,url_hash,metric)
 );
 
-CREATE TABLE tx_pagemetrics_import (
+CREATE TABLE tx_typo3pagemetrics_import (
 	uid int(11) unsigned NOT NULL auto_increment,
 	source varchar(32) DEFAULT '' NOT NULL,
 	site_identifier varchar(255) DEFAULT '' NOT NULL,
@@ -39,7 +39,7 @@ CREATE TABLE tx_pagemetrics_import (
 	UNIQUE KEY source_site (source,site_identifier)
 );
 
-CREATE TABLE tx_pagemetrics_annotation (
+CREATE TABLE tx_typo3pagemetrics_annotation (
 	uid int(11) unsigned NOT NULL auto_increment,
 	date date NOT NULL,
 	site_identifier varchar(255) DEFAULT '' NOT NULL,

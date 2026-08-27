@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -78,7 +78,7 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
      */
     public function getCssFiles(): array
     {
-        return ['EXT:page_metrics/Resources/Public/Css/page-metrics.css'];
+        return ['EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css'];
     }
 
     /**

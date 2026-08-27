@@ -26,7 +26,7 @@
 -- CROSS JOIN (...) ON DUPLICATE KEY UPDATE ..." with a syntax error right
 -- before ON DUPLICATE - wrapping the whole thing as "INSERT ... SELECT *
 -- FROM (WITH cte SELECT ...) sub ON DUPLICATE KEY UPDATE ..." avoids it.
-INSERT INTO tx_pagemetrics_daily (date, page_uid, sys_language_uid, source, metric, dimension, value)
+INSERT INTO tx_typo3pagemetrics_daily (date, page_uid, sys_language_uid, source, metric, dimension, value)
 SELECT * FROM (
     WITH RECURSIVE days AS (
         SELECT 0 AS day_offset
@@ -80,7 +80,7 @@ ON DUPLICATE KEY UPDATE value = VALUES(value);
 
 -- A handful of via_redirect pageviews on Home, so the "Via redirects" stat
 -- and redirect-share percentage have something to show too.
-INSERT INTO tx_pagemetrics_daily (date, page_uid, sys_language_uid, source, metric, dimension, value)
+INSERT INTO tx_typo3pagemetrics_daily (date, page_uid, sys_language_uid, source, metric, dimension, value)
 SELECT * FROM (
     WITH RECURSIVE days AS (
         SELECT 0 AS day_offset
@@ -94,7 +94,7 @@ ON DUPLICATE KEY UPDATE value = VALUES(value);
 
 -- Two sample annotations (release/campaign markers) within the 30-day
 -- window above, so the sparkline markers have something to render.
-INSERT INTO tx_pagemetrics_annotation (date, site_identifier, source, annotation_id, text)
+INSERT INTO tx_typo3pagemetrics_annotation (date, site_identifier, source, annotation_id, text)
 VALUES
     (DATE_SUB(CURDATE(), INTERVAL 5 DAY), 'main', 'matomo', 'demo-1', 'Release 2.0 deployed'),
     (DATE_SUB(CURDATE(), INTERVAL 15 DAY), 'main', 'matomo', 'demo-2', 'Marketing campaign started')
@@ -107,7 +107,7 @@ ON DUPLICATE KEY UPDATE date = VALUES(date), text = VALUES(text);
 -- query filters by "url LIKE '%://<site host>/%'", so a URL on any other
 -- host (foreign-host being the deliberate exception, see below) would
 -- never show up for this site.
-INSERT INTO tx_pagemetrics_unresolved (date, source, url_hash, url, metric, reason, value)
+INSERT INTO tx_typo3pagemetrics_unresolved (date, source, url_hash, url, metric, reason, value)
 VALUES
     -- foreign-host is inherently never site-scoped (its whole point is a
     -- host that matches no configured site), so it can never appear in

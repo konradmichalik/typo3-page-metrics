@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -21,54 +21,54 @@ use TYPO3\CMS\Core\Imaging\IconProvider\SvgIconProvider;
 return [
     'tabler-eye-search' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-eye-search.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-eye-search.svg',
     ],
     'tabler-chart-dots' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-chart-dots.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-chart-dots.svg',
     ],
     'tabler-trending-up' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-trending-up.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-trending-up.svg',
     ],
     'tabler-trending-down' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-trending-down.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-trending-down.svg',
     ],
     'tabler-minus' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-minus.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-minus.svg',
     ],
     'tabler-clock' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-clock.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-clock.svg',
     ],
     'tabler-door-exit' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-door-exit.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-door-exit.svg',
     ],
     'tabler-dots-vertical' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-dots-vertical.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-dots-vertical.svg',
     ],
     'tabler-robot' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-robot.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-robot.svg',
     ],
     'tabler-spider' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-spider.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-spider.svg',
     ],
     'tabler-world-search' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-world-search.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-world-search.svg',
     ],
     'tabler-list' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-list.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-list.svg',
     ],
     'tabler-note' => [
         'provider' => SvgIconProvider::class,
-        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-note.svg',
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-note.svg',
     ],
 ];

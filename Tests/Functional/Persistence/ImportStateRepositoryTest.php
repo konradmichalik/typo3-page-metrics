@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -58,9 +58,9 @@ final class ImportStateRepositoryTest extends FunctionalTestCase
         self::assertSame('2026-08-05', $this->subject->getLastImportedDate('matomo', 'main')?->format('Y-m-d'));
 
         $rowCount = (int) $this->get(ConnectionPool::class)
-            ->getQueryBuilderForTable('tx_pagemetrics_import')
+            ->getQueryBuilderForTable('tx_typo3pagemetrics_import')
             ->count('uid')
-            ->from('tx_pagemetrics_import')
+            ->from('tx_typo3pagemetrics_import')
             ->executeQuery()
             ->fetchOne();
 

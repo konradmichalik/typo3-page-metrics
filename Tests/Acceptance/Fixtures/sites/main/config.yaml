@@ -19,7 +19,7 @@ pageMetrics:
   sources:
     matomo:
       # Never-resolving TLD by design - the demo data below is seeded
-      # directly into tx_pagemetrics_daily/tx_pagemetrics_annotation, no
+      # directly into tx_typo3pagemetrics_daily/tx_typo3pagemetrics_annotation, no
       # Matomo API call is ever meant to happen against this endpoint.
       endpoint: 'https://matomo.example.invalid/'
       siteId: 1

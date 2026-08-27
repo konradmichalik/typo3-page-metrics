@@ -12,7 +12,7 @@ loaded, so this never sits on the page module's own critical rendering path.
 
 A `7 / 30 / 90 days` switch above the tiles controls the period every tile
 and its sparkline cover. The active period is carried in the page module URL
-(`tx_pagemetrics_period`), so it survives a reload or a bookmark.
+(`tx_typo3pagemetrics_period`), so it survives a reload or a bookmark.
 
 ## Including subpages
 
@@ -21,7 +21,7 @@ the period switch with a single **Include subpages** toggle. Turning it on
 aggregates the tiles across the whole subtree instead of just the current
 page, useful for a section landing page where the individual child pages
 carry the actual traffic. The choice is carried in the URL
-(`tx_pagemetrics_includeSubpages`) the same way the period is, and the
+(`tx_typo3pagemetrics_includeSubpages`) the same way the period is, and the
 trigger button gets a small badge while the filter is active.
 
 ## Sparkline popover

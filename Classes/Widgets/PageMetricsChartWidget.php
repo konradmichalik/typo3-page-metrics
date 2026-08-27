@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -65,11 +65,11 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
                 'metric',
                 'string',
                 '',
-                'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric.label',
-                'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric.description',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric.label',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric.description',
                 false,
                 [
-                    '' => 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric.auto',
+                    '' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric.auto',
                     ...$this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites()),
                 ],
             ),
@@ -77,13 +77,13 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
                 'period',
                 'int',
                 30,
-                'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.period.label',
-                'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.period.description',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.period.label',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.period.description',
                 false,
                 [
-                    7 => 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.7',
-                    30 => 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.30',
-                    90 => 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.90',
+                    7 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.7',
+                    30 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.30',
+                    90 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.90',
                 ],
             ),
         ];
@@ -119,7 +119,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
      */
     public function getCssFiles(): array
     {
-        return ['EXT:page_metrics/Resources/Public/Css/page-metrics.css'];
+        return ['EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css'];
     }
 
     /**
@@ -142,7 +142,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
         $languageService = $this->getLanguageService();
         $parts = [
             $languageService->sL($this->configuration->getTitle()),
-            $languageService->sL('LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period),
+            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period),
         ];
 
         if (1 === count($overviews)) {

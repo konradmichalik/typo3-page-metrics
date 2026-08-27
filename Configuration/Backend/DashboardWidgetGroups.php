@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -18,6 +18,6 @@ declare(strict_types=1);
 // this file needs no "is EXT:dashboard installed" guard of its own.
 return [
     'pageMetrics' => [
-        'title' => 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget_group.pageMetrics',
+        'title' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget_group.pageMetrics',
     ],
 ];

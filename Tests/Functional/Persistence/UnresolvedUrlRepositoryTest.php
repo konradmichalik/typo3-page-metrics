@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -62,9 +62,9 @@ final class UnresolvedUrlRepositoryTest extends FunctionalTestCase
         self::assertSame(2, $this->countRows());
 
         $remainingUrls = $this->get(ConnectionPool::class)
-            ->getQueryBuilderForTable('tx_pagemetrics_unresolved')
+            ->getQueryBuilderForTable('tx_typo3pagemetrics_unresolved')
             ->select('url')
-            ->from('tx_pagemetrics_unresolved')
+            ->from('tx_typo3pagemetrics_unresolved')
             ->executeQuery()
             ->fetchFirstColumn();
 
@@ -92,9 +92,9 @@ final class UnresolvedUrlRepositoryTest extends FunctionalTestCase
     private function countRows(): int
     {
         return (int) $this->get(ConnectionPool::class)
-            ->getQueryBuilderForTable('tx_pagemetrics_unresolved')
+            ->getQueryBuilderForTable('tx_typo3pagemetrics_unresolved')
             ->count('uid')
-            ->from('tx_pagemetrics_unresolved')
+            ->from('tx_typo3pagemetrics_unresolved')
             ->executeQuery()
             ->fetchOne();
     }

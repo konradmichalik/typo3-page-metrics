@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -28,7 +28,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
  */
 class AnnotationRepository
 {
-    private const TABLE = 'tx_pagemetrics_annotation';
+    private const TABLE = 'tx_typo3pagemetrics_annotation';
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,

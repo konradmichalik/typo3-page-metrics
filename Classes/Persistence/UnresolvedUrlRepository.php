@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -26,7 +26,7 @@ use function array_slice;
  */
 class UnresolvedUrlRepository
 {
-    private const TABLE = 'tx_pagemetrics_unresolved';
+    private const TABLE = 'tx_typo3pagemetrics_unresolved';
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,

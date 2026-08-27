@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is part of the "page_metrics" TYPO3 CMS extension.
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
  *
  * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
  *
@@ -22,7 +22,7 @@ use TYPO3\CMS\Core\Database\Query\Restriction\{DeletedRestriction, HiddenRestric
  *
  * Language-aware slug lookup against the pages table. Returns the
  * default-language page uid even for a translated hit (via l10n_parent),
- * so tx_pagemetrics_daily's page_uid column identifies "the page" across
+ * so tx_typo3pagemetrics_daily's page_uid column identifies "the page" across
  * languages, with sys_language_uid carrying the language dimension.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
