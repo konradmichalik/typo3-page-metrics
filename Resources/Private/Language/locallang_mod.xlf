@@ -9,6 +9,12 @@
             <trans-unit id="period.days" resname="period.days">
                 <source>days</source>
             </trans-unit>
+            <trans-unit id="subpages.include" resname="subpages.include">
+                <source>Include subpages</source>
+            </trans-unit>
+            <trans-unit id="options.label" resname="options.label">
+                <source>More options</source>
+            </trans-unit>
             <trans-unit id="unresolved.hint" resname="unresolved.hint">
                 <source>%1$d URLs from the last 30 days could not be matched to a page on this site.</source>
             </trans-unit>

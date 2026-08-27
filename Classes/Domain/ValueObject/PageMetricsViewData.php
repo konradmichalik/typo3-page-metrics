@@ -35,5 +35,7 @@ final readonly class PageMetricsViewData
         public string $currentRangeLabel,
         public string $previousRangeLabel,
         public array $annotations,
+        public bool $includeSubpages,
+        public bool $hasSubpages,
     ) {}
 }

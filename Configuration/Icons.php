@@ -47,6 +47,10 @@ return [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-door-exit.svg',
     ],
+    'tabler-dots-vertical' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-dots-vertical.svg',
+    ],
     'tabler-robot' => [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-robot.svg',

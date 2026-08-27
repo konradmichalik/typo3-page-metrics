@@ -263,6 +263,64 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         self::assertSame('Release 2.0', $viewData->annotations[0]->text);
     }
 
+    public function testIncludeSubpagesSumsMetricsAcrossTheWholeSubtree(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 32);
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(1, 0, 30, true);
+
+        $tile = $this->tileFor($viewData, 'matomo.pageviews');
+        self::assertSame(42, $tile->value);
+    }
+
+    public function testIncludeSubpagesFalseKeepsSinglePageTotals(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 32);
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(1, 0, 30, false);
+
+        $tile = $this->tileFor($viewData, 'matomo.pageviews');
+        self::assertSame(10, $tile->value);
+    }
+
+    public function testIncludeSubpagesHidesTheExternalLink(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(1, 0, 30, true);
+
+        $tile = $this->tileFor($viewData, 'matomo.pageviews');
+        self::assertNull($tile->externalLink);
+    }
+
+    public function testIncludeSubpagesFlagIsExposedOnTheViewData(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+
+        self::assertTrue($this->get(PageMetricsViewDataBuilder::class)->build(1, 0, 30, true)->includeSubpages);
+        self::assertFalse($this->get(PageMetricsViewDataBuilder::class)->build(1, 0, 30, false)->includeSubpages);
+    }
+
+    public function testHasSubpagesIsTrueForAPageWithChildren(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+
+        self::assertTrue($this->get(PageMetricsViewDataBuilder::class)->build(1, 0, 30)->hasSubpages);
+    }
+
+    public function testHasSubpagesIsFalseForALeafPage(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+
+        self::assertFalse($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30)->hasSubpages);
+    }
+
     private function tileFor(PageMetricsViewData $viewData, string $identifier): MetricTile
     {
         foreach ($viewData->tiles as $tile) {

@@ -162,6 +162,63 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         self::assertStringContainsString('Release 2.0', $body);
     }
 
+    public function testIncludeSubpagesSumsMetricsAcrossTheSubtreeAndMarksTheContainer(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 32);
+
+        $response = $this->dispatch(['id' => '1', 'includeSubpages' => '1']);
+        $body = (string) $response->getBody();
+
+        self::assertStringContainsString('data-include-subpages="1"', $body);
+        self::assertStringContainsString('42', $body);
+    }
+
+    public function testIncludeSubpagesHidesTheExternalLinkDataAttribute(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+
+        $response = $this->dispatch(['id' => '1', 'includeSubpages' => '1']);
+        $body = (string) $response->getBody();
+
+        self::assertStringNotContainsString('matomo.example.com', $body);
+    }
+
+    public function testRendersTheSubpagesOptionForAPageWithChildren(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+
+        $response = $this->dispatch(['id' => '1']);
+        $body = (string) $response->getBody();
+
+        self::assertStringContainsString('data-options-trigger', $body);
+        self::assertStringContainsString('data-include-subpages-toggle', $body);
+    }
+
+    public function testShowsACheckmarkInTheSubpagesMenuItemWhenActive(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+
+        $response = $this->dispatch(['id' => '1', 'includeSubpages' => '1']);
+        $body = (string) $response->getBody();
+
+        self::assertStringContainsString('pagemetrics-options-menu-item-active', $body);
+        self::assertStringContainsString('<svg viewBox="0 0 24 24"', $body);
+    }
+
+    public function testOmitsTheSubpagesOptionForALeafPage(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+
+        $response = $this->dispatch(['id' => '2']);
+        $body = (string) $response->getBody();
+
+        self::assertStringNotContainsString('data-options-trigger', $body);
+        self::assertStringNotContainsString('data-include-subpages-toggle', $body);
+    }
+
     public function testRendersEmptyResponseWhenBackendUserLacksPageAccess(): void
     {
         // Page 3 in the fixture has perms_everybody = 0 and perms_userid = 1,

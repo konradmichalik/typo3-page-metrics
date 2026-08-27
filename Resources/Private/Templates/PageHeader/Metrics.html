@@ -1,10 +1,34 @@
 <html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
-<nav class="pagemetrics-period" aria-label="{f:translate(key: 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.label', default: 'Period')}">
-    <f:for each="{periodOptions}" as="option">
-        <f:be.link route="web_layout" parameters="{id: pageId, tx_pagemetrics_period: option}" additionalAttributes="{'data-period': option}" class="pagemetrics-period-link{f:if(condition: '{option} == {periodDays}', then: ' pagemetrics-period-link-active')}">{option} <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.days" default="days" /></f:be.link>
-    </f:for>
-</nav>
-<div class="pagemetrics-tiles" data-page-id="{pageId}" data-annotations="{f:format.json(value: annotations)}">
+<f:variable name="includeSubpagesToggleValue"><f:if condition="{includeSubpages}" then="0" else="1" /></f:variable>
+<f:variable name="includeSubpagesDataValue"><f:if condition="{includeSubpages}" then="1" else="0" /></f:variable>
+<div class="pagemetrics-toolbar">
+    <nav class="pagemetrics-period" aria-label="{f:translate(key: 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.label', default: 'Period')}">
+        <f:for each="{periodOptions}" as="option">
+            <f:be.link route="web_layout" parameters="{id: pageId, tx_pagemetrics_period: option}" additionalAttributes="{'data-period': option}" class="pagemetrics-period-link{f:if(condition: '{option} == {periodDays}', then: ' pagemetrics-period-link-active')}">{option} <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:period.days" default="days" /></f:be.link>
+        </f:for>
+    </nav>
+    <f:if condition="{hasSubpages}">
+        <div class="pagemetrics-options">
+            <button type="button" class="pagemetrics-options-trigger{f:if(condition: includeSubpages, then: ' pagemetrics-options-trigger-has-active-filter')}" data-options-trigger aria-haspopup="true" aria-expanded="false" aria-label="{f:translate(key: 'LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:options.label', default: 'More options')}">
+                <core:icon identifier="tabler-dots-vertical" alternativeMarkupIdentifier="inline" />
+                <f:if condition="{includeSubpages}">
+                    <span class="pagemetrics-options-trigger-badge" aria-hidden="true"></span>
+                </f:if>
+            </button>
+            <div class="pagemetrics-options-menu" data-options-menu hidden>
+                <f:be.link route="web_layout" parameters="{id: pageId, tx_pagemetrics_period: periodDays, tx_pagemetrics_includeSubpages: includeSubpagesToggleValue}" additionalAttributes="{'data-include-subpages-toggle': 1}" class="pagemetrics-options-menu-item{f:if(condition: includeSubpages, then: ' pagemetrics-options-menu-item-active')}">
+                    <span class="pagemetrics-options-menu-check">
+                        <f:if condition="{includeSubpages}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5l10 -10" /></svg>
+                        </f:if>
+                    </span>
+                    <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:subpages.include" default="Include subpages" />
+                </f:be.link>
+            </div>
+        </div>
+    </f:if>
+</div>
+<div class="pagemetrics-tiles" data-page-id="{pageId}" data-include-subpages="{includeSubpagesDataValue}" data-annotations="{f:format.json(value: annotations)}">
     <f:for each="{tiles}" as="tile">
         <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-label="{tile.label}" data-description="{tile.description}" data-unit="{tile.unit.value}" data-external-link="{tile.externalLink}" data-sparkline="{f:format.json(value: tile.sparkline)}" data-redirect-share="{tile.redirectSharePercent}" style="--pm-accent: {tile.color}" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">
             <div class="pagemetrics-tile-head">

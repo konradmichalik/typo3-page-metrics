@@ -447,10 +447,77 @@ function bindPeriodLinks(container) {
   container.querySelectorAll('.pagemetrics-period-link').forEach((link) => {
     link.addEventListener('click', (event) => {
       event.preventDefault();
-      loadTiles(container, link.dataset.period);
+      loadTiles(container, link.dataset.period, container.dataset.includeSubpages === '1');
     });
   });
 }
+
+// menu -> its own trigger, so the global close handlers below never have to
+// guess the relationship from DOM position/order.
+const openOptionsMenus = new Map();
+
+function closeOptionsMenu(menu) {
+  const trigger = openOptionsMenus.get(menu);
+  if (!trigger) {
+    return;
+  }
+  menu.hidden = true;
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.classList.remove('pagemetrics-options-trigger-active');
+  openOptionsMenus.delete(menu);
+}
+
+function bindOptionsMenu(container) {
+  const trigger = container.querySelector('[data-options-trigger]');
+  const menu = container.querySelector('[data-options-menu]');
+  if (!trigger || !menu) {
+    return;
+  }
+
+  trigger.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!menu.hidden) {
+      closeOptionsMenu(menu);
+      return;
+    }
+
+    openOptionsMenus.forEach((_openTrigger, openMenu) => closeOptionsMenu(openMenu));
+
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    trigger.classList.add('pagemetrics-options-trigger-active');
+    openOptionsMenus.set(menu, trigger);
+  });
+
+  const toggle = menu.querySelector('[data-include-subpages-toggle]');
+  if (toggle) {
+    toggle.addEventListener('click', (event) => {
+      event.preventDefault();
+      closeOptionsMenu(menu);
+      loadTiles(container, container.dataset.period, container.dataset.includeSubpages !== '1');
+    });
+  }
+}
+
+document.addEventListener('click', (event) => {
+  openOptionsMenus.forEach((trigger, menu) => {
+    if (!menu.contains(event.target) && !trigger.contains(event.target)) {
+      closeOptionsMenu(menu);
+    }
+  });
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') {
+    return;
+  }
+  openOptionsMenus.forEach((trigger, menu) => {
+    closeOptionsMenu(menu);
+    trigger.focus();
+  });
+});
 
 const DEFAULT_SKELETON_TILE_COUNT = 4;
 // Kept in sync with the real .pagemetrics-tile width/gap in page-metrics.css.
@@ -509,7 +576,7 @@ function buildInitialLoadingSkeletonHtml(count, availableWidth) {
   return `${periodHtml}<div class="pagemetrics-slider">${prevArrow}${tilesHtml}${nextArrow}</div>${dotsRow}`;
 }
 
-async function loadTiles(container, period) {
+async function loadTiles(container, period, includeSubpages) {
   const previousHtml = container.innerHTML;
   const tilesContainer = container.querySelector('.pagemetrics-tiles');
 
@@ -538,6 +605,7 @@ async function loadTiles(container, period) {
   const url = new URL(container.dataset.ajaxUrl, window.location.origin);
   url.searchParams.set('id', container.dataset.pageId);
   url.searchParams.set('period', period);
+  url.searchParams.set('includeSubpages', includeSubpages ? '1' : '0');
 
   let html;
   try {
@@ -554,8 +622,10 @@ async function loadTiles(container, period) {
 
   container.innerHTML = html;
   container.dataset.period = period;
+  container.dataset.includeSubpages = includeSubpages ? '1' : '0';
   initializeTiles(container);
   bindPeriodLinks(container);
+  bindOptionsMenu(container);
   initializeSlider(container);
 }
 
@@ -587,7 +657,7 @@ window.addEventListener(
 );
 
 document.querySelectorAll('.pagemetrics-header-placeholder').forEach((container) => {
-  loadTiles(container, container.dataset.period || '30');
+  loadTiles(container, container.dataset.period || '30', container.dataset.includeSubpages === '1');
 });
 
 // The dashboard chart widget's markup is static (server-rendered, no AJAX

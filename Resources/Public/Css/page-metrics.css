@@ -2,12 +2,19 @@
     margin-bottom: 8px;
 }
 
+.pagemetrics-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
 .pagemetrics-period {
     display: flex;
     align-items: center;
     gap: 2px;
     width: fit-content;
-    margin: 0 0 8px auto;
     padding: 3px;
     border-radius: 999px;
     background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 6%, transparent);
@@ -37,6 +44,99 @@
     color: var(--typo3-text-color-base, #14213d);
     background: var(--typo3-component-bg, #fff);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.pagemetrics-options {
+    position: relative;
+}
+
+.pagemetrics-options-trigger {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 6%, transparent);
+    color: var(--typo3-text-color-variant, #6a7085);
+    cursor: pointer;
+}
+
+.pagemetrics-options-trigger-badge {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 8px;
+    height: 8px;
+    border: 1.5px solid var(--typo3-component-bg, #fff);
+    border-radius: 50%;
+    background: var(--typo3-text-color-base, #14213d);
+}
+
+.pagemetrics-options-trigger:hover,
+.pagemetrics-options-trigger:focus-visible,
+.pagemetrics-options-trigger-active {
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 12%, transparent);
+    color: var(--typo3-text-color-base, #14213d);
+}
+
+.pagemetrics-options-trigger svg {
+    width: 16px;
+    height: 16px;
+}
+
+.pagemetrics-options-menu {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 180px;
+    padding: 4px;
+    border: 1px solid var(--typo3-component-border-color, #cbcbcb);
+    border-radius: var(--typo3-component-border-radius, 4px);
+    background: var(--typo3-component-bg, #fff);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.pagemetrics-options-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: var(--typo3-component-border-radius, 4px);
+    font-size: 0.8125rem;
+    color: var(--typo3-text-color-base, #14213d);
+    text-decoration: none;
+}
+
+.pagemetrics-options-menu-item:hover,
+.pagemetrics-options-menu-item:focus {
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 6%, transparent);
+    text-decoration: none;
+}
+
+.pagemetrics-options-menu-check {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--typo3-component-border-color, #cbcbcb);
+    border-radius: 3px;
+}
+
+.pagemetrics-options-menu-check svg {
+    width: 10px;
+    height: 10px;
+}
+
+.pagemetrics-options-menu-item-active .pagemetrics-options-menu-check {
+    border-color: var(--typo3-text-color-base, #14213d);
+    background: var(--typo3-text-color-base, #14213d);
+    color: var(--typo3-component-bg, #fff);
 }
 
 .pagemetrics-slider {

@@ -57,7 +57,7 @@ final readonly class PageHeaderMetricsRenderer
         $ajaxUrl = htmlspecialchars((string) $this->uriBuilder->buildUriFromRoute('ajax_page_metrics_tiles'), \ENT_QUOTES);
 
         $event->addHeaderContent(sprintf(
-            '<div class="pagemetrics-header pagemetrics-header-placeholder" data-page-id="%d" data-period="30" data-ajax-url="%s"></div>',
+            '<div class="pagemetrics-header pagemetrics-header-placeholder" data-page-id="%d" data-period="30" data-include-subpages="0" data-ajax-url="%s"></div>',
             $pageId,
             $ajaxUrl,
         ));

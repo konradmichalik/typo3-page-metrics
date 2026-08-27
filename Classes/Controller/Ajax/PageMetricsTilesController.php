@@ -40,8 +40,9 @@ final readonly class PageMetricsTilesController
     {
         $pageId = (int) ($request->getQueryParams()['id'] ?? 0);
         $periodDays = (int) ($request->getQueryParams()['period'] ?? 30);
+        $includeSubpages = '1' === ($request->getQueryParams()['includeSubpages'] ?? '0');
 
-        $viewData = $this->viewDataBuilder->build($pageId, 0, $periodDays);
+        $viewData = $this->viewDataBuilder->build($pageId, 0, $periodDays, $includeSubpages);
 
         if (!$viewData->hasPage) {
             return new HtmlResponse('');
@@ -56,6 +57,8 @@ final readonly class PageMetricsTilesController
             'periodOptions' => $viewData->periodOptions,
             'currentRangeLabel' => $viewData->currentRangeLabel,
             'previousRangeLabel' => $viewData->previousRangeLabel,
+            'includeSubpages' => $viewData->includeSubpages,
+            'hasSubpages' => $viewData->hasSubpages,
             'annotations' => array_map(
                 static fn ($annotation) => ['date' => $annotation->date->format('Y-m-d'), 'text' => $annotation->text],
                 $viewData->annotations,

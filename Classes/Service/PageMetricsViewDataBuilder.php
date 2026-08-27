@@ -17,7 +17,7 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricTile, PageMetricsViewData, RateMetricDefinition};
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Throwable;
@@ -69,11 +69,12 @@ final class PageMetricsViewDataBuilder
         private readonly DailyMetricsRepository $dailyMetricsRepository,
         private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
         private readonly AnnotationRepository $annotationRepository,
+        private readonly SitePageUidRepository $pageUidRepository,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly iterable $sources,
     ) {}
 
-    public function build(int $pageId, int $languageId, int $requestedPeriodDays): PageMetricsViewData
+    public function build(int $pageId, int $languageId, int $requestedPeriodDays, bool $includeSubpages = false): PageMetricsViewData
     {
         if ($pageId > 0) {
             $pageRow = BackendUtility::readPageAccess($pageId, $this->getBackendUser()->getPagePermsClause(Permission::PAGE_SHOW));
@@ -100,17 +101,20 @@ final class PageMetricsViewDataBuilder
         $annotations = null !== $site
             ? $this->annotationRepository->forSiteAndRange($site->getIdentifier(), $tileRange)
             : [];
+        $hasSubpages = null !== $site && $this->pageUidRepository->hasChildren($pageId);
 
         return new PageMetricsViewData(
             $hasPage,
             $pageId,
-            null !== $site ? $this->buildTiles($site, $pageId, $languageId, $tileRange, $previousRange) : [],
+            null !== $site ? $this->buildTiles($site, $pageId, $languageId, $tileRange, $previousRange, $includeSubpages) : [],
             $unresolvedCount,
             $periodDays,
             self::PERIOD_OPTIONS,
             $this->formatRangeLabel($tileRange),
             $this->formatRangeLabel($previousRange),
             $annotations,
+            $includeSubpages,
+            $hasSubpages,
         );
     }
 
@@ -135,9 +139,15 @@ final class PageMetricsViewDataBuilder
     /**
      * @return list<MetricTile>
      */
-    private function buildTiles(Site $site, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange): array
+    private function buildTiles(Site $site, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange, bool $includeSubpages): array
     {
-        $pageUrl = $this->resolvePageUrl($site, $pageId);
+        // No external link when aggregating: it deep-links into Matomo
+        // filtered by a single page's URL (segment=pageUrl==...), and
+        // there's no equivalent for an arbitrary page subtree without a
+        // different segment filtering scheme entirely - not resolving a
+        // page URL at all is what makes collectDefinitions() skip it.
+        $pageUrl = $includeSubpages ? null : $this->resolvePageUrl($site, $pageId);
+        $pageUids = $includeSubpages ? $this->pageUidRepository->descendantsOf($pageId) : [$pageId];
         [$definitions, $rateDefinitions, $externalLinkByIdentifier] = $this->collectDefinitions($site, $pageUrl, $tileRange);
 
         /** @var list<array{sortOrder: int, tile: MetricTile}> $ordered */
@@ -146,14 +156,14 @@ final class PageMetricsViewDataBuilder
         foreach ($definitions as $definition) {
             $ordered[] = [
                 'sortOrder' => $definition->sortOrder,
-                'tile' => $this->buildCountTile($definition, $pageId, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null),
+                'tile' => $this->buildCountTile($definition, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null),
             ];
         }
 
         foreach ($rateDefinitions as $rateDefinition) {
             $ordered[] = [
                 'sortOrder' => $rateDefinition->sortOrder,
-                'tile' => $this->buildRateTile($rateDefinition, $pageId, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$rateDefinition->identifier] ?? null),
+                'tile' => $this->buildRateTile($rateDefinition, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$rateDefinition->identifier] ?? null),
             ];
         }
 
@@ -216,12 +226,15 @@ final class PageMetricsViewDataBuilder
         }
     }
 
-    private function buildCountTile(MetricDefinition $definition, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink): MetricTile
+    /**
+     * @param list<int> $pageUids
+     */
+    private function buildCountTile(MetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink): MetricTile
     {
-        $sparkline = $this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->identifier, $tileRange);
+        $sparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
         $value = array_sum($sparkline);
-        $previousValue = array_sum($this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->identifier, $previousRange));
-        $redirectValue = array_sum($this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->identifier, $tileRange, 'via_redirect'));
+        $previousValue = array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $previousRange));
+        $redirectValue = array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange, 'via_redirect'));
 
         [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
         $redirectSharePercent = $value > 0 ? (int) round($redirectValue / $value * 100) : 0;
@@ -251,10 +264,13 @@ final class PageMetricsViewDataBuilder
      * over each range, for the sparkline's daily points as well as the
      * tile/previous period totals.
      */
-    private function buildRateTile(RateMetricDefinition $definition, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink): MetricTile
+    /**
+     * @param list<int> $pageUids
+     */
+    private function buildRateTile(RateMetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink): MetricTile
     {
-        $numeratorSparkline = $this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->numerator, $tileRange);
-        $denominatorSparkline = $this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->denominator, $tileRange);
+        $numeratorSparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->numerator, $tileRange);
+        $denominatorSparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->denominator, $tileRange);
         $sparkline = $this->buildRatioSeries($numeratorSparkline, $denominatorSparkline, $definition->unit);
 
         $value = $this->computeRatio(
@@ -263,8 +279,8 @@ final class PageMetricsViewDataBuilder
             $definition->unit,
         );
         $previousValue = $this->computeRatio(
-            array_sum($this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->numerator, $previousRange)),
-            array_sum($this->dailyMetricsRepository->dailySeries($pageId, $languageId, $definition->denominator, $previousRange)),
+            array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->numerator, $previousRange)),
+            array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->denominator, $previousRange)),
             $definition->unit,
         );
 
