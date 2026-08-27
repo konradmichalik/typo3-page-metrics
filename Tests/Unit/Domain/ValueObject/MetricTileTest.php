@@ -17,13 +17,11 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricTile;
 use PHPUnit\Framework\TestCase;
 
-
 /**
  * MetricTileTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 final class MetricTileTest extends TestCase
 {
     public function testConstructorAssignsAllProperties(): void
