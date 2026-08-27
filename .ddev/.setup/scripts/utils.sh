@@ -814,14 +814,19 @@ function import_xml_data() {
 
 # Function to import SQL data into TYPO3.
 # It checks if the SQL data files exists, and if it does, it imports the SQL
-# data into the TYPO3 database using the MySQL command.
+# data into the TYPO3 database using the MySQL command. Same __VERSION__ /
+# __SITENAME__ placeholder substitution as import_site_configs() below,
+# piped through sed rather than applied to the file, so a fixture can embed
+# the real per-instance hostname (e.g. for a URL that must match a site's
+# own base for LIKE-host-filtered queries) without the two DDEV instances
+# stepping on each other's literal data.
 function import_sql_data() {
     FIXTURE_DIR="/var/www/html/Tests/Acceptance/Fixtures"
 
     for DATA_FILE in "$FIXTURE_DIR"/*.sql; do
         if [ -f "$DATA_FILE" ]; then
             message yellow "Importing $DATA_FILE..."
-            mysql -h db -u root -p"root" "$DATABASE" < "$DATA_FILE"
+            sed -e "s/__VERSION__/$VERSION/g" -e "s/__SITENAME__/$DDEV_SITENAME/g" "$DATA_FILE" | mysql -h db -u root -p"root" "$DATABASE"
         fi
     done
 

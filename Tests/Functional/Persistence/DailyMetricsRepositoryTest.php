@@ -91,4 +91,38 @@ final class DailyMetricsRepositoryTest extends FunctionalTestCase
         self::assertSame(['2026-08-01' => 30], $this->subject->dailySeries(2, 0, 'matomo.pageviews', new DateRange($date, $date)));
         self::assertSame(['2026-08-01' => 12], $this->subject->dailySeries(2, 0, 'matomo.pageviews', new DateRange($date, $date), 'via_redirect'));
     }
+
+    public function testSiteSeriesSumsAcrossPages(): void
+    {
+        $date = new DateTimeImmutable('2026-08-01');
+        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.pageviews', 10);
+        $this->subject->upsert(3, 0, 'matomo', $date, 'matomo.pageviews', 25);
+
+        $series = $this->subject->siteSeries([2, 3], 0, 'matomo.pageviews', new DateRange($date, $date));
+
+        self::assertSame(['2026-08-01' => 35], $series);
+    }
+
+    public function testSiteSeriesReturnsZeroForDaysWithoutARow(): void
+    {
+        $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 5);
+
+        $series = $this->subject->siteSeries([2, 3], 0, 'matomo.pageviews', new DateRange(
+            new DateTimeImmutable('2026-08-01'),
+            new DateTimeImmutable('2026-08-02'),
+        ));
+
+        self::assertSame(['2026-08-01' => 5, '2026-08-02' => 0], $series);
+    }
+
+    public function testSiteSeriesFiltersByDimension(): void
+    {
+        $date = new DateTimeImmutable('2026-08-01');
+        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.pageviews', 30, '');
+        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.pageviews', 12, 'via_redirect');
+        $this->subject->upsert(3, 0, 'matomo', $date, 'matomo.pageviews', 8, 'via_redirect');
+
+        self::assertSame(['2026-08-01' => 30], $this->subject->siteSeries([2, 3], 0, 'matomo.pageviews', new DateRange($date, $date)));
+        self::assertSame(['2026-08-01' => 20], $this->subject->siteSeries([2, 3], 0, 'matomo.pageviews', new DateRange($date, $date), 'via_redirect'));
+    }
 }

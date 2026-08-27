@@ -1,0 +1,41 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:layout name="Widget/Widget" />
+<f:section name="main">
+    <f:if condition="{sites}">
+        <f:then>
+            <div class="pagemetrics-widget{f:if(condition: compact, then: ' pagemetrics-widget--compact')}">
+                <f:for each="{sites}" as="overview" iteration="siteIteration">
+                    <div class="pagemetrics-widget-site">
+                        <f:if condition="{siteIteration.total} > 1">
+                            <h3 class="pagemetrics-widget-site-title">
+                                <span class="pagemetrics-widget-site-icon"><core:icon identifier="{overview.chartIcon}" size="small" alternativeMarkupIdentifier="inline" /></span>
+                                {overview.site.identifier}
+                                <span class="pagemetrics-widget-site-subtitle">{overview.chartLabel}</span>
+                            </h3>
+                        </f:if>
+                        <div
+                            class="pagemetrics-widget-chart"
+                            data-unit="{overview.chartUnit.value}"
+                            data-sparkline="{f:format.json(value: overview.chartSeries)}"
+                            data-annotations="{f:format.json(value: overview.annotations)}"
+                            style="--pm-accent: {overview.chartColor}"
+                        ></div>
+                    </div>
+                </f:for>
+            </div>
+        </f:then>
+        <f:else>
+            <div class="callout callout-info">
+                <div class="callout-icon">
+                    <span class="icon-emphasized"><core:icon identifier="{configuration.iconIdentifier}" /></span>
+                </div>
+                <div class="callout-content">
+                    <div class="callout-title">
+                        <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." />
+                    </div>
+                </div>
+            </div>
+        </f:else>
+    </f:if>
+</f:section>
+</html>

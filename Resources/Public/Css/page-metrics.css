@@ -107,6 +107,75 @@
     scrollbar-width: none;
 }
 
+.pagemetrics-tiles-static {
+    flex-wrap: wrap;
+    scroll-snap-type: none;
+}
+
+.pagemetrics-tiles-static .pagemetrics-tile {
+    cursor: default;
+    /* Fixed-width in the PageHeader's own horizontally-scrolling slider (see
+       .pagemetrics-tile above), but the dashboard widget has no slider -
+       tiles grow to fill whatever row width the card actually has instead
+       of leaving a gap after the last one. */
+    flex: 1 1 180px;
+    width: auto;
+}
+
+.pagemetrics-widget-site + .pagemetrics-widget-site {
+    margin-top: 16px;
+}
+
+.pagemetrics-widget-site-title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 0 0 8px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--typo3-text-color-base, #14213d);
+}
+
+.pagemetrics-widget-site-icon {
+    display: inline-flex;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-widget-site-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.pagemetrics-widget-site-subtitle {
+    font-weight: 400;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-widget-chart {
+    position: relative;
+    width: 100%;
+}
+
+.pagemetrics-widget-chart .pagemetrics-sparkline {
+    display: block;
+    width: 100%;
+    /* Taller than the popover's own 52px sparkline (see
+       .pagemetrics-popover .pagemetrics-sparkline above): this chart is
+       the widget's only content, not an add-on shown alongside tiles, so it
+       gets to fill the dashboard card (a "medium" height widget slot)
+       instead of leaving most of it empty. */
+    height: 260px;
+    color: var(--pm-accent);
+    cursor: crosshair;
+}
+
+/* The compact chart widget registration (height: small, a single 200px
+   dashboard row) doesn't have room for the full-size sparkline above -
+   scales it down instead of letting the card scroll. */
+.pagemetrics-widget--compact .pagemetrics-sparkline {
+    height: 90px;
+}
+
 .pagemetrics-tiles::-webkit-scrollbar {
     display: none;
 }
@@ -463,4 +532,42 @@
     100% {
         background-position: 0 50%;
     }
+}
+
+/* Value + trend badge sharing one table cell/column (Most viewed pages /
+   Trend widgets), right-aligned as a unit so the badge sits directly next
+   to the number it qualifies instead of its own separate column. */
+.pagemetrics-widget-value-trend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* Trend badge for a table cell (Most viewed pages / Trend widgets) - same
+   up/down/flat colors as .pagemetrics-tile-delta-*, but inline rather than
+   an absolutely-positioned corner pill. */
+.pagemetrics-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.pagemetrics-trend svg {
+    width: 12px;
+    height: 12px;
+}
+
+.pagemetrics-trend-up {
+    color: #1a7f37;
+}
+
+.pagemetrics-trend-down {
+    color: #c92a2a;
+}
+
+.pagemetrics-trend-flat {
+    color: var(--typo3-text-color-variant, #6a7085);
 }

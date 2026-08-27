@@ -13,7 +13,13 @@
 -- idempotent, matching AnnotationRepository/DailyMetricsRepository's own
 -- upsert() semantics.
 
--- 30 days x 2 pages (Home=1, About=2) x 5 Matomo metrics.
+-- 60 days x 5 pages (Home=1, About=2, Services=3, Blog=4, Contact=5) x 5
+-- Matomo metrics - covers every page in page_metrics_demo.xml's tree, so the
+-- "most viewed pages" dashboard widget has more than one page to rank. 60
+-- days rather than 30: the "trend" widget and the trend column on "most
+-- viewed pages" compare the selected period against an equally long period
+-- immediately before it, so a 30-day default period needs 60 days of
+-- history to have anything but "new" to show.
 --
 -- The WITH RECURSIVE + CROSS JOIN SELECT is wrapped in an outer derived
 -- table: MariaDB 10.6 rejects "INSERT ... WITH cte SELECT ... FROM cte
@@ -25,7 +31,7 @@ SELECT * FROM (
     WITH RECURSIVE days AS (
         SELECT 0 AS day_offset
         UNION ALL
-        SELECT day_offset + 1 FROM days WHERE day_offset < 29
+        SELECT day_offset + 1 FROM days WHERE day_offset < 59
     )
     SELECT
         DATE_SUB(CURDATE(), INTERVAL day_offset DAY) AS date,
@@ -34,12 +40,32 @@ SELECT * FROM (
         'matomo' AS source,
         metrics.metric,
         '' AS dimension,
-        metrics.base + ((day_offset * 7 + pages.page_uid * 13) % (metrics.spread + 1)) AS value
+        -- page_uid factored in with a decreasing weight (100 down to 20) so
+        -- the "most viewed pages" widget ranks Home highest and Contact
+        -- lowest, rather than every page landing at roughly the same total.
+        -- trends.delta only shifts matomo.pageviews (the primary metric the
+        -- trend/top-pages widgets rank by): applied as-is for the recent 30
+        -- days and inverted for the 30 days before that, so Home trends up,
+        -- Contact trends down, and Services stays flat - GREATEST guards
+        -- the smaller metrics' bases against ever going negative.
+        GREATEST(1, metrics.base + (100 - pages.page_uid * 20)
+            + (CASE WHEN metrics.metric = 'matomo.pageviews' THEN (CASE WHEN day_offset < 30 THEN trends.delta ELSE -trends.delta END) ELSE 0 END)
+            + ((day_offset * 7 + pages.page_uid * 13) % (metrics.spread + 1))) AS value
     FROM days
     CROSS JOIN (
         SELECT 1 AS page_uid UNION ALL
-        SELECT 2
+        SELECT 2 UNION ALL
+        SELECT 3 UNION ALL
+        SELECT 4 UNION ALL
+        SELECT 5
     ) pages
+    INNER JOIN (
+        SELECT 1 AS page_uid, 25 AS delta UNION ALL
+        SELECT 2, 10 UNION ALL
+        SELECT 3, 0 UNION ALL
+        SELECT 4, -10 UNION ALL
+        SELECT 5, -25
+    ) trends ON trends.page_uid = pages.page_uid
     CROSS JOIN (
         -- entries/entry_bounces bases keep bounces below entries at every
         -- offset, so the derived bounce-rate tile never exceeds 100%.
@@ -73,3 +99,22 @@ VALUES
     (DATE_SUB(CURDATE(), INTERVAL 5 DAY), 'main', 'matomo', 'demo-1', 'Release 2.0 deployed'),
     (DATE_SUB(CURDATE(), INTERVAL 15 DAY), 'main', 'matomo', 'demo-2', 'Marketing campaign started')
 ON DUPLICATE KEY UPDATE date = VALUES(date), text = VALUES(text);
+
+-- Unresolved URLs, one per UnresolvedReason case, so the "not found pages"
+-- dashboard widget has all four reason badges to show. __VERSION__ and
+-- __SITENAME__ are substituted by import_sql_data() (see utils.sh),
+-- matching the site's own base in sites/main/config.yaml - the widget's
+-- query filters by "url LIKE '%://<site host>/%'", so a URL on any other
+-- host (foreign-host being the deliberate exception, see below) would
+-- never show up for this site.
+INSERT INTO tx_pagemetrics_unresolved (date, source, url_hash, url, metric, reason, value)
+VALUES
+    -- foreign-host is inherently never site-scoped (its whole point is a
+    -- host that matches no configured site), so it can never appear in
+    -- this widget - kept here anyway as realistic import-time data, e.g.
+    -- for a future sitewide/unscoped variant of the widget.
+    (DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'matomo', LEFT(SHA2('https://external-blog.example.com/page-metrics-launch', 256), 40), 'https://external-blog.example.com/page-metrics-launch', 'matomo.pageviews', 'foreign-host', 14),
+    (DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'matomo', LEFT(SHA2('https://__VERSION__.__SITENAME__.ddev.site/downloads/brochure.pdf', 256), 40), 'https://__VERSION__.__SITENAME__.ddev.site/downloads/brochure.pdf', 'matomo.pageviews', 'file', 9),
+    (DATE_SUB(CURDATE(), INTERVAL 3 DAY), 'matomo', LEFT(SHA2('https://__VERSION__.__SITENAME__.ddev.site/old-campaign-page', 256), 40), 'https://__VERSION__.__SITENAME__.ddev.site/old-campaign-page', 'matomo.pageviews', 'non-page', 22),
+    (DATE_SUB(CURDATE(), INTERVAL 4 DAY), 'matomo', LEFT(SHA2('https://__VERSION__.__SITENAME__.ddev.site/?utm_broken=1', 256), 40), 'https://__VERSION__.__SITENAME__.ddev.site/?utm_broken=1', 'matomo.pageviews', 'unknown', 3)
+ON DUPLICATE KEY UPDATE value = VALUES(value);

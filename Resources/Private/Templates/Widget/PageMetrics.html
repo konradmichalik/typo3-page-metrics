@@ -1,0 +1,45 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:layout name="Widget/Widget" />
+<f:section name="main">
+    <f:if condition="{sites}">
+        <f:then>
+            <div class="pagemetrics-widget">
+                <f:for each="{sites}" as="siteTiles" iteration="siteIteration">
+                    <div class="pagemetrics-widget-site">
+                        <f:if condition="{siteIteration.total} > 1">
+                            <h3 class="pagemetrics-widget-site-title">{siteTiles.site.identifier}</h3>
+                        </f:if>
+                        <div class="pagemetrics-tiles pagemetrics-tiles-static">
+                            <f:for each="{siteTiles.tiles}" as="tile">
+                                <div class="pagemetrics-tile" style="--pm-accent: {tile.color}">
+                                    <div class="pagemetrics-tile-head">
+                                        <span class="pagemetrics-tile-icon"><core:icon identifier="{tile.icon}" size="medium" alternativeMarkupIdentifier="inline" /></span>
+                                        <div class="pagemetrics-tile-text">
+                                            <span class="pagemetrics-tile-main">
+                                                <span class="pagemetrics-tile-value">{tile.formattedValue}</span>
+                                            </span>
+                                            <span class="pagemetrics-tile-label">{tile.label}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </f:for>
+                        </div>
+                    </div>
+                </f:for>
+            </div>
+        </f:then>
+        <f:else>
+            <div class="callout callout-info">
+                <div class="callout-icon">
+                    <span class="icon-emphasized"><core:icon identifier="{configuration.iconIdentifier}" /></span>
+                </div>
+                <div class="callout-content">
+                    <div class="callout-title">
+                        <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." />
+                    </div>
+                </div>
+            </div>
+        </f:else>
+    </f:if>
+</f:section>
+</html>

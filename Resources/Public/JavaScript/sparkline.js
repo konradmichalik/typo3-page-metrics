@@ -589,3 +589,147 @@ window.addEventListener(
 document.querySelectorAll('.pagemetrics-header-placeholder').forEach((container) => {
   loadTiles(container, container.dataset.period || '30');
 });
+
+// The dashboard chart widget's markup is static (server-rendered, no AJAX
+// reload/popover like the tile), so it only needs the same SVG-building
+// math as PageMetricsTile.buildSparklineSvg() - not the click/popover
+// machinery that math is normally wrapped in. Duplicated rather than
+// reused via that method: PageMetricsTile hard-codes a popover as the
+// overflow boundary for its hover tooltip, which does not exist here.
+function initializeStaticCharts(root) {
+  root.querySelectorAll('.pagemetrics-widget-chart:not([data-initialized])').forEach((container) => {
+    container.dataset.initialized = 'true';
+
+    const data = JSON.parse(container.dataset.sparkline || '{}');
+    const entries = Object.entries(data);
+    if (entries.length === 0) {
+      return;
+    }
+
+    const values = entries.map(([, value]) => value);
+    // Scaled against the data's own [min, max] rather than [0, max]: this
+    // chart is the widget's only content (unlike the tile's popover
+    // sparkline, shown alongside an exact numeric value), so a tight
+    // real-world range - e.g. 800-950 pageviews/day - should fill the
+    // chart's height instead of reading as a nearly flat line pinned near
+    // the top of a 0-based axis.
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+    const width = SPARKLINE_WIDTH * 3;
+    const step = entries.length > 1 ? width / (entries.length - 1) : 0;
+    const points = entries.map(([, value], index) => [index * step, SPARKLINE_HEIGHT - ((value - min) / range) * SPARKLINE_HEIGHT]);
+
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${width} ${SPARKLINE_HEIGHT}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('class', 'pagemetrics-sparkline');
+
+    const area = document.createElementNS(SVG_NS, 'polygon');
+    const areaPoints = [...points, [width, SPARKLINE_HEIGHT], [0, SPARKLINE_HEIGHT]];
+    area.setAttribute('points', areaPoints.map((point) => point.join(',')).join(' '));
+    area.setAttribute('fill', 'currentColor');
+    area.setAttribute('fill-opacity', '0.2');
+    area.setAttribute('stroke', 'none');
+    svg.appendChild(area);
+
+    const polyline = document.createElementNS(SVG_NS, 'polyline');
+    polyline.setAttribute('points', points.map((point) => point.join(',')).join(' '));
+    polyline.setAttribute('fill', 'none');
+    polyline.setAttribute('stroke', 'currentColor');
+    polyline.setAttribute('stroke-width', '1');
+    polyline.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.appendChild(polyline);
+
+    // Same dashed annotation markers as the tile sparkline (see
+    // buildSparklineSvg() above) - the list is embedded on this same
+    // element rather than looked up via getAnnotations()/closest(), since
+    // this chart has no surrounding .pagemetrics-tiles container.
+    const annotationTextByDate = new Map(JSON.parse(container.dataset.annotations || '[]').map((annotation) => [annotation.date, annotation.text]));
+
+    annotationTextByDate.forEach((text, date) => {
+      const index = entries.findIndex(([entryDate]) => entryDate === date);
+      if (index === -1) {
+        return;
+      }
+
+      const [x] = points[index];
+      const marker = document.createElementNS(SVG_NS, 'line');
+      marker.setAttribute('x1', x);
+      marker.setAttribute('x2', x);
+      marker.setAttribute('y1', '0');
+      marker.setAttribute('y2', String(SPARKLINE_HEIGHT));
+      marker.setAttribute('class', 'pagemetrics-sparkline-annotation');
+      marker.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(marker);
+    });
+
+    const marker = document.createElement('div');
+    marker.className = 'pagemetrics-sparkline-marker';
+    marker.hidden = true;
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'pagemetrics-sparkline-tooltip';
+    tooltip.hidden = true;
+
+    const tooltipValue = document.createElement('div');
+    tooltipValue.className = 'pagemetrics-sparkline-tooltip-value';
+    tooltip.appendChild(tooltipValue);
+
+    const tooltipAnnotation = document.createElement('div');
+    tooltipAnnotation.className = 'pagemetrics-sparkline-tooltip-annotation';
+    tooltip.appendChild(tooltipAnnotation);
+
+    svg.addEventListener('mousemove', (event) => {
+      const rect = svg.getBoundingClientRect();
+      const relativeX = ((event.clientX - rect.left) / rect.width) * width;
+      const index = Math.max(0, Math.min(entries.length - 1, step > 0 ? Math.round(relativeX / step) : 0));
+      const [date, value] = entries[index];
+      const [x, y] = points[index];
+
+      const centerX = (x / width) * rect.width;
+      const centerY = (y / SPARKLINE_HEIGHT) * rect.height;
+
+      marker.style.left = `${centerX}px`;
+      marker.style.top = `${centerY}px`;
+      marker.hidden = false;
+
+      const annotationText = annotationTextByDate.get(date);
+      tooltipValue.textContent = `${date}: ${formatValueForUnit(value, container.dataset.unit)}`;
+      tooltipAnnotation.textContent = annotationText ?? '';
+      tooltipAnnotation.hidden = !annotationText;
+      tooltip.hidden = false;
+
+      const halfTooltipWidth = tooltip.offsetWidth / 2;
+      const clampedX = Math.min(Math.max(centerX, halfTooltipWidth), rect.width - halfTooltipWidth);
+      tooltip.style.left = `${clampedX}px`;
+      tooltip.style.top = `${centerY}px`;
+    });
+
+    svg.addEventListener('mouseleave', () => {
+      marker.hidden = true;
+      tooltip.hidden = true;
+    });
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'pagemetrics-sparkline-wrapper';
+    wrapper.appendChild(svg);
+    wrapper.appendChild(marker);
+    wrapper.appendChild(tooltip);
+    container.appendChild(wrapper);
+  });
+}
+
+initializeStaticCharts(document);
+
+// Dashboard widgets are fetched via AJAX and injected into the DOM well
+// after this module's own top-level code has already run once above, so
+// each widget's own static content needs its own initialization pass -
+// typo3-dashboard-widget dispatches this (bubbling) event once its content
+// is in the DOM. Scoped to event.target rather than re-scanning the whole
+// document, and the [data-initialized] guard above stops a duplicate pass
+// (e.g. a widget refresh) from building the chart twice.
+document.addEventListener('typo3:dashboard:widget:content:rendered', (event) => {
+  const target = event.target instanceof Element ? event.target : document;
+  initializeStaticCharts(target);
+});

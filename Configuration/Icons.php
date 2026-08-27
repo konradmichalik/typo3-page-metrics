@@ -59,4 +59,12 @@ return [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-world-search.svg',
     ],
+    'tabler-list' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-list.svg',
+    ],
+    'tabler-note' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:page_metrics/Resources/Public/Icons/tabler-note.svg',
+    ],
 ];

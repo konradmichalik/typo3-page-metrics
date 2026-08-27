@@ -12,6 +12,15 @@
             <trans-unit id="unresolved.hint" resname="unresolved.hint">
                 <source>%1$d URLs from the last 30 days could not be matched to a page on this site.</source>
             </trans-unit>
+            <trans-unit id="widget_group.pageMetrics" resname="widget_group.pageMetrics">
+                <source>Page Metrics</source>
+            </trans-unit>
+            <trans-unit id="dashboardPreset.title" resname="dashboardPreset.title">
+                <source>Page Metrics</source>
+            </trans-unit>
+            <trans-unit id="dashboardPreset.description" resname="dashboardPreset.description">
+                <source>All page metrics widgets: tiles, chart, most viewed pages, trend, not found pages and annotations.</source>
+            </trans-unit>
             <trans-unit id="trend.new" resname="trend.new">
                 <source>new</source>
             </trans-unit>
@@ -23,6 +32,132 @@
             </trans-unit>
             <trans-unit id="trend.explanation.new" resname="trend.explanation.new">
                 <source>No data in the previous period (%1$s) to compare against</source>
+            </trans-unit>
+            <trans-unit id="widget.title" resname="widget.title">
+                <source>Page metrics</source>
+            </trans-unit>
+            <trans-unit id="widget.description" resname="widget.description">
+                <source>Shows the page metrics tiles for each site's homepage.</source>
+            </trans-unit>
+            <trans-unit id="widget.empty" resname="widget.empty">
+                <source>No page metrics available yet.</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.title" resname="widget.chart.title">
+                <source>Page metrics chart</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.description" resname="widget.chart.description">
+                <source>A daily chart of each site's primary metric, with annotation markers.</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.setting.metric.label" resname="widget.chart.setting.metric.label">
+                <source>Metric</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.setting.metric.description" resname="widget.chart.setting.metric.description">
+                <source>Which metric the chart plots. Defaults to the site's primary metric.</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.setting.metric.auto" resname="widget.chart.setting.metric.auto">
+                <source>Automatic (site's primary metric)</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.setting.period.label" resname="widget.chart.setting.period.label">
+                <source>Period</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.setting.period.description" resname="widget.chart.setting.period.description">
+                <source>How many days the chart covers.</source>
+            </trans-unit>
+            <trans-unit id="widget.chartCompact.title" resname="widget.chartCompact.title">
+                <source>Page metrics chart (compact)</source>
+            </trans-unit>
+            <trans-unit id="widget.chartCompact.description" resname="widget.chartCompact.description">
+                <source>The same configurable chart, sized to fit more easily into a compact dashboard layout.</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.title" resname="widget.topPages.title">
+                <source>Most viewed pages</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.description" resname="widget.topPages.description">
+                <source>The highest-traffic pages per site, linked into the page module.</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.empty" resname="widget.topPages.empty">
+                <source>No page views recorded yet.</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.column.page" resname="widget.topPages.column.page">
+                <source>Page</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.column.views" resname="widget.topPages.column.views">
+                <source>Views</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.title" resname="widget.trend.title">
+                <source>Page metrics trend</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.description" resname="widget.trend.description">
+                <source>The pages with the biggest rise or drop in traffic against the previous period.</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.empty" resname="widget.trend.empty">
+                <source>No trending pages in this period.</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.setting.direction.label" resname="widget.trend.setting.direction.label">
+                <source>Direction</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.setting.direction.description" resname="widget.trend.setting.direction.description">
+                <source>Whether to show the biggest drops or the biggest gains.</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.setting.direction.down" resname="widget.trend.setting.direction.down">
+                <source>Biggest drops</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.setting.direction.up" resname="widget.trend.setting.direction.up">
+                <source>Biggest gains</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.setting.period.label" resname="widget.trend.setting.period.label">
+                <source>Period</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.setting.period.description" resname="widget.trend.setting.period.description">
+                <source>Compares this period against the one immediately before it.</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.setting.period.7" resname="widget.trend.setting.period.7">
+                <source>7 days</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.setting.period.30" resname="widget.trend.setting.period.30">
+                <source>30 days</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.setting.period.90" resname="widget.trend.setting.period.90">
+                <source>90 days</source>
+            </trans-unit>
+            <trans-unit id="widget.notFoundPages.title" resname="widget.notFoundPages.title">
+                <source>Not found pages</source>
+            </trans-unit>
+            <trans-unit id="widget.notFoundPages.description" resname="widget.notFoundPages.description">
+                <source>URLs the daily import could not resolve to a page, with the reason why.</source>
+            </trans-unit>
+            <trans-unit id="widget.notFoundPages.empty" resname="widget.notFoundPages.empty">
+                <source>No unresolved URLs in the last 30 days.</source>
+            </trans-unit>
+            <trans-unit id="widget.notFoundPages.column.url" resname="widget.notFoundPages.column.url">
+                <source>URL</source>
+            </trans-unit>
+            <trans-unit id="widget.notFoundPages.column.reason" resname="widget.notFoundPages.column.reason">
+                <source>Reason</source>
+            </trans-unit>
+            <trans-unit id="widget.notFoundPages.column.hits" resname="widget.notFoundPages.column.hits">
+                <source>Hits</source>
+            </trans-unit>
+            <trans-unit id="widget.annotations.title" resname="widget.annotations.title">
+                <source>Page metrics annotations</source>
+            </trans-unit>
+            <trans-unit id="widget.annotations.description" resname="widget.annotations.description">
+                <source>Recent site-wide annotations, such as Matomo release markers.</source>
+            </trans-unit>
+            <trans-unit id="widget.annotations.empty" resname="widget.annotations.empty">
+                <source>No annotations in this period.</source>
+            </trans-unit>
+            <trans-unit id="unresolved.reason.foreign-host" resname="unresolved.reason.foreign-host">
+                <source>Foreign host</source>
+            </trans-unit>
+            <trans-unit id="unresolved.reason.file" resname="unresolved.reason.file">
+                <source>File</source>
+            </trans-unit>
+            <trans-unit id="unresolved.reason.non-page" resname="unresolved.reason.non-page">
+                <source>Not a page</source>
+            </trans-unit>
+            <trans-unit id="unresolved.reason.unknown" resname="unresolved.reason.unknown">
+                <source>Unknown</source>
             </trans-unit>
         </body>
     </file>

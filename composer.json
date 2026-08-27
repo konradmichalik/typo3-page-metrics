@@ -28,9 +28,13 @@
 		"konradmichalik/ttt": "^0.4.0",
 		"phpunit/phpunit": "^11.0 || ^12.0 || ^13.0",
 		"typo3/cms-base-distribution": "^13.4 || ^14.0",
+		"typo3/cms-dashboard": "^13.4 || ^14.0",
 		"typo3/cms-lowlevel": "^13.4 || ^14.0",
 		"typo3/cms-redirects": "^13.4 || ^14.0",
 		"typo3/testing-framework": "^8.2 || ^9.0 || ^10.0"
+	},
+	"suggest": {
+		"typo3/cms-dashboard": "Enables the 'Page metrics' dashboard widget, showing each site's homepage tiles at a glance."
 	},
 	"autoload": {
 		"psr-4": {
@@ -39,8 +43,8 @@
 	},
 	"autoload-dev": {
 		"psr-4": {
-			"KonradMichalik\\Typo3PageMetrics\\Tests\\": "Tests/",
-			"KonradMichalik\\PageMetricsDemoTiles\\": "Tests/Functional/Service/Fixtures/Extensions/page_metrics_demo_tiles/Classes/"
+			"KonradMichalik\\PageMetricsDemoTiles\\": "Tests/Functional/Service/Fixtures/Extensions/page_metrics_demo_tiles/Classes/",
+			"KonradMichalik\\Typo3PageMetrics\\Tests\\": "Tests/"
 		}
 	},
 	"config": {

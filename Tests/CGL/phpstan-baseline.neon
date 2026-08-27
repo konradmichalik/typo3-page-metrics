@@ -81,6 +81,26 @@ parameters:
 			count: 1
 			path: ../../Classes/Source/Ga4/Ga4MetricSource.php
 		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Widgets/PageMetricsWidget.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Persistence/SitePageUidRepository.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 2
+			path: ../../Classes/Service/SiteMetricsOverviewBuilder.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Widgets/PageMetricsChartWidget.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 2
+			path: ../../Classes/Widgets/TrendWidget.php
+		-
 			# MetricDefinition and UrlMetric are `@api` value objects whose trailing
 			# nullable parameter (maxDimensions / dimension) means "not applicable"
 			# for the common case. Removing the default would force every call

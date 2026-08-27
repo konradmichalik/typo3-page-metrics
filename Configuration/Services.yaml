@@ -52,9 +52,21 @@ services:
     KonradMichalik\Typo3PageMetrics\Persistence\AnnotationRepository:
         public: true
 
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Persistence\SitePageUidRepository:
+        public: true
+
     # Public so functional tests can fetch it directly via $this->get() instead
     # of dispatching a full ModifyPageLayoutContentEvent.
     KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder:
+        arguments:
+            $sources: !tagged_iterator page_metrics.metric_source
+        public: true
+
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming widget references it.
+    KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder:
         arguments:
             $sources: !tagged_iterator page_metrics.metric_source
         public: true

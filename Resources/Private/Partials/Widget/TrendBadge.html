@@ -1,0 +1,8 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
+<span class="pagemetrics-trend pagemetrics-trend-{trend.value}">
+    <f:if condition="{trend.value} == 'up'"><f:then><core:icon identifier="tabler-trending-up" size="small" alternativeMarkupIdentifier="inline" /></f:then></f:if>
+    <f:if condition="{trend.value} == 'down'"><f:then><core:icon identifier="tabler-trending-down" size="small" alternativeMarkupIdentifier="inline" /></f:then></f:if>
+    <f:if condition="{trend.value} == 'flat'"><f:then><core:icon identifier="tabler-minus" size="small" alternativeMarkupIdentifier="inline" /></f:then></f:if>
+    {deltaText}
+</span>
+</html>

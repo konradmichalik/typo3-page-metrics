@@ -75,6 +75,38 @@ class UnresolvedUrlRepository
     }
 
     /**
+     * The highest-value unresolved URLs for a site, one row per url+reason,
+     * summed across every day in range - the "not found pages" widget's
+     * data source.
+     *
+     * @return list<array{url: string, reason: string, value: int}>
+     */
+    public function listForSite(string $host, DateTimeImmutable $since, int $limit): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $likePattern = '%://'.$queryBuilder->escapeLikeWildcards($host).'/%';
+
+        $rows = $queryBuilder
+            ->select('url', 'reason')
+            ->addSelectLiteral('SUM('.$queryBuilder->quoteIdentifier('value').') AS total')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->like('url', $queryBuilder->createNamedParameter($likePattern)),
+                $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($since->format('Y-m-d'))),
+            )
+            ->groupBy('url', 'reason')
+            ->orderBy('total', 'DESC')
+            ->setMaxResults($limit)
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        return array_map(
+            static fn (array $row): array => ['url' => (string) $row['url'], 'reason' => (string) $row['reason'], 'value' => (int) $row['total']],
+            $rows,
+        );
+    }
+
+    /**
      * Keeps the $capPerDay highest-value rows for the day, deletes the rest -
      * the lowest-value entries are the least actionable ones to lose.
      */

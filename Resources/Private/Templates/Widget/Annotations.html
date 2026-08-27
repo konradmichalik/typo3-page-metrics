@@ -1,0 +1,53 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:layout name="Widget/Widget" />
+<f:section name="main">
+    <f:if condition="{sites}">
+        <f:then>
+            <f:for each="{sites}" as="overview" iteration="siteIteration">
+                <div class="pagemetrics-widget-site">
+                    <f:if condition="{siteIteration.total} > 1">
+                        <h3 class="pagemetrics-widget-site-title">{overview.site.identifier}</h3>
+                    </f:if>
+                    <f:if condition="{overview.annotations}">
+                        <f:then>
+                            <div class="widget-table-wrapper">
+                                <table class="widget-table table table-striped table-hover">
+                                    <tbody>
+                                        <f:for each="{overview.annotations}" as="annotation">
+                                            <tr>
+                                                <td class="nowrap"><f:format.date date="{annotation.date}" format="Y-m-d" /></td>
+                                                <td>{annotation.text}</td>
+                                            </tr>
+                                        </f:for>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </f:then>
+                        <f:else>
+                            <div class="callout callout-info">
+                                <div class="callout-content">
+                                    <div class="callout-title">
+                                        <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.annotations.empty" default="No annotations in this period." />
+                                    </div>
+                                </div>
+                            </div>
+                        </f:else>
+                    </f:if>
+                </div>
+            </f:for>
+        </f:then>
+        <f:else>
+            <div class="callout callout-info">
+                <div class="callout-icon">
+                    <span class="icon-emphasized"><core:icon identifier="{configuration.iconIdentifier}" /></span>
+                </div>
+                <div class="callout-content">
+                    <div class="callout-title">
+                        <f:translate key="LLL:EXT:page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." />
+                    </div>
+                </div>
+            </div>
+        </f:else>
+    </f:if>
+</f:section>
+</html>
