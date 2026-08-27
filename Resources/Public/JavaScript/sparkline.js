@@ -14,6 +14,18 @@ function chevronSvg(path) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${path}" /></svg>`;
 }
 
+function getAnnotations(tileElement) {
+  const container = tileElement.closest('.pagemetrics-tiles');
+  if (!container || !container.dataset.annotations) {
+    return [];
+  }
+  try {
+    return JSON.parse(container.dataset.annotations);
+  } catch {
+    return [];
+  }
+}
+
 function formatValueForUnit(value, unit) {
   if (unit === 'percent') {
     return `${value}%`;
@@ -103,6 +115,32 @@ class PageMetricsTile {
     polyline.setAttribute('vector-effect', 'non-scaling-stroke');
     svg.appendChild(polyline);
 
+    // Minimal, dashed vertical ticks for annotations (e.g. Matomo releases)
+    // that fall on one of this sparkline's own dates - same list on every
+    // tile/metric, since annotations are site-wide, not per-metric. Text is
+    // surfaced through the existing mousemove-tracked value tooltip below
+    // (see annotationTextByDate) rather than a native SVG <title>: a 1px
+    // line is a poor, hard-to-hit hover target, and a second, independent
+    // tooltip mechanism would fight the one already there.
+    const annotationTextByDate = new Map(getAnnotations(this.element).map((annotation) => [annotation.date, annotation.text]));
+
+    annotationTextByDate.forEach((text, date) => {
+      const index = entries.findIndex(([entryDate]) => entryDate === date);
+      if (index === -1) {
+        return;
+      }
+
+      const [x] = points[index];
+      const marker = document.createElementNS(SVG_NS, 'line');
+      marker.setAttribute('x1', x);
+      marker.setAttribute('x2', x);
+      marker.setAttribute('y1', '0');
+      marker.setAttribute('y2', String(SPARKLINE_HEIGHT));
+      marker.setAttribute('class', 'pagemetrics-sparkline-annotation');
+      marker.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(marker);
+    });
+
     // An HTML element rather than an SVG <circle>: the SVG uses
     // preserveAspectRatio="none" so the line fills the full width/height,
     // but that also stretches SVG shapes non-uniformly - a native circle
@@ -115,6 +153,19 @@ class PageMetricsTile {
     const tooltip = document.createElement('div');
     tooltip.className = 'pagemetrics-sparkline-tooltip';
     tooltip.hidden = true;
+
+    // Two separate lines rather than one run-on string: the date/value is
+    // always short and must stay on one line, while an annotation's text is
+    // free-form and needs to wrap - mixing both in one nowrap-vs-normal
+    // element produces an unpredictably narrow, cramped box (a tooltip
+    // <div> with no explicit width shrinks-to-fit under position:absolute).
+    const tooltipValue = document.createElement('div');
+    tooltipValue.className = 'pagemetrics-sparkline-tooltip-value';
+    tooltip.appendChild(tooltipValue);
+
+    const tooltipAnnotation = document.createElement('div');
+    tooltipAnnotation.className = 'pagemetrics-sparkline-tooltip-annotation';
+    tooltip.appendChild(tooltipAnnotation);
 
     svg.addEventListener('mousemove', (event) => {
       const rect = svg.getBoundingClientRect();
@@ -130,14 +181,34 @@ class PageMetricsTile {
       marker.style.top = `${centerY}px`;
       marker.hidden = false;
 
-      tooltip.textContent = `${date}: ${formatValueForUnit(value, this.element.dataset.unit)}`;
+      const annotationText = annotationTextByDate.get(date);
+      tooltipValue.textContent = `${date}: ${formatValueForUnit(value, this.element.dataset.unit)}`;
+      tooltipAnnotation.textContent = annotationText ?? '';
+      tooltipAnnotation.hidden = !annotationText;
       tooltip.hidden = false;
+      tooltip.style.left = `${centerX}px`;
+      tooltip.style.top = `${centerY}px`;
+
+      // Below the cursor by default (see .pagemetrics-sparkline-tooltip),
+      // but the popover has no room to spare - a hover point near the
+      // chart's bottom edge pushes the tooltip past the popover's own
+      // bottom, where overflow:hidden would clip it. Flip to above only
+      // when that would actually happen, mirroring positionPopover()'s own
+      // viewport-edge clamping for the popover as a whole.
+      //
+      // Always measured from the default "below" state, never from
+      // whatever class the previous mousemove event left behind - checking
+      // against last frame's already-flipped position turns this into a
+      // feedback loop (each frame's verdict based on the other position),
+      // which reads as the tooltip flickering between above/below on every
+      // move instead of settling.
+      tooltip.classList.remove('pagemetrics-sparkline-tooltip-above');
+      const overflowsBelow = tooltip.getBoundingClientRect().bottom > this.popover.getBoundingClientRect().bottom;
+      tooltip.classList.toggle('pagemetrics-sparkline-tooltip-above', overflowsBelow);
 
       const halfTooltipWidth = tooltip.offsetWidth / 2;
       const clampedX = Math.min(Math.max(centerX, halfTooltipWidth), rect.width - halfTooltipWidth);
-
       tooltip.style.left = `${clampedX}px`;
-      tooltip.style.top = `${centerY}px`;
     });
 
     svg.addEventListener('mouseleave', () => {

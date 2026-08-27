@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Controller\Ajax;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsTilesController;
-use KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository;
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository};
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Backend\Routing\Route;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -148,6 +148,18 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
 
         self::assertStringContainsString('Previous period', $body);
         self::assertStringContainsString('20%', $body);
+    }
+
+    public function testRendersAnnotationsAsADataAttributeOnTheTilesContainer(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', '1', new DateTimeImmutable('today'), 'Release 2.0');
+
+        $response = $this->dispatch(['id' => '2']);
+        $body = (string) $response->getBody();
+
+        self::assertStringContainsString('data-annotations="', $body);
+        self::assertStringContainsString('Release 2.0', $body);
     }
 
     public function testRendersEmptyResponseWhenBackendUserLacksPageAccess(): void

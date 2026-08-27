@@ -245,6 +245,13 @@
     cursor: crosshair;
 }
 
+.pagemetrics-sparkline-annotation {
+    opacity: 0.6;
+    stroke: var(--typo3-text-color-variant, #6a7085);
+    stroke-dasharray: 2 2;
+    stroke-width: 1;
+}
+
 .pagemetrics-sparkline-marker {
     position: absolute;
     z-index: 1;
@@ -259,14 +266,35 @@
 .pagemetrics-sparkline-tooltip {
     position: absolute;
     z-index: 1;
-    transform: translate(-50%, -100%) translateY(-6px);
-    padding: 2px 6px;
+    width: max-content;
+    max-width: 180px;
+    /* Below the cursor by default: above would overlap the popover's own
+       Today/Yesterday/Peak/Average stats row sitting right above the
+       sparkline. Flipped to .pagemetrics-sparkline-tooltip-above in JS when
+       the popover has no room below (see the mousemove handler). */
+    transform: translate(-50%, 0) translateY(6px);
+    padding: 4px 8px;
     border-radius: var(--typo3-component-border-radius, 4px);
     background: var(--typo3-text-color-base, #14213d);
     color: #fff;
     font-size: 0.6875rem;
-    white-space: nowrap;
+    text-align: center;
     pointer-events: none;
+}
+
+.pagemetrics-sparkline-tooltip-above {
+    transform: translate(-50%, -100%) translateY(-6px);
+}
+
+.pagemetrics-sparkline-tooltip-value {
+    white-space: nowrap;
+}
+
+.pagemetrics-sparkline-tooltip-annotation {
+    margin-top: 3px;
+    padding-top: 3px;
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+    white-space: normal;
 }
 
 .pagemetrics-popover-heading {

@@ -56,6 +56,10 @@ final readonly class PageMetricsTilesController
             'periodOptions' => $viewData->periodOptions,
             'currentRangeLabel' => $viewData->currentRangeLabel,
             'previousRangeLabel' => $viewData->previousRangeLabel,
+            'annotations' => array_map(
+                static fn ($annotation) => ['date' => $annotation->date->format('Y-m-d'), 'text' => $annotation->text],
+                $viewData->annotations,
+            ),
         ]);
 
         return new HtmlResponse($view->render('PageHeader/Metrics'));

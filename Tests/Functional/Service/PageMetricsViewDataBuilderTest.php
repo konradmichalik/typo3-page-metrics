@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Service;
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{TrendDirection, UnresolvedReason};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{MetricTile, PageMetricsViewData};
-use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -241,6 +241,26 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
 
         self::assertSame(1, $viewData->unresolvedCount);
+    }
+
+    public function testAnnotationsAreEmptyWhenNoneAreStored(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
+
+        self::assertSame([], $viewData->annotations);
+    }
+
+    public function testAnnotationsWithinTheSelectedPeriodAreExposed(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', '1', new DateTimeImmutable('today'), 'Release 2.0');
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
+
+        self::assertCount(1, $viewData->annotations);
+        self::assertSame('Release 2.0', $viewData->annotations[0]->text);
     }
 
     private function tileFor(PageMetricsViewData $viewData, string $identifier): MetricTile

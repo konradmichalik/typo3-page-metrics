@@ -17,7 +17,7 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricTile, PageMetricsViewData, RateMetricDefinition};
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
-use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Throwable;
@@ -68,6 +68,7 @@ final class PageMetricsViewDataBuilder
         private readonly SiteFinder $siteFinder,
         private readonly DailyMetricsRepository $dailyMetricsRepository,
         private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
+        private readonly AnnotationRepository $annotationRepository,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly iterable $sources,
     ) {}
@@ -96,6 +97,9 @@ final class PageMetricsViewDataBuilder
         $unresolvedCount = null !== $site
             ? $this->unresolvedUrlRepository->countForSite($site->getBase()->getHost(), (new DateTimeImmutable('today'))->modify('-30 days'))
             : 0;
+        $annotations = null !== $site
+            ? $this->annotationRepository->forSiteAndRange($site->getIdentifier(), $tileRange)
+            : [];
 
         return new PageMetricsViewData(
             $hasPage,
@@ -106,6 +110,7 @@ final class PageMetricsViewDataBuilder
             self::PERIOD_OPTIONS,
             $this->formatRangeLabel($tileRange),
             $this->formatRangeLabel($previousRange),
+            $annotations,
         );
     }
 

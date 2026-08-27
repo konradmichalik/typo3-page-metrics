@@ -23,6 +23,7 @@ final readonly class PageMetricsViewData
     /**
      * @param list<MetricTile> $tiles
      * @param list<int>        $periodOptions
+     * @param list<Annotation> $annotations
      */
     public function __construct(
         public bool $hasPage,
@@ -33,5 +34,6 @@ final readonly class PageMetricsViewData
         public array $periodOptions,
         public string $currentRangeLabel,
         public string $previousRangeLabel,
+        public array $annotations,
     ) {}
 }
