@@ -20,7 +20,7 @@ without leaving the backend.
 > instead. This extension is for page-level metrics, not dashboards — the
 > two are complementary, not competing.
 
-## Features
+## ✨ Features
 
 - URL → page resolver with redirect-chain and multilingual slug support,
   persisted at import time (never resolved live, never retroactively)
@@ -32,17 +32,28 @@ without leaving the backend.
   visits, avg. time on page, bounce rate, a period switch (7/30/90 days),
   and a sparkline popover per tile covering that same period, loaded
   asynchronously so it never affects the page module's own render time
+- An options menu on the tiles to include subpages in the aggregated
+  numbers, shown whenever the current page has any — see
+  [Page module tiles](docs/page-tiles.md)
+- Matomo annotations imported as a site-wide, extensible data source
+  (`AnnotationSourceInterface`) and marked on every sparkline — see
+  [Page module tiles](docs/page-tiles.md#annotations)
+- Site-wide [EXT:dashboard](https://docs.typo3.org/permanent/typo3/cms-dashboard/main/en-us/)
+  widgets (tiles, chart, top pages, trend, not-found pages, annotations)
+  plus a ready-made dashboard preset — see
+  [Dashboard widgets](docs/dashboard-widgets.md)
 - `ModifyMetricTilesEvent` lets other extensions contribute additional
   tiles without implementing the full `MetricSourceInterface`
 - Only aggregates are stored — no IPs, no user agents, no sub-day timestamps
+- Tiles can be turned off per backend user group via User TSconfig
 
-## Installation
+## 🔥 Installation
 
 ```bash
 composer require konradmichalik/typo3-page-metrics
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 Add to a site's `config/sites/<identifier>/config.yaml`:
 
@@ -93,9 +104,25 @@ GA4's Data API can take 24-48 hours to finalize a day's data, so its most
 recently imported days may be understated. Periodically re-run the import
 with `--force` (see [Usage](#usage)) to pick up corrections to those days.
 
-## Usage
+## 🔒 Security
 
-Run the import (also schedulable via the TYPO3 Scheduler):
+The page-metrics tiles are visible to every backend user by default. To hide
+them for a user group (or an individual user), set in that group's/user's
+**User TSconfig**:
+
+```
+tx_pagemetrics.disabled = 1
+```
+
+This is enforced both where the tiles are injected into the page module and
+on the AJAX route that loads them, so a user without access cannot reach the
+data by calling that route directly either.
+
+## ⚡ Usage
+
+Run the import (also schedulable via the TYPO3 Scheduler). The same command
+imports both metrics and any annotations from a registered source (e.g.
+Matomo release markers, see [Page module tiles](docs/page-tiles.md#annotations)):
 
 ```bash
 vendor/bin/typo3 page-metrics:import
@@ -103,9 +130,20 @@ vendor/bin/typo3 page-metrics:import --force
 ```
 
 Then open **Web → Page** and select a page in the page tree — the tiles
-appear directly below the page title.
+appear directly below the page title. See
+[Page module tiles](docs/page-tiles.md) for the period switch, the subpages
+toggle and the sparkline popover, or
+[Dashboard widgets](docs/dashboard-widgets.md) for the site-wide EXT:dashboard
+widgets.
 
-## Development
+## 📚 Documentation
+
+| Page | What's inside |
+| --- | --- |
+| [Dashboard widgets](docs/dashboard-widgets.md) | The full EXT:dashboard widget catalog, their settings and the bundled preset |
+| [Page module tiles](docs/page-tiles.md) | The period switch, the subpages toggle, sparkline popovers and annotations |
+
+## 🛠️ Development
 
 ```bash
 composer install
@@ -113,6 +151,6 @@ composer test
 composer cgl sca
 ```
 
-## License
+## ⭐ License
 
 GPL-2.0-or-later, see [`LICENSE.md`](LICENSE.md).

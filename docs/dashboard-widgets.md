@@ -1,0 +1,41 @@
+# Dashboard widgets
+
+`page_metrics` registers a set of [EXT:dashboard](https://docs.typo3.org/permanent/typo3/cms-dashboard/main/en-us/)
+widgets once that extension is installed, so page-level metrics are also
+visible site-wide, without opening the page module. Registration is
+conditional: on installations without EXT:dashboard, none of this loads (see
+`Configuration/Services.php`).
+
+Each widget lists every site that has a configured metric source, and is
+skipped entirely for sites without one.
+
+![The Page Metrics dashboard preset: tiles, chart, two compact charts, trend and most viewed pages](img/dashboard-widgets.png)
+
+| Widget | Identifier | Shows | Fixed period | Configurable |
+| --- | --- | --- | --- | --- |
+| Page metrics | `pageMetrics` | Each site's homepage tiles: page views, visits, avg. time on page, bounce rate | 7 days | — |
+| Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers | — | Metric, period (7/30/90 days) |
+| Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days) |
+| Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | — |
+| Page metrics trend | `pageMetricsTrend` | Pages with the biggest rise or drop against the previous period | 7/30/90 days | Direction (drops/gains), period |
+| Not found pages | `pageMetricsNotFoundPages` | URLs the daily import could not resolve to a page, with the reason | 30 days | — |
+| Page metrics annotations | `pageMetricsAnnotations` | Recent site-wide annotations, such as Matomo release markers | 90 days | — |
+
+Every widget except the site-homepage tiles reads from the same
+`SiteMetricsOverviewBuilder`, aggregated across all pages of a site rather
+than a single one.
+
+## Chart metric selection
+
+The chart widget's **Metric** setting defaults to each site's primary
+metric. Picking one explicitly is only meaningful for a single-site widget
+instance: a multi-site chart falls back to each site's own primary metric
+for any site whose source doesn't support the configured one.
+
+## Dashboard preset
+
+A ready-made **Page Metrics** dashboard preset bundles the tiles, chart, top
+pages, trend, not-found-pages and annotations widgets (everything except the
+compact chart variant). It appears in the dashboard creation wizard once
+EXT:dashboard is installed, so a new dashboard covering every site's metrics
+is one click away.
