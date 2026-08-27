@@ -13,12 +13,14 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\Annotation;
 use KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
+use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
-use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, RequestAwareWidgetInterface, WidgetConfigurationInterface, WidgetInterface};
+use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, JavaScriptInterface, RequestAwareWidgetInterface, WidgetConfigurationInterface, WidgetInterface};
 
 /**
  * PageMetricsWidget.
@@ -31,7 +33,7 @@ use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, RequestAwareWidgetInter
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInterface, AdditionalCssInterface
+final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInterface, AdditionalCssInterface, JavaScriptInterface
 {
     private const PERIOD_DAYS = 7;
 
@@ -80,7 +82,15 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
     }
 
     /**
-     * @return list<array{site: Site, tiles: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricTile>}>
+     * @return list<JavaScriptModuleInstruction>
+     */
+    public function getJavaScriptModuleInstructions(): array
+    {
+        return [JavaScriptModuleInstruction::create('@konradmichalik/page-metrics/sparkline.js')];
+    }
+
+    /**
+     * @return list<array{site: Site, tiles: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricTile>, annotations: list<array{date: string, text: string}>}>
      */
     private function collectSiteTiles(): array
     {
@@ -93,7 +103,14 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
                 continue;
             }
 
-            $result[] = ['site' => $site, 'tiles' => $viewData->tiles];
+            $result[] = [
+                'site' => $site,
+                'tiles' => $viewData->tiles,
+                'annotations' => array_map(
+                    static fn (Annotation $annotation): array => ['date' => $annotation->date->format('Y-m-d'), 'text' => $annotation->text],
+                    $viewData->annotations,
+                ),
+            ];
         }
 
         return $result;

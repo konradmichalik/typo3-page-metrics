@@ -802,4 +802,9 @@ initializeStaticCharts(document);
 document.addEventListener('typo3:dashboard:widget:content:rendered', (event) => {
   const target = event.target instanceof Element ? event.target : document;
   initializeStaticCharts(target);
+  // The "Page metrics" widget's tiles are interactive (see PageMetricsTile
+  // above) just like the PageHeader ones - a no-op for every other
+  // dashboard widget, since initializeTiles() only ever finds something to
+  // do where .pagemetrics-tile elements actually exist.
+  initializeTiles(target);
 });

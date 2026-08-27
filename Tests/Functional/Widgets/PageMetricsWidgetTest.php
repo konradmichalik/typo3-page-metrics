@@ -14,12 +14,13 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Widgets;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository;
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository};
 use KonradMichalik\Typo3PageMetrics\Widgets\PageMetricsWidget;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
 use TYPO3\CMS\Core\Http\{NormalizedParams, ServerRequest};
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 /**
@@ -64,6 +65,33 @@ final class PageMetricsWidgetTest extends FunctionalTestCase
         $content = $this->renderWidget();
 
         self::assertStringContainsString('callout-info', $content);
+    }
+
+    public function testTilesAreInteractiveWithSparklineDataAndAnnotations(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 42);
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', 'a1', $today, 'Release 2.0');
+
+        $content = $this->renderWidget();
+
+        self::assertStringContainsString('data-sparkline="', $content);
+        self::assertStringContainsString('tabindex="0"', $content);
+        self::assertStringContainsString('role="button"', $content);
+        self::assertStringContainsString('aria-haspopup="true"', $content);
+        self::assertStringContainsString('&quot;Release 2.0&quot;', $content);
+    }
+
+    public function testLoadsTheSparklineJavaScriptModule(): void
+    {
+        $widget = $this->get('dashboard.widget.pageMetrics');
+        self::assertInstanceOf(PageMetricsWidget::class, $widget);
+
+        $modules = $widget->getJavaScriptModuleInstructions();
+
+        self::assertCount(1, $modules);
+        self::assertInstanceOf(JavaScriptModuleInstruction::class, $modules[0]);
     }
 
     private function renderWidget(): string

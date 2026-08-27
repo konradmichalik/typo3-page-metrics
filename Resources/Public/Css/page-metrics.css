@@ -213,7 +213,6 @@
 }
 
 .pagemetrics-tiles-static .pagemetrics-tile {
-    cursor: default;
     /* Fixed-width in the PageHeader's own horizontally-scrolling slider (see
        .pagemetrics-tile above), but the dashboard widget has no slider -
        tiles grow to fill whatever row width the card actually has instead
