@@ -250,18 +250,21 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('Bounce rate', (string) $result->label);
     }
 
-    public function testTopPagesWidgetOffersALevelSetting(): void
+    public function testTopPagesWidgetOffersALevelAndIncludeSubpagesSetting(): void
     {
         $widget = $this->get('dashboard.widget.pageMetricsTopPages');
         self::assertInstanceOf(TopPagesWidget::class, $widget);
 
         $definitions = $widget->getSettingsDefinitions();
-        self::assertCount(1, $definitions);
+        self::assertCount(2, $definitions);
         self::assertSame('level', $definitions[0]->key);
         self::assertArrayHasKey('', $definitions[0]->enum);
         self::assertArrayHasKey('1', $definitions[0]->enum);
         self::assertArrayHasKey('2', $definitions[0]->enum);
         self::assertArrayHasKey('3', $definitions[0]->enum);
+        self::assertSame('includeSubpages', $definitions[1]->key);
+        self::assertSame('bool', $definitions[1]->type);
+        self::assertFalse($definitions[1]->default);
     }
 
     public function testTopPagesWidgetRanksAcrossTheWholeSiteByDefault(): void
@@ -270,7 +273,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         $today = new DateTimeImmutable('today');
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 20);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.pageviews', 10);
-        // Page 5 ("Team") is a level-2 page (child of "About") - still
+        // Page 5 ("Team") is a level-2 page (child of "Restricted") - still
         // included when no level restriction is configured.
         $this->get(DailyMetricsRepository::class)->upsert(5, 0, 'matomo', $today, 'matomo.pageviews', 5);
 
@@ -308,6 +311,36 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
 
         self::assertStringContainsString('Most viewed pages', (string) $result->label);
         self::assertStringContainsString('Level 1', (string) $result->label);
+    }
+
+    public function testTopPagesWidgetRollsUpSubpagesIntoTheirLevelAncestorWhenConfigured(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        // Page 5 ("Team") is a child of page 3 ("Restricted") - a level-2
+        // page rolling up into its level-1 ancestor.
+        $this->get(DailyMetricsRepository::class)->upsert(3, 0, 'matomo', $today, 'matomo.pageviews', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(5, 0, 'matomo', $today, 'matomo.pageviews', 8);
+
+        $withoutRollup = $this->renderTopPagesWidget(['level' => '1']);
+        $withRollup = $this->renderTopPagesWidget(['level' => '1', 'includeSubpages' => '1']);
+
+        self::assertMatchesRegularExpression('/\b10\b/', $withoutRollup);
+        self::assertDoesNotMatchRegularExpression('/\b18\b/', $withoutRollup);
+        self::assertMatchesRegularExpression('/\b18\b/', $withRollup);
+        self::assertStringNotContainsString('Team', $withRollup);
+    }
+
+    public function testTopPagesWidgetLabelIncludesIncludeSubpagesOnlyWhenALevelIsSelected(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 20);
+
+        $withLevel = $this->renderTopPagesWidgetResult(['level' => '1', 'includeSubpages' => '1']);
+        $withoutLevel = $this->renderTopPagesWidgetResult(['includeSubpages' => '1']);
+
+        self::assertStringContainsString('Include subpages', (string) $withLevel->label);
+        self::assertStringNotContainsString('Include subpages', (string) $withoutLevel->label);
     }
 
     public function testTopPagesWidgetRendersTheEmptyStateWhenNoSiteIsConfigured(): void

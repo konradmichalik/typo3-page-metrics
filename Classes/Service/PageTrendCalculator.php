@@ -75,6 +75,32 @@ final class PageTrendCalculator
     }
 
     /**
+     * The rolled-up counterpart to rankedByValue(): each ranked row is not
+     * one page but a whole subtree (see SitePageUidRepository::descendantsOf()),
+     * with the anchor page's own value plus every one of its subpages' -
+     * used by "most viewed pages" when both a page level and "include
+     * subpages" are configured, so a section's own traffic and its
+     * subpages' traffic show as one number under that section instead of
+     * separate rows. MetricDefinition only, unlike the other ranking
+     * methods: "most viewed pages" has no metric picker of its own, it
+     * always ranks by the site's primary metric (see
+     * SiteMetricsOverviewBuilder::primaryDefinition(), whose return type is
+     * MetricDefinition, never RateMetricDefinition) - a rate metric here
+     * would be unreachable code, not a real capability.
+     *
+     * @param array<int, list<int>> $pageUidsByAnchor anchor page uid => every page uid whose data rolls up into it (including the anchor itself)
+     *
+     * @return list<TopPage>
+     */
+    public function rankedByValueGrouped(array $pageUidsByAnchor, int $languageId, MetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit): array
+    {
+        $trends = $this->computeGroupedTrends($pageUidsByAnchor, $languageId, $metric->identifier, $currentRange, $previousRange);
+        usort($trends, static fn (array $a, array $b): int => $b['value'] <=> $a['value']);
+
+        return $this->toTopPages(array_slice($trends, 0, $limit), $metric->unit);
+    }
+
+    /**
      * @param list<int> $pageUids
      *
      * @return list<array{pageUid: int, value: int, deltaPercent: ?int, trend: TrendDirection}>
@@ -116,6 +142,57 @@ final class PageTrendCalculator
         }
 
         return $trends;
+    }
+
+    /**
+     * @param array<int, list<int>> $pageUidsByAnchor
+     *
+     * @return list<array{pageUid: int, value: int, deltaPercent: ?int, trend: TrendDirection}>
+     */
+    private function computeGroupedTrends(array $pageUidsByAnchor, int $languageId, string $metric, DateRange $currentRange, DateRange $previousRange): array
+    {
+        $allPageUids = $this->flattenAnchorPageUids($pageUidsByAnchor);
+        $currentSums = $this->dailyMetricsRepository->sumsByPage($allPageUids, $languageId, $metric, $currentRange);
+        $previousSums = $this->dailyMetricsRepository->sumsByPage($allPageUids, $languageId, $metric, $previousRange);
+
+        $trends = [];
+        foreach ($pageUidsByAnchor as $anchorUid => $pageUids) {
+            $value = $this->sumForPages($pageUids, $currentSums);
+            $previousValue = $this->sumForPages($pageUids, $previousSums);
+
+            if (0 === $value && 0 === $previousValue) {
+                continue;
+            }
+
+            [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
+            $trends[] = ['pageUid' => $anchorUid, 'value' => $value, 'deltaPercent' => $deltaPercent, 'trend' => $trend];
+        }
+
+        return $trends;
+    }
+
+    /**
+     * @param array<int, list<int>> $pageUidsByAnchor
+     *
+     * @return list<int>
+     */
+    private function flattenAnchorPageUids(array $pageUidsByAnchor): array
+    {
+        return array_values(array_unique(array_merge([], ...array_values($pageUidsByAnchor))));
+    }
+
+    /**
+     * @param list<int>       $pageUids
+     * @param array<int, int> $sumsByPage
+     */
+    private function sumForPages(array $pageUids, array $sumsByPage): int
+    {
+        $total = 0;
+        foreach ($pageUids as $pageUid) {
+            $total += $sumsByPage[$pageUid] ?? 0;
+        }
+
+        return $total;
     }
 
     /**

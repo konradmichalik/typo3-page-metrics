@@ -16,7 +16,7 @@ skipped entirely for sites without one.
 | Page metrics | `pageMetrics` | Each site's homepage tiles: page views, visits, avg. time on page, bounce rate | 7 days | — |
 | Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers | — | Metric, period (7/30/90 days) |
 | Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days) |
-| Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level |
+| Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level, include subpages |
 | Page metrics trend | `pageMetricsTrend` | Pages with the biggest rise or drop against the previous period | 7/30/90 days | Metric, direction (drops/gains), period |
 | Not found pages | `pageMetricsNotFoundPages` | URLs the daily import could not resolve to a page, with the reason | 30 days | — |
 | Page metrics annotations | `pageMetricsAnnotations` | Recent site-wide annotations, such as Matomo release markers | 90 days | — |
@@ -32,6 +32,17 @@ site's primary metric. Picking one explicitly is only meaningful for a
 single-site widget instance: a multi-site widget falls back to each
 site's own primary metric for any site whose source doesn't support the
 configured one.
+
+## Most viewed pages: page level and subpages
+
+By default "Most viewed pages" ranks every individual page across the
+whole site. Setting **Page level** restricts the ranking to pages at an
+exact depth below the site root (level 1 = the site's top-level sections,
+level 2 = their children, and so on) instead. Combined with **Include
+subpages**, each of those pages' own number becomes its own traffic plus
+everything under it rolled up into one total — useful for seeing which
+top-level section performs best as a whole, not just its own landing
+page. "Include subpages" only has an effect once a page level is set.
 
 ## Dashboard preset
 

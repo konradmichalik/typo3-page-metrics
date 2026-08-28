@@ -116,11 +116,14 @@ final class SiteMetricsOverviewBuilder
      * of the whole subtree when $level is given - used by the standalone
      * "most viewed pages" widget, which is user-configurable for this
      * independent of the combined build() used by the other site-metrics
-     * widgets.
+     * widgets. $includeSubpages only has an effect together with $level:
+     * each page at that level then represents its own value plus every one
+     * of its own subpages' - without a level, every individual page is
+     * already its own row, so there is nothing to roll up into.
      *
      * @return ?list<TopPage> null when no source supports $site
      */
-    public function buildTopPagesForSite(Site $site, int $languageId, int $periodDays, ?int $level = null): ?array
+    public function buildTopPagesForSite(Site $site, int $languageId, int $periodDays, ?int $level = null, bool $includeSubpages = false): ?array
     {
         $source = $this->resolveSource($site);
 
@@ -130,6 +133,16 @@ final class SiteMetricsOverviewBuilder
 
         $primary = $this->primaryDefinition($source);
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
+
+        if (null !== $level && $includeSubpages) {
+            $pageUidsByAnchor = [];
+            foreach ($this->pageUidRepository->descendantsAtLevel($site->getRootPageId(), $level) as $anchorUid) {
+                $pageUidsByAnchor[$anchorUid] = $this->pageUidRepository->descendantsOf($anchorUid);
+            }
+
+            return $this->trendCalculator->rankedByValueGrouped($pageUidsByAnchor, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT);
+        }
+
         $pageUids = null !== $level
             ? $this->pageUidRepository->descendantsAtLevel($site->getRootPageId(), $level)
             : $this->pageUidRepository->descendantsOf($site->getRootPageId());

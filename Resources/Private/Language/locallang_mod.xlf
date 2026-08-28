@@ -108,6 +108,9 @@
             <trans-unit id="widget.topPages.setting.level.3" resname="widget.topPages.setting.level.3">
                 <source>Level 3</source>
             </trans-unit>
+            <trans-unit id="widget.topPages.setting.includeSubpages.description" resname="widget.topPages.setting.includeSubpages.description">
+                <source>Roll up each page's own subpages into its number instead of listing them separately. Only takes effect when a page level above is selected.</source>
+            </trans-unit>
             <trans-unit id="widget.trend.title" resname="widget.trend.title">
                 <source>Page metrics trend</source>
             </trans-unit>

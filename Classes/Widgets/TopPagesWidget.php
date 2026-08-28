@@ -28,7 +28,9 @@ use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, WidgetConfigurationInte
  * only possible because the daily import already resolves URLs to page
  * UIDs. The page-level setting restricts the ranking to pages at an exact
  * tree depth below the site root (e.g. only top-level sections) instead of
- * the whole site - see SiteMetricsOverviewBuilder::buildTopPagesForSite().
+ * the whole site; "include subpages" then rolls each of those pages' own
+ * subpages into its number instead of leaving them out - see
+ * SiteMetricsOverviewBuilder::buildTopPagesForSite().
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
@@ -63,6 +65,13 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
                     '3' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.setting.level.3',
                 ],
             ),
+            new SettingDefinition(
+                'includeSubpages',
+                'bool',
+                false,
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:subpages.include',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.setting.includeSubpages.description',
+            ),
         ];
     }
 
@@ -70,8 +79,9 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
     {
         $level = (string) $context->settings->get('level');
         $level = '' !== $level ? (int) $level : null;
+        $includeSubpages = (bool) $context->settings->get('includeSubpages');
 
-        $sites = $this->collectTopPages($level);
+        $sites = $this->collectTopPages($level, $includeSubpages);
 
         $view = $this->backendViewFactory->create($context->request, ['konradmichalik/typo3-page-metrics', 'typo3/cms-dashboard']);
         $view->assignMultiple([
@@ -79,7 +89,7 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
             'configuration' => $this->configuration,
         ]);
 
-        return new WidgetResult($view->render('Widget/TopPages'), [] !== $sites ? $this->buildLabel($level) : null);
+        return new WidgetResult($view->render('Widget/TopPages'), [] !== $sites ? $this->buildLabel($level, $includeSubpages) : null);
     }
 
     /**
@@ -95,15 +105,24 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
      * title alone doesn't tell two instances with different level settings
      * apart on the dashboard, so the resolved level is appended to make a
      * user's configuration visible without opening the settings dialog.
+     * "Include subpages" is only appended when a level is actually selected:
+     * it has no effect otherwise (see buildTopPagesForSite()), so showing it
+     * regardless would claim a configuration that isn't really active.
      */
-    private function buildLabel(?int $level): string
+    private function buildLabel(?int $level, bool $includeSubpages): string
     {
         $languageService = $this->getLanguageService();
 
-        return implode(' · ', [
+        $parts = [
             $languageService->sL($this->configuration->getTitle()),
             $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.setting.level.'.(null !== $level ? $level : 'all')),
-        ]);
+        ];
+
+        if (null !== $level && $includeSubpages) {
+            $parts[] = $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:subpages.include');
+        }
+
+        return implode(' · ', $parts);
     }
 
     private function getLanguageService(): LanguageService
@@ -114,12 +133,12 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
     /**
      * @return list<array{site: Site, topPages: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\TopPage>}>
      */
-    private function collectTopPages(?int $level): array
+    private function collectTopPages(?int $level, bool $includeSubpages): array
     {
         $result = [];
 
         foreach ($this->siteFinder->getAllSites() as $site) {
-            $topPages = $this->overviewBuilder->buildTopPagesForSite($site, 0, self::PERIOD_DAYS, $level);
+            $topPages = $this->overviewBuilder->buildTopPagesForSite($site, 0, self::PERIOD_DAYS, $level, $includeSubpages);
 
             if (null === $topPages) {
                 continue;
