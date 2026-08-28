@@ -166,11 +166,11 @@ final class SiteMetricsOverviewBuilder
      * a site mix pulls in both. A label unique among the relevant sources
      * (e.g. Matomo's "Visits" vs. GA4's "Sessions") is shown as-is.
      *
-     * @param iterable<Site> $sites restricts the result to sources supporting at least one of these sites
+     * @param array<Site> $sites restricts the result to sources supporting at least one of these sites
      *
      * @return array<string, string> metric identifier => label, across every relevant source
      */
-    public function availableMetrics(iterable $sites): array
+    public function availableMetrics(array $sites): array
     {
         $sources = $this->relevantSources($sites);
         $definitions = [];
@@ -195,11 +195,11 @@ final class SiteMetricsOverviewBuilder
     }
 
     /**
-     * @param iterable<Site> $sites
+     * @param array<Site> $sites
      *
      * @return list<MetricSourceInterface>
      */
-    private function relevantSources(iterable $sites): array
+    private function relevantSources(array $sites): array
     {
         $sources = [];
 
