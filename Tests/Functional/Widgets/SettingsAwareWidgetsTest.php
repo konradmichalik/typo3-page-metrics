@@ -146,13 +146,28 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('callout-info', $this->renderChartWidget([]));
     }
 
-    public function testTrendWidgetOffersDirectionAndPeriodSettings(): void
+    public function testTrendWidgetOffersMetricDirectionAndPeriodSettings(): void
     {
+        $this->writeSiteConfiguration();
         $widget = $this->get('dashboard.widget.pageMetricsTrend');
         self::assertInstanceOf(TrendWidget::class, $widget);
 
-        $keys = array_map(static fn ($definition) => $definition->key, $widget->getSettingsDefinitions());
-        self::assertSame(['direction', 'period'], $keys);
+        $definitions = $widget->getSettingsDefinitions();
+        $keys = array_map(static fn ($definition) => $definition->key, $definitions);
+        self::assertSame(['metric', 'direction', 'period'], $keys);
+        self::assertArrayHasKey('matomo.bounce_rate', $definitions[0]->enum);
+    }
+
+    public function testTrendWidgetMetricSettingOnlyOffersMetricsFromConfiguredSources(): void
+    {
+        $this->writeSiteConfiguration();
+        $widget = $this->get('dashboard.widget.pageMetricsTrend');
+        self::assertInstanceOf(TrendWidget::class, $widget);
+
+        $enum = $widget->getSettingsDefinitions()[0]->enum;
+
+        self::assertArrayNotHasKey('ga4.sessions', $enum);
+        self::assertSame('Page views', $enum['matomo.pageviews']);
     }
 
     public function testTrendWidgetListsTheBiggestDropByDefault(): void
@@ -212,6 +227,27 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('Page metrics trend', (string) $result->label);
         self::assertStringContainsString('Biggest gains', (string) $result->label);
         self::assertStringContainsString('7 days', (string) $result->label);
+    }
+
+    public function testTrendWidgetRanksByTheConfiguredRateMetricInstead(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $previous = $today->modify('-40 days');
+        // Page 2's bounce rate worsens from 20% to 80% - page views stay
+        // flat, so this would only show up when ranking by bounce rate.
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entry_bounces', 8);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entries', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $previous, 'matomo.entry_bounces', 2);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $previous, 'matomo.entries', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 50);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $previous, 'matomo.pageviews', 50);
+
+        $result = $this->renderTrendWidgetResult(['metric' => 'matomo.bounce_rate', 'direction' => 'up']);
+
+        self::assertStringContainsString('About', $result->content);
+        self::assertStringContainsString('80%', $result->content);
+        self::assertStringContainsString('Bounce rate', (string) $result->label);
     }
 
     public function testTopPagesWidgetOffersALevelSetting(): void

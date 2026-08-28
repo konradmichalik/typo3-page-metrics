@@ -25,7 +25,12 @@
                                             <thead>
                                                 <tr>
                                                     <th><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.page" default="Page" /></th>
-                                                    <th class="text-end"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.views" default="Views" /></th>
+                                                    <th class="text-end">
+                                                        <f:if condition="{columnLabel}">
+                                                            <f:then>{columnLabel}</f:then>
+                                                            <f:else><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.column.views" default="Views" /></f:else>
+                                                        </f:if>
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody>

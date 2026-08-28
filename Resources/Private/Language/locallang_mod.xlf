@@ -114,6 +114,12 @@
             <trans-unit id="widget.trend.description" resname="widget.trend.description">
                 <source>The pages with the biggest rise or drop in traffic against the previous period.</source>
             </trans-unit>
+            <trans-unit id="widget.trend.setting.metric.label" resname="widget.trend.setting.metric.label">
+                <source>Metric</source>
+            </trans-unit>
+            <trans-unit id="widget.trend.setting.metric.description" resname="widget.trend.setting.metric.description">
+                <source>Which metric ranks the pages. Defaults to the site's primary metric.</source>
+            </trans-unit>
             <trans-unit id="widget.trend.empty" resname="widget.trend.empty">
                 <source>No trending pages in this period.</source>
             </trans-unit>

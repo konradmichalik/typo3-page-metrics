@@ -16,8 +16,8 @@ skipped entirely for sites without one.
 | Page metrics | `pageMetrics` | Each site's homepage tiles: page views, visits, avg. time on page, bounce rate | 7 days | — |
 | Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers | — | Metric, period (7/30/90 days) |
 | Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days) |
-| Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | — |
-| Page metrics trend | `pageMetricsTrend` | Pages with the biggest rise or drop against the previous period | 7/30/90 days | Direction (drops/gains), period |
+| Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level |
+| Page metrics trend | `pageMetricsTrend` | Pages with the biggest rise or drop against the previous period | 7/30/90 days | Metric, direction (drops/gains), period |
 | Not found pages | `pageMetricsNotFoundPages` | URLs the daily import could not resolve to a page, with the reason | 30 days | — |
 | Page metrics annotations | `pageMetricsAnnotations` | Recent site-wide annotations, such as Matomo release markers | 90 days | — |
 
@@ -25,12 +25,13 @@ Every widget except the site-homepage tiles reads from the same
 `SiteMetricsOverviewBuilder`, aggregated across all pages of a site rather
 than a single one.
 
-## Chart metric selection
+## Chart and trend metric selection
 
-The chart widget's **Metric** setting defaults to each site's primary
-metric. Picking one explicitly is only meaningful for a single-site widget
-instance: a multi-site chart falls back to each site's own primary metric
-for any site whose source doesn't support the configured one.
+The chart and trend widgets' **Metric** setting both default to each
+site's primary metric. Picking one explicitly is only meaningful for a
+single-site widget instance: a multi-site widget falls back to each
+site's own primary metric for any site whose source doesn't support the
+configured one.
 
 ## Dashboard preset
 

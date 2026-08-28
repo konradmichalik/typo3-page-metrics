@@ -26,10 +26,10 @@ use function in_array;
 /**
  * TrendWidget.
  *
- * The pages with the biggest rise or drop in the site's primary metric,
- * comparing a configurable period against the period immediately before it
- * - direction and period are both user-configurable per widget instance,
- * see getSettingsDefinitions().
+ * The pages with the biggest rise or drop in a metric, comparing a
+ * configurable period against the period immediately before it - metric,
+ * direction and period are all user-configurable per widget instance, see
+ * getSettingsDefinitions().
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
@@ -55,6 +55,18 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
     public function getSettingsDefinitions(): array
     {
         return [
+            new SettingDefinition(
+                'metric',
+                'string',
+                '',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.metric.label',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.metric.description',
+                false,
+                [
+                    '' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric.auto',
+                    ...$this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites()),
+                ],
+            ),
             new SettingDefinition(
                 'direction',
                 'string',
@@ -85,20 +97,22 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
 
     public function renderWidget(WidgetContext $context): WidgetResult
     {
+        $metric = (string) $context->settings->get('metric');
         $direction = TrendDirection::tryFrom((string) $context->settings->get('direction')) ?? TrendDirection::Down;
         $period = (int) $context->settings->get('period');
         $period = in_array($period, self::PERIOD_OPTIONS, true) ? $period : 30;
 
-        $sites = $this->collectTrendPages($direction, $period);
+        $sites = $this->collectTrendPages($metric, $direction, $period);
 
         $view = $this->backendViewFactory->create($context->request, ['konradmichalik/typo3-page-metrics', 'typo3/cms-dashboard']);
         $view->assignMultiple([
             'sites' => $sites,
             'direction' => $direction->value,
+            'columnLabel' => '' !== $metric ? ($this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites())[$metric] ?? null) : null,
             'configuration' => $this->configuration,
         ]);
 
-        return new WidgetResult($view->render('Widget/Trend'), [] !== $sites ? $this->buildLabel($direction, $period) : null);
+        return new WidgetResult($view->render('Widget/Trend'), [] !== $sites ? $this->buildLabel($metric, $direction, $period) : null);
     }
 
     /**
@@ -112,22 +126,36 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
     /**
      * Mirrors PageMetricsChartWidget::buildLabel(): the registered widget
      * title alone doesn't tell two trend widgets with different settings
-     * apart on the dashboard, so the resolved direction and period are
-     * appended to make a user's configuration visible without opening the
-     * settings dialog.
+     * apart on the dashboard, so the resolved metric, direction and period
+     * are appended to make a user's configuration visible without opening
+     * the settings dialog. Unlike the chart widget, the metric segment is
+     * built from the raw setting value rather than a per-site resolved
+     * label: direction and period are already setting-based here, and a
+     * per-site fallback (a configured metric one site's source doesn't
+     * support) is a rarer edge case for a ranking than for a single chart
+     * line.
      */
-    private function buildLabel(TrendDirection $direction, int $period): string
+    private function buildLabel(string $metricIdentifier, TrendDirection $direction, int $period): string
     {
         $languageService = $this->getLanguageService();
         $directionKey = TrendDirection::Up === $direction
             ? 'widget.trend.setting.direction.up'
             : 'widget.trend.setting.direction.down';
 
-        return implode(' · ', [
-            $languageService->sL($this->configuration->getTitle()),
-            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:'.$directionKey),
-            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period),
-        ]);
+        $parts = [$languageService->sL($this->configuration->getTitle())];
+
+        if ('' !== $metricIdentifier) {
+            $metricLabel = $this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites())[$metricIdentifier] ?? null;
+
+            if (null !== $metricLabel) {
+                $parts[] = $metricLabel;
+            }
+        }
+
+        $parts[] = $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:'.$directionKey);
+        $parts[] = $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period);
+
+        return implode(' · ', $parts);
     }
 
     private function getLanguageService(): LanguageService
@@ -138,12 +166,13 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
     /**
      * @return list<array{site: Site, topPages: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\TopPage>}>
      */
-    private function collectTrendPages(TrendDirection $direction, int $period): array
+    private function collectTrendPages(string $metricIdentifier, TrendDirection $direction, int $period): array
     {
+        $preferredMetricIdentifier = '' !== $metricIdentifier ? $metricIdentifier : null;
         $result = [];
 
         foreach ($this->siteFinder->getAllSites() as $site) {
-            $topPages = $this->overviewBuilder->buildTrendPages($site, 0, $period, $direction, self::LIMIT);
+            $topPages = $this->overviewBuilder->buildTrendPages($site, 0, $period, $direction, $preferredMetricIdentifier, self::LIMIT);
 
             if (null === $topPages) {
                 continue;

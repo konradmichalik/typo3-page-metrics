@@ -43,13 +43,23 @@ SELECT * FROM (
         -- page_uid factored in with a decreasing weight (100 down to 20) so
         -- the "most viewed pages" widget ranks Home highest and Contact
         -- lowest, rather than every page landing at roughly the same total.
-        -- trends.delta only shifts matomo.pageviews (the primary metric the
-        -- trend/top-pages widgets rank by): applied as-is for the recent 30
-        -- days and inverted for the 30 days before that, so Home trends up,
-        -- Contact trends down, and Services stays flat - GREATEST guards
-        -- the smaller metrics' bases against ever going negative.
+        -- trends.*_delta shifts pageviews, visits and entries (all applied
+        -- as-is for the recent 30 days and inverted for the 30 days before
+        -- that, so Home trends up, Contact trends down, and Services stays
+        -- flat) - GREATEST guards the smaller metrics' bases against ever
+        -- going negative. time_spent_seconds and entry_bounces are left on
+        -- their own noise only, so avg_time_on_page/bounce_rate (each a
+        -- ratio against visits/entries) trend the opposite way instead of
+        -- landing flat: a page whose traffic is rising dilutes its average
+        -- engagement and its bounce share, and vice versa - every tile ends
+        -- up with a visible, page-specific trend instead of just pageviews.
         GREATEST(1, metrics.base + (100 - pages.page_uid * 20)
-            + (CASE WHEN metrics.metric = 'matomo.pageviews' THEN (CASE WHEN day_offset < 30 THEN trends.delta ELSE -trends.delta END) ELSE 0 END)
+            + (CASE
+                WHEN metrics.metric = 'matomo.pageviews' THEN (CASE WHEN day_offset < 30 THEN trends.pageviews_delta ELSE -trends.pageviews_delta END)
+                WHEN metrics.metric = 'matomo.visits' THEN (CASE WHEN day_offset < 30 THEN trends.visits_delta ELSE -trends.visits_delta END)
+                WHEN metrics.metric = 'matomo.entries' THEN (CASE WHEN day_offset < 30 THEN trends.entries_delta ELSE -trends.entries_delta END)
+                ELSE 0
+            END)
             + ((day_offset * 7 + pages.page_uid * 13) % (metrics.spread + 1))) AS value
     FROM days
     CROSS JOIN (
@@ -60,11 +70,11 @@ SELECT * FROM (
         SELECT 5
     ) pages
     INNER JOIN (
-        SELECT 1 AS page_uid, 25 AS delta UNION ALL
-        SELECT 2, 10 UNION ALL
-        SELECT 3, 0 UNION ALL
-        SELECT 4, -10 UNION ALL
-        SELECT 5, -25
+        SELECT 1 AS page_uid, 25 AS pageviews_delta, 15 AS visits_delta, 6 AS entries_delta UNION ALL
+        SELECT 2, 10, 6, 3 UNION ALL
+        SELECT 3, 0, 0, 0 UNION ALL
+        SELECT 4, -10, -6, -3 UNION ALL
+        SELECT 5, -25, -15, -6
     ) trends ON trends.page_uid = pages.page_uid
     CROSS JOIN (
         -- entries/entry_bounces bases keep bounces below entries at every

@@ -20,7 +20,6 @@ use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetr
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
-use function array_slice;
 use function sprintf;
 use function ucfirst;
 
@@ -34,7 +33,8 @@ use function ucfirst;
  * sortOrder), the source's own "pageviews"-equivalent by convention - the
  * chart can be pointed at a different metric via $preferredMetricIdentifier.
  * The "biggest trend" widget goes through buildTrendPages() instead, since
- * it has its own period and ranking axis independent of the others.
+ * it has its own period and ranking axis independent of the others. Per-page
+ * trend/ranking math itself lives in PageTrendCalculator, shared by both.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
@@ -52,6 +52,7 @@ final class SiteMetricsOverviewBuilder
         private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
         private readonly AnnotationRepository $annotationRepository,
         private readonly ManualAnnotationRepository $manualAnnotationRepository,
+        private readonly PageTrendCalculator $trendCalculator,
         private readonly iterable $sources,
     ) {}
 
@@ -77,7 +78,7 @@ final class SiteMetricsOverviewBuilder
             $chartMetric->color,
             $chartMetric->unit,
             $this->buildChartSeries($chartMetric, $pageUids, $languageId, $currentRange),
-            $this->buildTopPages($pageUids, $languageId, $primary, $currentRange, $previousRange),
+            $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT),
             $this->buildUnresolvedUrls($site),
             $this->buildAnnotations($site->getIdentifier(), $currentRange),
         );
@@ -85,13 +86,15 @@ final class SiteMetricsOverviewBuilder
 
     /**
      * The highest (direction: Up) or lowest (direction: Down) trending
-     * pages by the site's primary metric, over their own period - used by
-     * the standalone "trend" widget, which is user-configurable for both
-     * independent of the other widgets' fixed periods.
+     * pages by $preferredMetricIdentifier (the site's primary metric when
+     * null, or when the requested identifier does not belong to this
+     * site's own source), over their own period - used by the standalone
+     * "trend" widget, which is user-configurable for all three independent
+     * of the other widgets' fixed periods.
      *
      * @return ?list<TopPage> null when no source supports $site
      */
-    public function buildTrendPages(Site $site, int $languageId, int $periodDays, TrendDirection $direction, int $limit = self::TOP_PAGES_LIMIT): ?array
+    public function buildTrendPages(Site $site, int $languageId, int $periodDays, TrendDirection $direction, ?string $preferredMetricIdentifier = null, int $limit = self::TOP_PAGES_LIMIT): ?array
     {
         $source = $this->resolveSource($site);
 
@@ -100,20 +103,11 @@ final class SiteMetricsOverviewBuilder
         }
 
         $primary = $this->primaryDefinition($source);
+        $metric = $this->resolveChartMetric($source, $preferredMetricIdentifier) ?? $primary;
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
 
-        $trends = $this->computePageTrends($pageUids, $languageId, $primary->identifier, $currentRange, $previousRange);
-        $trends = array_filter($trends, static fn (array $trend): bool => null !== $trend['deltaPercent'] && $trend['trend'] === $direction);
-
-        usort(
-            $trends,
-            TrendDirection::Down === $direction
-                ? static fn (array $a, array $b): int => $a['deltaPercent'] <=> $b['deltaPercent']
-                : static fn (array $a, array $b): int => $b['deltaPercent'] <=> $a['deltaPercent'],
-        );
-
-        return $this->toTopPages(array_slice($trends, 0, $limit), $primary->unit);
+        return $this->trendCalculator->rankedByTrend($pageUids, $languageId, $metric, $currentRange, $previousRange, $direction, $limit);
     }
 
     /**
@@ -140,7 +134,7 @@ final class SiteMetricsOverviewBuilder
             ? $this->pageUidRepository->descendantsAtLevel($site->getRootPageId(), $level)
             : $this->pageUidRepository->descendantsOf($site->getRootPageId());
 
-        return $this->buildTopPages($pageUids, $languageId, $primary, $currentRange, $previousRange);
+        return $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT);
     }
 
     /**
@@ -328,71 +322,6 @@ final class SiteMetricsOverviewBuilder
         return [$currentRange, $previousRange];
     }
 
-    /**
-     * @param list<int> $pageUids
-     *
-     * @return list<TopPage>
-     */
-    private function buildTopPages(array $pageUids, int $languageId, MetricDefinition $primary, DateRange $currentRange, DateRange $previousRange): array
-    {
-        $trends = $this->computePageTrends($pageUids, $languageId, $primary->identifier, $currentRange, $previousRange);
-        usort($trends, static fn (array $a, array $b): int => $b['value'] <=> $a['value']);
-
-        return $this->toTopPages(array_slice($trends, 0, self::TOP_PAGES_LIMIT), $primary->unit);
-    }
-
-    /**
-     * Every page with data in $currentRange and/or $previousRange, with its
-     * trend against the previous period - the shared data source for
-     * "most viewed pages" (sorted by value) and the "trend" widget (sorted
-     * by deltaPercent). A page with zero current traffic but real previous
-     * traffic still appears here (a real, meaningful drop), which is why
-     * this does not simply reuse DailyMetricsRepository::topPages().
-     *
-     * @param list<int> $pageUids
-     *
-     * @return list<array{pageUid: int, value: int, deltaPercent: ?int, trend: TrendDirection}>
-     */
-    private function computePageTrends(array $pageUids, int $languageId, string $metric, DateRange $currentRange, DateRange $previousRange): array
-    {
-        $currentSums = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric, $currentRange);
-        $previousSums = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric, $previousRange);
-
-        $trends = [];
-        foreach (array_unique([...array_keys($currentSums), ...array_keys($previousSums)]) as $pageUid) {
-            $value = $currentSums[$pageUid] ?? 0;
-            $previousValue = $previousSums[$pageUid] ?? 0;
-
-            if (0 === $value && 0 === $previousValue) {
-                continue;
-            }
-
-            [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
-            $trends[] = ['pageUid' => $pageUid, 'value' => $value, 'deltaPercent' => $deltaPercent, 'trend' => $trend];
-        }
-
-        return $trends;
-    }
-
-    /**
-     * @return array{0: ?int, 1: TrendDirection}
-     */
-    private function computeTrend(int $value, int $previousValue): array
-    {
-        if (0 === $previousValue) {
-            return [null, $value > 0 ? TrendDirection::Up : TrendDirection::Flat];
-        }
-
-        $deltaPercent = (int) round(($value - $previousValue) / $previousValue * 100);
-        $trend = match (true) {
-            $value > $previousValue => TrendDirection::Up,
-            $value < $previousValue => TrendDirection::Down,
-            default => TrendDirection::Flat,
-        };
-
-        return [$deltaPercent, $trend];
-    }
-
     private function computeRatio(int $numerator, int $denominator, MetricUnit $unit): int
     {
         if (0 === $denominator) {
@@ -402,36 +331,6 @@ final class SiteMetricsOverviewBuilder
         $ratio = $numerator / $denominator;
 
         return MetricUnit::Percent === $unit ? (int) round($ratio * 100) : (int) round($ratio);
-    }
-
-    /**
-     * @param list<array{pageUid: int, value: int, deltaPercent: ?int, trend: TrendDirection}> $trends
-     *
-     * @return list<TopPage>
-     */
-    private function toTopPages(array $trends, MetricUnit $unit): array
-    {
-        $titlesByUid = $this->pageUidRepository->titlesFor(array_map(static fn (array $trend): int => $trend['pageUid'], $trends));
-
-        return array_map(
-            fn (array $trend): TopPage => new TopPage(
-                $trend['pageUid'],
-                $titlesByUid[$trend['pageUid']] ?? sprintf('#%d', $trend['pageUid']),
-                $this->formatValue($trend['value'], $unit),
-                $trend['deltaPercent'],
-                $trend['trend'],
-            ),
-            $trends,
-        );
-    }
-
-    private function formatValue(int $value, MetricUnit $unit): string
-    {
-        return match ($unit) {
-            MetricUnit::Percent => sprintf('%d%%', $value),
-            MetricUnit::Seconds => sprintf('%d:%02d', intdiv($value, 60), $value % 60),
-            MetricUnit::Count => (string) $value,
-        };
     }
 
     /**
