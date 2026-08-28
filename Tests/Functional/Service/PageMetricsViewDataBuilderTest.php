@@ -19,6 +19,7 @@ use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{MetricTile, PageMetricsV
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 use function sprintf;
@@ -261,6 +262,23 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
 
         self::assertCount(1, $viewData->annotations);
         self::assertSame('Release 2.0', $viewData->annotations[0]->text);
+    }
+
+    public function testAnnotationsCombineImportedAndManuallyCreatedOnesInDateOrder(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', '1', $today, 'Imported release');
+        $this->get(ConnectionPool::class)->getConnectionForTable('tx_typo3pagemetrics_manual_annotation')->insert(
+            'tx_typo3pagemetrics_manual_annotation',
+            ['pid' => 0, 'site_identifier' => 'main', 'date' => $today->modify('-1 day')->getTimestamp(), 'text' => 'Manual note'],
+        );
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
+
+        self::assertCount(2, $viewData->annotations);
+        self::assertSame('Manual note', $viewData->annotations[0]->text);
+        self::assertSame('Imported release', $viewData->annotations[1]->text);
     }
 
     public function testIncludeSubpagesSumsMetricsAcrossTheWholeSubtree(): void

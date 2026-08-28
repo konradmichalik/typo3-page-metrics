@@ -105,6 +105,22 @@ parameters:
 			count: 1
 			path: ../../Classes/Widgets/TopPagesWidget.php
 		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Classes/Persistence/ManualAnnotationRepository.php
+		-
+			identifier: typeCoverage.constantTypeCoverage
+			count: 1
+			path: ../../Tests/Functional/Persistence/ManualAnnotationRepositoryTest.php
+		-
+			# itemsProcFunc has a fixed, framework-mandated signature -
+			# array &$parameters passed by reference - the same contract TYPO3
+			# core's own TcaSystemLanguageCollector::populateAvailableSiteLanguages()
+			# implements. Not a code smell, just not expressible any other way.
+			identifier: ergebnis.noParameterPassedByReference
+			count: 1
+			path: ../../Classes/UserFunction/AnnotationSiteItemsProcFunc.php
+		-
 			# MetricDefinition and UrlMetric are `@api` value objects whose trailing
 			# nullable parameter (maxDimensions / dimension) means "not applicable"
 			# for the common case. Removing the default would force every call

@@ -15,8 +15,8 @@ namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection, UnresolvedReason};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, SitePageUidRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -51,6 +51,7 @@ final class SiteMetricsOverviewBuilder
         private readonly DailyMetricsRepository $dailyMetricsRepository,
         private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
         private readonly AnnotationRepository $annotationRepository,
+        private readonly ManualAnnotationRepository $manualAnnotationRepository,
         private readonly iterable $sources,
     ) {}
 
@@ -78,7 +79,7 @@ final class SiteMetricsOverviewBuilder
             $this->buildChartSeries($chartMetric, $pageUids, $languageId, $currentRange),
             $this->buildTopPages($pageUids, $languageId, $primary, $currentRange, $previousRange),
             $this->buildUnresolvedUrls($site),
-            $this->annotationRepository->forSiteAndRange($site->getIdentifier(), $currentRange),
+            $this->buildAnnotations($site->getIdentifier(), $currentRange),
         );
     }
 
@@ -292,6 +293,26 @@ final class SiteMetricsOverviewBuilder
         }
 
         return $series;
+    }
+
+    /**
+     * Combines the imported (e.g. Matomo) annotations with the ones editors
+     * create directly in the backend (see ManualAnnotationRepository) into
+     * one date-ordered list - callers never need to know an annotation can
+     * come from two different places.
+     *
+     * @return list<Annotation>
+     */
+    private function buildAnnotations(string $siteIdentifier, DateRange $range): array
+    {
+        $annotations = [
+            ...$this->annotationRepository->forSiteAndRange($siteIdentifier, $range),
+            ...$this->manualAnnotationRepository->forSiteAndRange($siteIdentifier, $range),
+        ];
+
+        usort($annotations, static fn (Annotation $a, Annotation $b): int => $a->date <=> $b->date);
+
+        return $annotations;
     }
 
     /**

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.0">
+    <file source-language="en" datatype="plaintext" original="messages" date="2026-08-27T00:00:00Z" product-name="typo3_page_metrics">
+        <header/>
+        <body>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation" resname="tx_typo3pagemetrics_manual_annotation">
+                <source>Page metrics annotation</source>
+            </trans-unit>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.site_identifier" resname="tx_typo3pagemetrics_manual_annotation.site_identifier">
+                <source>Site</source>
+            </trans-unit>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.date" resname="tx_typo3pagemetrics_manual_annotation.date">
+                <source>Date</source>
+            </trans-unit>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.text" resname="tx_typo3pagemetrics_manual_annotation.text">
+                <source>Text</source>
+            </trans-unit>
+        </body>
+    </file>
+</xliff>

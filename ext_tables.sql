@@ -51,3 +51,21 @@ CREATE TABLE tx_typo3pagemetrics_annotation (
 	KEY site_date (site_identifier,date),
 	UNIQUE KEY fact (source,site_identifier,annotation_id)
 );
+
+# uid/pid and the standard ctrl fields (tstamp, crdate, cruser_id, deleted,
+# hidden) are added automatically from Configuration/TCA/tx_typo3pagemetrics_
+# manual_annotation.php by TYPO3's DefaultTcaSchema - only this table's own
+# custom columns need declaring here, same as core's sys_note.
+#
+# date is int, not the SQL `date` type tx_typo3pagemetrics_annotation uses:
+# this column is edited through TCA (type=datetime), which stores as a Unix
+# timestamp by convention - unlike tx_typo3pagemetrics_annotation.date,
+# which is only ever written by this extension's own code as a plain
+# 'Y-m-d' string, never through a form.
+CREATE TABLE tx_typo3pagemetrics_manual_annotation (
+	site_identifier varchar(255) DEFAULT '' NOT NULL,
+	date int(11) unsigned DEFAULT '0' NOT NULL,
+	text varchar(1024) DEFAULT '' NOT NULL,
+
+	KEY site_date (site_identifier,date)
+);

@@ -36,13 +36,27 @@ text in the tooltip alongside that day's value.
 
 ## Annotations
 
-Annotations are site-wide, point-in-time events, imported by the same
-`page-metrics:import` command via any registered
-`AnnotationSourceInterface` (mirroring `MetricSourceInterface`'s
-extensibility, but for events rather than per-URL metrics). The bundled
-Matomo source imports Matomo's own annotations (e.g. release markers) —
-no extra configuration beyond an already-configured `sources.matomo` is
-needed.
+Annotations are site-wide, point-in-time events, from two independent
+sources that are always merged together:
+
+- **Imported**, via the same `page-metrics:import` command, from any
+  registered `AnnotationSourceInterface` (mirroring
+  `MetricSourceInterface`'s extensibility, but for events rather than
+  per-URL metrics). The bundled Matomo source imports Matomo's own
+  annotations (e.g. release markers) — no extra configuration beyond an
+  already-configured `sources.matomo` is needed. GA4 has no equivalent API
+  to import from.
+- **Manual**, created directly in the TYPO3 backend as a "Page metrics
+  annotation" record — pick the site, a date and a text. An annotation is
+  scoped by that "Site" field alone, not by its position in a page tree,
+  so the record lives at the absolute root (`rootLevel = 1`, the same
+  convention as `be_users`/`be_groups`) rather than under any one page:
+  open the root page in the page tree (the extension/site name at the
+  very top) and use **New record** there. This also means only backend
+  admins can create one, the same restriction TYPO3 applies to any
+  root-level record. Manual annotations are the way to mark events on
+  GA4-only sites, or anything not tied to an external API at all, and
+  appear immediately, without waiting for the next import run.
 
 Annotations show up in two places: the marker ticks on every sparkline
 (page-tile popovers and the [dashboard chart widget](dashboard-widgets.md)

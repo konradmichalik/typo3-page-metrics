@@ -15,9 +15,9 @@ namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricTile, PageMetricsViewData, RateMetricDefinition};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricDefinition, MetricTile, PageMetricsViewData, RateMetricDefinition};
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, SitePageUidRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Throwable;
@@ -69,6 +69,7 @@ final class PageMetricsViewDataBuilder
         private readonly DailyMetricsRepository $dailyMetricsRepository,
         private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
         private readonly AnnotationRepository $annotationRepository,
+        private readonly ManualAnnotationRepository $manualAnnotationRepository,
         private readonly SitePageUidRepository $pageUidRepository,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly iterable $sources,
@@ -98,9 +99,7 @@ final class PageMetricsViewDataBuilder
         $unresolvedCount = null !== $site
             ? $this->unresolvedUrlRepository->countForSite($site->getBase()->getHost(), (new DateTimeImmutable('today'))->modify('-30 days'))
             : 0;
-        $annotations = null !== $site
-            ? $this->annotationRepository->forSiteAndRange($site->getIdentifier(), $tileRange)
-            : [];
+        $annotations = null !== $site ? $this->buildAnnotations($site->getIdentifier(), $tileRange) : [];
         $hasSubpages = null !== $site && $this->pageUidRepository->hasChildren($pageId);
 
         return new PageMetricsViewData(
@@ -116,6 +115,26 @@ final class PageMetricsViewDataBuilder
             $includeSubpages,
             $hasSubpages,
         );
+    }
+
+    /**
+     * Combines the imported (e.g. Matomo) annotations with the ones editors
+     * create directly in the backend (see ManualAnnotationRepository) into
+     * one date-ordered list - callers never need to know an annotation can
+     * come from two different places.
+     *
+     * @return list<Annotation>
+     */
+    private function buildAnnotations(string $siteIdentifier, DateRange $range): array
+    {
+        $annotations = [
+            ...$this->annotationRepository->forSiteAndRange($siteIdentifier, $range),
+            ...$this->manualAnnotationRepository->forSiteAndRange($siteIdentifier, $range),
+        ];
+
+        usort($annotations, static fn (Annotation $a, Annotation $b): int => $a->date <=> $b->date);
+
+        return $annotations;
     }
 
     /**

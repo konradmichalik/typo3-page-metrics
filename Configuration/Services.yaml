@@ -67,7 +67,19 @@ services:
 
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Persistence\ManualAnnotationRepository:
+        public: true
+
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
     KonradMichalik\Typo3PageMetrics\Persistence\SitePageUidRepository:
+        public: true
+
+    # Public because GeneralUtility::makeInstance() resolves itemsProcFunc
+    # classes directly by class name (see the TCA type=select on
+    # tx_typo3pagemetrics_manual_annotation's site_identifier field), the same
+    # reason TYPO3 core's own TcaSystemLanguageCollector is public.
+    KonradMichalik\Typo3PageMetrics\UserFunction\AnnotationSiteItemsProcFunc:
         public: true
 
     # Public so functional tests can fetch it directly via $this->get() instead
