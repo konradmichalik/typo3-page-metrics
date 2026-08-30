@@ -1,5 +1,7 @@
 <div align="center">
 
+![Extension icon](Resources/Public/Icons/Extension.png)
+
 # TYPO3 extension `typo3_page_metrics`
 
 [![License](https://poser.pugx.org/konradmichalik/typo3-page-metrics/license)](LICENSE.md)
