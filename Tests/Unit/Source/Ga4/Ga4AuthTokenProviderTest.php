@@ -14,10 +14,12 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Source\Ga4;
 
 use Firebase\JWT\{JWT, Key};
+use GuzzleHttp\Psr7\Utils;
 use KonradMichalik\Typo3PageMetrics\Exception\Ga4RequestFailedException;
 use KonradMichalik\Typo3PageMetrics\Source\Ga4\{Ga4AuthTokenProvider, Ga4Configuration};
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
+use RuntimeException;
 use TYPO3\CMS\Core\Http\RequestFactory;
 
 /**
@@ -121,6 +123,30 @@ final class Ga4AuthTokenProviderTest extends TestCase
         $this->subject->getAccessToken($malformedConfiguration);
     }
 
+    public function testGetAccessTokenWrapsTransportFailuresInADomainException(): void
+    {
+        $this->requestFactory->method('request')->willThrowException(new RuntimeException('Connection reset'));
+
+        $this->expectException(Ga4RequestFailedException::class);
+        $this->expectExceptionCode(1756200100);
+        $this->expectExceptionMessage('Connection reset');
+
+        $this->subject->getAccessToken($this->configuration);
+    }
+
+    public function testGetAccessTokenThrowsWhenTheBodyIsNotJson(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(200);
+        $response->method('getBody')->willReturn(Utils::streamFor('not json at all'));
+        $this->requestFactory->method('request')->willReturn($response);
+
+        $this->expectException(Ga4RequestFailedException::class);
+        $this->expectExceptionCode(1756200102);
+
+        $this->subject->getAccessToken($this->configuration);
+    }
+
     /**
      * @param array<mixed> $payload
      */
@@ -128,7 +154,7 @@ final class Ga4AuthTokenProviderTest extends TestCase
     {
         $response = $this->createMock(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn($statusCode);
-        $response->method('getBody')->willReturn(\GuzzleHttp\Psr7\Utils::streamFor(json_encode($payload, \JSON_THROW_ON_ERROR)));
+        $response->method('getBody')->willReturn(Utils::streamFor(json_encode($payload, \JSON_THROW_ON_ERROR)));
 
         return $response;
     }

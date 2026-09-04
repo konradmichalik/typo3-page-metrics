@@ -258,4 +258,36 @@ final class Ga4MetricSourceTest extends TestCase
 
         self::assertSame([], $metrics);
     }
+
+    public function testFetchSkipsRowsWhoseValueContainersAreNotArrays(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+        $this->apiClient->method('runReport')->willReturn([
+            'rows' => [
+                ['dimensionValues' => 'broken', 'metricValues' => [['value' => '42']]],
+                ['dimensionValues' => [['value' => '20260801'], ['value' => '/about']], 'metricValues' => 'broken'],
+            ],
+        ]);
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+
+        self::assertSame([], iterator_to_array($this->subject->fetch($this->site, $range)));
+    }
+
+    public function testFetchSkipsRowsWhoseDateIsNotInYmdFormat(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+        $this->apiClient->method('runReport')->willReturn([
+            'rows' => [
+                [
+                    'dimensionValues' => [['value' => 'not-a-date'], ['value' => '/about']],
+                    'metricValues' => [['value' => '42'], ['value' => '10'], ['value' => '123.7']],
+                ],
+            ],
+        ]);
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+
+        self::assertSame([], iterator_to_array($this->subject->fetch($this->site, $range)));
+    }
 }

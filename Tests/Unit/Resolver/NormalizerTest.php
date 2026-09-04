@@ -101,4 +101,25 @@ final class NormalizerTest extends TestCase
             $this->normalizer->normalize('https://example.com:8443/foo', true, []),
         );
     }
+
+    public function testReturnsTheInputUnchangedWhenItHasNoSchemeAndHost(): void
+    {
+        self::assertSame('/just/a/path', $this->normalizer->normalize('/just/a/path', true, []));
+    }
+
+    public function testKeepsAnAllowlistedParamWithoutBracketNotation(): void
+    {
+        self::assertSame(
+            'https://example.com/search?q=typo3',
+            $this->normalizer->normalize('https://example.com/search?q=typo3&utm_source=x', true, ['q']),
+        );
+    }
+
+    public function testDropsAnAllowlistedParamWhoseBracketNotationIsMalformed(): void
+    {
+        self::assertSame(
+            'https://example.com/search',
+            $this->normalizer->normalize('https://example.com/search?tx_solr[q]=typo3', true, ['tx_solr[q']),
+        );
+    }
 }

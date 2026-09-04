@@ -141,4 +141,41 @@ final class LanguageMatcherTest extends TestCase
         self::assertNotNull($language);
         self::assertSame(0, $language->getLanguageId());
     }
+
+    public function testReturnsNullForAUrlWithoutAHost(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'languages' => [
+                ['languageId' => 0, 'locale' => 'de_DE.UTF-8', 'base' => '/'],
+            ],
+        ]);
+
+        self::assertNull($this->matcher->match('/no-host-here', $site));
+    }
+
+    public function testReturnsNullWhenNoLanguageBaseHostMatches(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'languages' => [
+                ['languageId' => 0, 'locale' => 'de_DE.UTF-8', 'base' => 'https://example.com/'],
+            ],
+        ]);
+
+        self::assertNull($this->matcher->match('https://foreign.example/page', $site));
+    }
+
+    public function testIgnoresAdditionalHostsThatAreNotAList(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['resolution' => ['additionalHosts' => 'www.example.com']],
+            'languages' => [
+                ['languageId' => 0, 'locale' => 'de_DE.UTF-8', 'base' => 'https://example.com/'],
+            ],
+        ]);
+
+        self::assertNull($this->matcher->match('https://www.example.com/page', $site));
+    }
 }
