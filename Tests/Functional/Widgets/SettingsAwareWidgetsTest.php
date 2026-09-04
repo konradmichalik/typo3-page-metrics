@@ -20,6 +20,7 @@ use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
 use TYPO3\CMS\Core\Http\{NormalizedParams, ServerRequest};
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
 use TYPO3\CMS\Core\Settings\SettingsInterface;
 use TYPO3\CMS\Dashboard\Factory\WidgetSettingsFactory;
 use TYPO3\CMS\Dashboard\Widgets\{WidgetConfigurationInterface, WidgetContext, WidgetRendererInterface, WidgetResult};
@@ -363,6 +364,55 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
 
         self::assertStringContainsString('callout-info', $result->content);
         self::assertNull($result->label);
+    }
+
+    public function testEachSettingsAwareWidgetDeclaresItsBackendAssets(): void
+    {
+        $css = ['EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css'];
+
+        $chart = $this->get('dashboard.widget.pageMetricsChart');
+        self::assertInstanceOf(PageMetricsChartWidget::class, $chart);
+        self::assertSame($css, $chart->getCssFiles());
+        self::assertEquals(
+            [JavaScriptModuleInstruction::create('@konradmichalik/page-metrics/sparkline.js')],
+            $chart->getJavaScriptModuleInstructions(),
+        );
+
+        $trend = $this->get('dashboard.widget.pageMetricsTrend');
+        self::assertInstanceOf(TrendWidget::class, $trend);
+        self::assertSame($css, $trend->getCssFiles());
+
+        $topPages = $this->get('dashboard.widget.pageMetricsTopPages');
+        self::assertInstanceOf(TopPagesWidget::class, $topPages);
+        self::assertSame($css, $topPages->getCssFiles());
+    }
+
+    public function testEachSettingsAwareWidgetSkipsSitesWithoutAConfiguredMetricSource(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->writeUnconfiguredSiteConfiguration();
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 42);
+
+        foreach ([
+            $this->renderChartWidget([]),
+            $this->renderTrendWidget([]),
+            $this->renderTopPagesWidget([]),
+        ] as $content) {
+            self::assertStringNotContainsString('unconfigured', $content);
+        }
+    }
+
+    private function writeUnconfiguredSiteConfiguration(): void
+    {
+        $this->get(SiteWriter::class)->write('unconfigured', [
+            'rootPageId' => 2,
+            'base' => 'https://unconfigured.example.com/',
+            'languages' => [
+                0 => ['title' => 'English', 'enabled' => true, 'languageId' => 0, 'base' => '/', 'locale' => 'en_US.UTF-8', 'navigationTitle' => 'English', 'flag' => 'us'],
+            ],
+            'errorHandling' => [],
+            'routes' => [],
+        ]);
     }
 
     /**

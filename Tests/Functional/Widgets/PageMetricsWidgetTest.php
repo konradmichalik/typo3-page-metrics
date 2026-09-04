@@ -94,6 +94,27 @@ final class PageMetricsWidgetTest extends FunctionalTestCase
         self::assertInstanceOf(JavaScriptModuleInstruction::class, $modules[0]);
     }
 
+    public function testDeclaresItsBackendAssetsAndNoLegacyOptions(): void
+    {
+        $widget = $this->get('dashboard.widget.pageMetrics');
+        self::assertInstanceOf(PageMetricsWidget::class, $widget);
+
+        self::assertSame(['EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css'], $widget->getCssFiles());
+        self::assertSame([], $widget->getOptions());
+    }
+
+    public function testSkipsSitesWhoseRootPageHasNoTiles(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $this->writeSiteConfiguration('ghost', 99, 'https://ghost.example.com/');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 42);
+
+        $content = $this->renderWidget();
+
+        self::assertStringContainsString('main', $content);
+        self::assertStringNotContainsString('ghost', $content);
+    }
+
     private function renderWidget(): string
     {
         $request = (new ServerRequest('https://example.com/typo3/module/dashboard'))
