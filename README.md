@@ -39,23 +39,6 @@ leaving the backend.
 - Matomo and GA4 as pluggable data sources, extensible with your own — see
   [Registering custom tiles](docs/extending.md)
 
-## 🧭 Related extensions
-
-`typo3_page_metrics` reads an analytics source you already operate. It tracks
-nothing itself and sends no data anywhere, which also means it can only show
-what your source already collects.
-
-- [TYPO3 Analytics](https://analytics.typo3.com/) (`t3g/analytics`) is the
-  opposite trade-off: a hosted analytics service by TYPO3 GmbH that registers
-  your site, injects its own tracking script and shows the results in the
-  backend. Pick it if you want analytics *and* the backend integration in one
-  paid package, rather than a backend view onto an analytics setup you already
-  run.
-- [matomo_widgets](https://github.com/brotkrueml/typo3-matomo-widgets) puts
-  Matomo's own reports on the TYPO3 dashboard, live via the Reporting API.
-  Pick it if you want Matomo's reports as-is; it deliberately stays in Matomo's
-  URL world and does not map anything onto the page tree.
-
 ## 🔥 Installation
 
 ### Requirements
@@ -153,6 +136,23 @@ widgets.
 | [Page module tiles](docs/page-tiles.md) | The period switch, the subpages toggle, sparkline popovers and annotations |
 | [Security](docs/security.md) | Restricting tile visibility per backend user group |
 | [Registering custom tiles](docs/extending.md) | Contributing an additional tile via `ModifyMetricTilesEvent`, without implementing `MetricSourceInterface` |
+
+## 🧭 Related extensions
+
+`typo3_page_metrics` reads an analytics source you already operate. It tracks
+nothing itself and sends no data anywhere, which also means it can only show
+what your source already collects.
+
+- [TYPO3 Analytics](https://analytics.typo3.com/) (`t3g/analytics`) is the
+  opposite trade-off: a hosted analytics service by TYPO3 GmbH that registers
+  your site, injects its own tracking script and shows the results in the
+  backend. Pick it if you want analytics *and* the backend integration in one
+  paid package, rather than a backend view onto an analytics setup you already
+  run.
+- [matomo_widgets](https://github.com/brotkrueml/typo3-matomo-widgets) puts
+  Matomo's own reports on the TYPO3 dashboard, live via the Reporting API.
+  Pick it if you want Matomo's reports as-is; it deliberately stays in Matomo's
+  URL world and does not map anything onto the page tree.
 
 ## 🧑‍💻 Contributing
 
