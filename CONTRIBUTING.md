@@ -41,10 +41,8 @@ ddev composer test:unit
 # Functional tests
 ddev composer test:functional
 
-# Both suites with merged code coverage (needs a coverage driver)
-ddev xdebug on
+# Both suites with merged code coverage (pcov is installed in the web image)
 ddev composer test:coverage
-ddev xdebug off
 ```
 
 `test:coverage` runs the unit and functional suites separately and merges

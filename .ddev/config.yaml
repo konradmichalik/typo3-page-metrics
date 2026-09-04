@@ -4,6 +4,7 @@ docroot: .Build
 php_version: "8.2"
 webserver_type: apache-fpm
 xdebug_enabled: false
+webimage_extra_packages: [php8.2-pcov]
 additional_hostnames: []
 additional_fqdns: []
 database:
