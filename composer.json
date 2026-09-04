@@ -47,6 +47,7 @@
 	},
 	"autoload-dev": {
 		"psr-4": {
+			"KonradMichalik\\PageMetricsDemoSource\\": "Tests/Functional/Service/Fixtures/Extensions/page_metrics_demo_source/Classes/",
 			"KonradMichalik\\PageMetricsDemoTiles\\": "Tests/Functional/Service/Fixtures/Extensions/page_metrics_demo_tiles/Classes/",
 			"KonradMichalik\\Typo3PageMetrics\\Tests\\": "Tests/"
 		}
