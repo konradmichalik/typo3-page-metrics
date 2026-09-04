@@ -81,7 +81,14 @@
 		],
 		"cgl": "@composer -d Tests/CGL --",
 		"test": "@test:unit",
-		"test:coverage": "phpunit -c phpunit.xml",
+		"test:coverage": [
+			"@test:coverage:unit",
+			"@test:coverage:functional",
+			"@test:coverage:merge"
+		],
+		"test:coverage:functional": "phpunit -c phpunit.functional.xml --coverage-php .Build/coverage/functional.cov",
+		"test:coverage:merge": "@php Tests/Coverage/merge.php",
+		"test:coverage:unit": "phpunit -c phpunit.xml --coverage-php .Build/coverage/unit.cov",
 		"test:functional": "phpunit -c phpunit.functional.xml",
 		"test:unit": "phpunit -c phpunit.xml --no-coverage"
 	}

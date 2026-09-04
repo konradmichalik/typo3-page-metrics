@@ -41,9 +41,17 @@ ddev composer test:unit
 # Functional tests
 ddev composer test:functional
 
-# All tests with code coverage
+# Both suites with merged code coverage (needs a coverage driver)
+ddev xdebug on
 ddev composer test:coverage
+ddev xdebug off
 ```
+
+`test:coverage` runs the unit and functional suites separately and merges
+the two results, because neither alone describes the extension. It writes
+`.Build/coverage/clover.xml` plus the shields.io endpoint JSON behind the
+README badge, and lists every file under `Classes/` that is not fully
+covered.
 
 ## TYPO3 setup
 
