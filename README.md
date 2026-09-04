@@ -4,6 +4,8 @@
 
 # TYPO3 extension `typo3_page_metrics`
 
+[![CI](https://github.com/konradmichalik/typo3-page-metrics/actions/workflows/ci.yml/badge.svg)](https://github.com/konradmichalik/typo3-page-metrics/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fkonradmichalik%2Fecbc8f47725de8c7cc37bdd9770c7e74%2Fraw%2Fbadge.json)](https://github.com/konradmichalik/typo3-page-metrics/actions/workflows/ci.yml)
 [![License](https://poser.pugx.org/konradmichalik/typo3-page-metrics/license)](LICENSE.md)
 [![Supported TYPO3 versions](https://badgen.net/badge/TYPO3/13.4%20%7C%2014.3/orange)](https://extensions.typo3.org/extension/typo3_page_metrics)
 

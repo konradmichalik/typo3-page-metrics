@@ -100,3 +100,54 @@ jobs:
 
       - name: Dependency analysis
         run: composer cgl analyze:dependencies
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    # Job level, so the "Publish badge" step can test it in its own `if`:
+    # a step cannot read the env block it declares itself.
+    env:
+      GIST_ID: ecbc8f47725de8c7cc37bdd9770c7e74
+      GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: intl, mbstring, json, zip, pdo_sqlite, sqlite3
+          coverage: xdebug
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-progress --no-interaction
+
+      # Neither suite alone is meaningful - the unit tests cannot reach the
+      # repositories and widgets, the functional tests skip the pure value
+      # objects - so this runs both and merges them, see Tests/Coverage/merge.php.
+      - name: Collect coverage
+        env:
+          XDEBUG_MODE: coverage
+        run: composer test:coverage | tee .Build/coverage/summary.txt
+
+      - name: Job summary
+        run: |
+          {
+            echo '### Coverage'
+            echo '```'
+            tail -n 20 .Build/coverage/summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The README badge reads this gist through shields.io's endpoint API.
+      # Only a push to main updates it, so a pull request never moves the
+      # badge before it is merged; skipped when the secret is absent.
+      - name: Publish badge
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.GIST_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: |
+          jq -n --rawfile content .Build/coverage/badge.json \
+            '{files: {"badge.json": {content: $content}}}' \
+            | gh api "gists/$GIST_ID" --method PATCH --input -
