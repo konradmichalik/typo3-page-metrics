@@ -129,7 +129,12 @@ jobs:
       - name: Collect coverage
         env:
           XDEBUG_MODE: coverage
-        run: composer test:coverage | tee .Build/coverage/summary.txt
+        # .Build is gitignored, so it does not exist at checkout time. tee
+        # starts in parallel with composer and would fail before PHPUnit gets
+        # round to creating the directory itself.
+        run: |
+          mkdir -p .Build/coverage
+          composer test:coverage | tee .Build/coverage/summary.txt
 
       - name: Job summary
         run: |
