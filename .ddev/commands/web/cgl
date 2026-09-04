@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+## Description: Run the CGL toolchain (linters, static analysis, Rector).
+## Usage: cgl [script]
+## Example: "ddev cgl lint" or "ddev cgl fix:php" or "ddev cgl sca:php"
+
+# No `#ddev-generated` marker on purpose: unlike its siblings in this folder
+# this command is not part of the typo3-multi-version-extension add-on (see
+# .ddev/addon-metadata/.../manifest.yaml), so DDEV must leave it alone on an
+# add-on upgrade.
+
+. .ddev/.setup/scripts/utils.sh
+
+# The toolchain lives in its own Composer project so its dependencies never
+# mix with the extension's, see Tests/CGL/composer.json. This is the shorthand
+# for `ddev composer cgl <script>`, which resolves to the same call.
+CGL_PATH="/var/www/html/Tests/CGL"
+
+if [ ! -d "${CGL_PATH}/vendor" ]; then
+    message yellow "CGL toolchain not installed yet, running 'composer install' in Tests/CGL"
+    composer -d "$CGL_PATH" install --no-interaction || exit 1
+fi
+
+message magenta "[CGL] ${*:-<list scripts>}"
+
+composer -d "$CGL_PATH" -- "$@"

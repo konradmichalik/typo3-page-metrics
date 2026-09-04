@@ -24,12 +24,12 @@ ddev composer install
 
 ```bash
 # Everything
-ddev composer cgl
+ddev cgl
 
 # Specific tools
-ddev composer cgl lint:php
-ddev composer cgl fix:php
-ddev composer cgl sca:php
+ddev cgl lint:php
+ddev cgl fix:php
+ddev cgl sca:php
 ```
 
 ## Run tests
