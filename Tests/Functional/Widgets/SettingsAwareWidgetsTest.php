@@ -22,8 +22,10 @@ use TYPO3\CMS\Core\Http\{NormalizedParams, ServerRequest};
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Settings\SettingsInterface;
 use TYPO3\CMS\Dashboard\Factory\WidgetSettingsFactory;
-use TYPO3\CMS\Dashboard\Widgets\{WidgetConfigurationInterface, WidgetContext, WidgetResult};
+use TYPO3\CMS\Dashboard\Widgets\{WidgetConfigurationInterface, WidgetContext, WidgetRendererInterface, WidgetResult};
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
+
+use function interface_exists;
 
 /**
  * SettingsAwareWidgetsTest.
@@ -43,7 +45,19 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
+        // Skipping has to happen after parent::setUp(), not before: the
+        // testing framework's tearDown() reads $instancePath, which only the
+        // parent initialises, and would fatal on a test skipped ahead of it.
         parent::setUp();
+
+        // The three widgets under test are registered only where
+        // WidgetRendererInterface exists, which is a TYPO3 14 addition - on
+        // TYPO3 13.4 Configuration/Services.php deliberately skips them, so
+        // there is nothing to fetch from the container here.
+        if (!interface_exists(WidgetRendererInterface::class)) {
+            self::markTestSkipped('Settings-aware widgets require TYPO3 14 (WidgetRendererInterface).');
+        }
+
         $this->importCSVDataSet(__DIR__.'/../Service/Fixtures/pages.csv');
         $this->importCSVDataSet(__DIR__.'/../Service/Fixtures/be_users.csv');
         $backendUser = $this->setUpBackendUser(1);
