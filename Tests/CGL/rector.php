@@ -27,8 +27,10 @@ return RectorConfig::configure()
     ->withPaths([
         $rootPath.'/Classes',
         $rootPath.'/Configuration',
+        // No ext_localconf.php / ext_tables.php here - everything is wired up
+        // through Configuration/. They stay in withSkip() below so the rule is
+        // already right should the extension ever gain one.
         $rootPath.'/ext_emconf.php',
-        $rootPath.'/ext_localconf.php',
         $rootPath.'/Tests/Unit',
         $rootPath.'/Tests/Functional',
     ])
