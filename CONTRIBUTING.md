@@ -53,6 +53,11 @@ the two results, because neither alone describes the extension. It writes
 README badge, and lists every file under `Classes/` that is not fully
 covered.
 
+The README's Coverage badge is only updated by CI on a push to `main` (and
+only once the `GIST_TOKEN` secret is configured) — until then, or on a
+pull request, it renders as "invalid" rather than a percentage. That is
+expected, not a broken pipeline.
+
 ## TYPO3 setup
 
 For testing the extension against a real backend, you need to set up the TYPO3 instances.
