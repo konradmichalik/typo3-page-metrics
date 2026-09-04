@@ -117,7 +117,12 @@ jobs:
         with:
           php-version: '8.2'
           extensions: intl, mbstring, json, zip, pdo_sqlite, sqlite3
-          coverage: xdebug
+          # pcov, like the DDEV web image, so a local run and the badge are
+          # computed by the same driver - xdebug counts executable lines
+          # slightly differently. Only line coverage is reported, which is
+          # all pcov can do anyway, and it is markedly faster.
+          coverage: pcov
+          ini-values: pcov.directory=Classes
           tools: composer:v2
 
       - name: Install dependencies
@@ -127,8 +132,6 @@ jobs:
       # repositories and widgets, the functional tests skip the pure value
       # objects - so this runs both and merges them, see Tests/Coverage/merge.php.
       - name: Collect coverage
-        env:
-          XDEBUG_MODE: coverage
         # .Build is gitignored, so it does not exist at checkout time. tee
         # starts in parallel with composer and would fail before PHPUnit gets
         # round to creating the directory itself.
