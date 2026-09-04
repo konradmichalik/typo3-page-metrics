@@ -16,3 +16,5 @@
 ,14,0,0,0,"*","/six-hop-4","/six-hop-5",307
 ,15,0,0,0,"*","/six-hop-5","/six-hop-6",307
 ,16,0,0,0,"*","/six-hop-6","t3://page?uid=2",307
+,17,0,0,0,"*","/old-missing-page","t3://page?uid=9999",307
+,18,0,0,0,"*","/old-relative","relative/target",307

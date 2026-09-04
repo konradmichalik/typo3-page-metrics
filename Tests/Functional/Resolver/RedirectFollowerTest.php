@@ -71,4 +71,14 @@ final class RedirectFollowerTest extends FunctionalTestCase
         self::assertSame('/redirect-b', $this->subject->findTarget('example.com', '/redirect-a'));
         self::assertSame('/redirect-a', $this->subject->findTarget('example.com', '/redirect-b'));
     }
+
+    public function testReturnsNullWhenAPageTargetPointsAtANonExistentPage(): void
+    {
+        self::assertNull($this->subject->findTarget('example.com', '/old-missing-page'));
+    }
+
+    public function testReturnsNullForATargetThatIsNeitherAPageNorAnAbsoluteOrRootRelativeUrl(): void
+    {
+        self::assertNull($this->subject->findTarget('example.com', '/old-relative'));
+    }
 }
