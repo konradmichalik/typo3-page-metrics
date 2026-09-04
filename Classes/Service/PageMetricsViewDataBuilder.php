@@ -240,8 +240,17 @@ final class PageMetricsViewDataBuilder
     {
         try {
             return (string) $site->getRouter()->generateUri($pageId, [], '', RouterInterface::ABSOLUTE_URL);
+            // @codeCoverageIgnoreStart
+            // generateUri() declares InvalidRouteArgumentsException, but no
+            // state reachable from a test produces it: verified against an
+            // existing page, a folder, a non-existent uid, a negative uid,
+            // uid 0 and a site without language configuration - every one
+            // returns a URL. The guard is for third-party route enhancers,
+            // which a functional test cannot install, so the two lines below
+            // are excluded from coverage rather than left permanently red.
         } catch (Throwable) {
             return null;
+            // @codeCoverageIgnoreEnd
         }
     }
 
