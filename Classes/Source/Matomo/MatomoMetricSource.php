@@ -36,13 +36,13 @@ use function sprintf;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class MatomoMetricSource implements MetricSourceInterface
+final readonly class MatomoMetricSource implements MetricSourceInterface
 {
     private const IDENTIFIER = 'matomo';
 
     public function __construct(
-        private readonly MatomoConfigurationResolver $configurationResolver,
-        private readonly MatomoApiClient $apiClient,
+        private MatomoConfigurationResolver $configurationResolver,
+        private MatomoApiClient $apiClient,
     ) {}
 
     public function getIdentifier(): string

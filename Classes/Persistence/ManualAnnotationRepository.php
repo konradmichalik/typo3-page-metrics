@@ -32,12 +32,12 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class ManualAnnotationRepository
+final readonly class ManualAnnotationRepository
 {
     private const TABLE = 'tx_typo3pagemetrics_manual_annotation';
 
     public function __construct(
-        private readonly ConnectionPool $connectionPool,
+        private ConnectionPool $connectionPool,
     ) {}
 
     /**

@@ -42,7 +42,7 @@ use function sprintf;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class PageMetricsViewDataBuilder
+final readonly class PageMetricsViewDataBuilder
 {
     /** @var list<int> */
     private const PERIOD_OPTIONS = [7, 30, 90];
@@ -65,14 +65,14 @@ final class PageMetricsViewDataBuilder
      * @param iterable<MetricSourceInterface> $sources
      */
     public function __construct(
-        private readonly SiteFinder $siteFinder,
-        private readonly DailyMetricsRepository $dailyMetricsRepository,
-        private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
-        private readonly AnnotationRepository $annotationRepository,
-        private readonly ManualAnnotationRepository $manualAnnotationRepository,
-        private readonly SitePageUidRepository $pageUidRepository,
-        private readonly EventDispatcherInterface $eventDispatcher,
-        private readonly iterable $sources,
+        private SiteFinder $siteFinder,
+        private DailyMetricsRepository $dailyMetricsRepository,
+        private UnresolvedUrlRepository $unresolvedUrlRepository,
+        private AnnotationRepository $annotationRepository,
+        private ManualAnnotationRepository $manualAnnotationRepository,
+        private SitePageUidRepository $pageUidRepository,
+        private EventDispatcherInterface $eventDispatcher,
+        private iterable $sources,
     ) {}
 
     public function build(int $pageId, int $languageId, int $requestedPeriodDays, bool $includeSubpages = false): PageMetricsViewData

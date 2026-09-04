@@ -27,10 +27,10 @@ use TYPO3\CMS\Core\Database\Query\Restriction\{DeletedRestriction, HiddenRestric
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class SlugLookup
+final readonly class SlugLookup
 {
     public function __construct(
-        private readonly ConnectionPool $connectionPool,
+        private ConnectionPool $connectionPool,
     ) {}
 
     public function find(string $slug, int $languageId): ?int

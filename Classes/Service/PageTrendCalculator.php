@@ -34,11 +34,11 @@ use function sprintf;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class PageTrendCalculator
+final readonly class PageTrendCalculator
 {
     public function __construct(
-        private readonly DailyMetricsRepository $dailyMetricsRepository,
-        private readonly SitePageUidRepository $pageUidRepository,
+        private DailyMetricsRepository $dailyMetricsRepository,
+        private SitePageUidRepository $pageUidRepository,
     ) {}
 
     /**
