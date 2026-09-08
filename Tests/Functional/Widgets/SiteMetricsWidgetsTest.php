@@ -77,6 +77,37 @@ final class SiteMetricsWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('callout-info', $this->renderWidget('dashboard.widget.pageMetricsAnnotations', AnnotationsWidget::class));
     }
 
+    public function testEveryWidgetDeclaresItsBackendAssetsAndNoLegacyOptions(): void
+    {
+        foreach (['dashboard.widget.pageMetricsNotFoundPages', 'dashboard.widget.pageMetricsAnnotations'] as $serviceId) {
+            $widget = $this->get($serviceId);
+            self::assertInstanceOf(AbstractSiteMetricsWidget::class, $widget);
+
+            self::assertSame(['EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css'], $widget->getCssFiles(), $serviceId);
+            self::assertSame([], $widget->getOptions(), $serviceId);
+        }
+    }
+
+    public function testSkipsSitesWithoutAConfiguredMetricSource(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->get(SiteWriter::class)->write('unconfigured', [
+            'rootPageId' => 2,
+            'base' => 'https://unconfigured.example.com/',
+            'languages' => [
+                0 => ['title' => 'English', 'enabled' => true, 'languageId' => 0, 'base' => '/', 'locale' => 'en_US.UTF-8', 'navigationTitle' => 'English', 'flag' => 'us'],
+            ],
+            'errorHandling' => [],
+            'routes' => [],
+        ]);
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', 'a1', new DateTimeImmutable('today'), 'Release 2.0');
+
+        $content = $this->renderWidget('dashboard.widget.pageMetricsAnnotations', AnnotationsWidget::class);
+
+        self::assertStringContainsString('Release 2.0', $content);
+        self::assertStringNotContainsString('unconfigured', $content);
+    }
+
     /**
      * @param class-string<AbstractSiteMetricsWidget> $expectedClass
      */

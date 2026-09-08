@@ -38,7 +38,7 @@ use function ucfirst;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class SiteMetricsOverviewBuilder
+final readonly class SiteMetricsOverviewBuilder
 {
     private const TOP_PAGES_LIMIT = 5;
     private const UNRESOLVED_LIMIT = 5;
@@ -47,13 +47,13 @@ final class SiteMetricsOverviewBuilder
      * @param iterable<MetricSourceInterface> $sources
      */
     public function __construct(
-        private readonly SitePageUidRepository $pageUidRepository,
-        private readonly DailyMetricsRepository $dailyMetricsRepository,
-        private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
-        private readonly AnnotationRepository $annotationRepository,
-        private readonly ManualAnnotationRepository $manualAnnotationRepository,
-        private readonly PageTrendCalculator $trendCalculator,
-        private readonly iterable $sources,
+        private SitePageUidRepository $pageUidRepository,
+        private DailyMetricsRepository $dailyMetricsRepository,
+        private UnresolvedUrlRepository $unresolvedUrlRepository,
+        private AnnotationRepository $annotationRepository,
+        private ManualAnnotationRepository $manualAnnotationRepository,
+        private PageTrendCalculator $trendCalculator,
+        private iterable $sources,
     ) {}
 
     public function build(Site $site, int $languageId, int $periodDays, ?string $preferredMetricIdentifier = null): SiteMetricsOverview

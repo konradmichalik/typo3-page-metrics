@@ -20,7 +20,7 @@ use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, U
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
 use KonradMichalik\Typo3PageMetrics\Source\{AnnotationSourceInterface, MetricSourceInterface};
-use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{PartiallyFailingAnnotationSource, PartiallyFailingMetricSource, StubAnnotationSource, StubMetricSource};
+use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{PartiallyFailingAnnotationSource, PartiallyFailingMetricSource, StubAnnotationSource, StubMetricSource, UnsupportedAnnotationSource, UnsupportedMetricSource};
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -242,6 +242,70 @@ final class ImportCommandTest extends FunctionalTestCase
         self::assertSame(Command::FAILURE, $exitCode);
         $series = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today));
         self::assertSame([$today->format('Y-m-d') => 10], $series);
+    }
+
+    public function testSkipsSitesThatHaveNotOptedIn(): void
+    {
+        $this->writeDisabledSite();
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricSource([new UrlMetric('https://disabled.example.com/about', $today, 'stub.hits', 42)]);
+
+        $exitCode = $this->runImport([$stub]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        // Only "main" was processed, so the opted-out site left no import state.
+        self::assertNull($this->importStateRepository->getLastImportedDate('stub', 'disabled'));
+        self::assertNotNull($this->importStateRepository->getLastImportedDate('stub', 'main'));
+    }
+
+    public function testSkipsSourcesThatDoNotSupportTheSite(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
+
+        $exitCode = $this->runImport([new UnsupportedMetricSource(), $stub]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertNull($this->importStateRepository->getLastImportedDate('unsupported', 'main'));
+        self::assertNotNull($this->importStateRepository->getLastImportedDate('stub', 'main'));
+    }
+
+    public function testSkipsAnnotationSourcesThatDoNotSupportTheSite(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
+
+        $exitCode = $this->runImport([$stub], false, [new UnsupportedAnnotationSource()]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertSame([], $this->annotationRepository->forSiteAndRange('main', new DateRange($today->modify('-5 days'), $today)));
+    }
+
+    public function testImportsNothingWhenEveryDayUpToTodayIsAlreadyImported(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $this->importStateRepository->markImported('stub', 'main', $today);
+        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
+
+        $exitCode = $this->runImport([$stub]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        // dailySeries() zero-fills the range, so "nothing imported" is a 0, not an absent key.
+        self::assertSame([$today->format('Y-m-d') => 0], $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today)));
+    }
+
+    private function writeDisabledSite(): void
+    {
+        $this->get(SiteWriter::class)->write('disabled', [
+            'rootPageId' => 10,
+            'base' => 'https://disabled.example.com/',
+            'languages' => [
+                0 => ['title' => 'English', 'enabled' => true, 'languageId' => 0, 'base' => '/', 'locale' => 'en_US.UTF-8', 'navigationTitle' => 'English', 'flag' => 'us'],
+            ],
+            'errorHandling' => [],
+            'routes' => [],
+            'pageMetrics' => ['enabled' => false],
+        ]);
     }
 
     /**

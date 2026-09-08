@@ -42,6 +42,6 @@ final class PartiallyFailingAnnotationSource implements AnnotationSourceInterfac
 
     public function fetch(Site $site, DateRange $range): iterable
     {
-        throw new RuntimeException(sprintf('Simulated annotation source failure for site "%s".', $site->getIdentifier()));
+        throw new RuntimeException(sprintf('Simulated annotation source failure for site "%s".', $site->getIdentifier()), 7741689055);
     }
 }

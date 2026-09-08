@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Persistence;
 
 use DateTimeImmutable;
+use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
 /**
@@ -27,6 +28,7 @@ class ImportStateRepository
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
+        private readonly Context $context,
     ) {}
 
     public function getLastImportedDate(string $source, string $siteIdentifier): ?DateTimeImmutable
@@ -52,7 +54,7 @@ class ImportStateRepository
         $existingUid = $connection->select(['uid'], self::TABLE, $identity)->fetchOne();
         $values = [
             'last_imported_date' => $date->format('Y-m-d'),
-            'tstamp' => $GLOBALS['EXEC_TIME'] ?? time(),
+            'tstamp' => $this->context->getPropertyFromAspect('date', 'timestamp') ?? time(),
         ];
 
         if (false !== $existingUid) {

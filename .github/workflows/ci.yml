@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+# A new push to a branch supersedes the run that is still in flight for it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests (PHP ${{ matrix.php-version }}, TYPO3 ${{ matrix.typo3-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['8.2', '8.3', '8.4', '8.5']
+        typo3-version: ['^13.4', '^14.0']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          # pdo_sqlite/sqlite3 back the functional suite, see phpunit.functional.xml
+          extensions: intl, mbstring, json, zip, pdo_sqlite, sqlite3
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate composer.json
+        run: composer validate --no-check-lock
+
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ matrix.php-version }}-${{ matrix.typo3-version }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ matrix.php-version }}-${{ matrix.typo3-version }}-
+
+      # Pinning cms-core pins the whole cms-* family: every typo3/cms-<x> release
+      # requires its matching core version, so one constraint selects the line.
+      - name: Install dependencies (TYPO3 ${{ matrix.typo3-version }})
+        run: composer update --no-progress --no-interaction --with="typo3/cms-core:${{ matrix.typo3-version }}"
+
+      - name: Unit tests
+        run: composer test:unit
+
+      - name: Functional tests
+        run: composer test:functional
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `cgl lint:editorconfig` runs `ec --git-only` and needs the full history.
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: intl, mbstring, json, zip
+          coverage: none
+          tools: composer:v2
+
+      # `composer install` triggers post-install-cmd, which installs Tests/CGL.
+      - name: Install dependencies
+        run: composer install --no-progress --no-interaction
+
+      - name: Lint
+        run: composer cgl lint
+
+  sca:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: intl, mbstring, json, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-progress --no-interaction
+
+      - name: PHPStan
+        run: composer cgl sca:php
+
+      - name: Dependency analysis
+        run: composer cgl analyze:dependencies
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    # Job level, so the "Publish badge" step can test it in its own `if`:
+    # a step cannot read the env block it declares itself.
+    env:
+      GIST_ID: ecbc8f47725de8c7cc37bdd9770c7e74
+      GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: intl, mbstring, json, zip, pdo_sqlite, sqlite3
+          # pcov, like the DDEV web image, so a local run and the badge are
+          # computed by the same driver - xdebug counts executable lines
+          # slightly differently. Only line coverage is reported, which is
+          # all pcov can do anyway, and it is markedly faster.
+          coverage: pcov
+          ini-values: pcov.directory=Classes
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-progress --no-interaction
+
+      # Neither suite alone is meaningful - the unit tests cannot reach the
+      # repositories and widgets, the functional tests skip the pure value
+      # objects - so this runs both and merges them, see Tests/Coverage/merge.php.
+      - name: Collect coverage
+        # .Build is gitignored, so it does not exist at checkout time. tee
+        # starts in parallel with composer and would fail before PHPUnit gets
+        # round to creating the directory itself.
+        run: |
+          mkdir -p .Build/coverage
+          composer test:coverage | tee .Build/coverage/summary.txt
+
+      - name: Job summary
+        run: |
+          {
+            echo '### Coverage'
+            echo '```'
+            tail -n 20 .Build/coverage/summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The README badge reads this gist through shields.io's endpoint API.
+      # Only a push to main updates it, so a pull request never moves the
+      # badge before it is merged; skipped when the secret is absent.
+      - name: Publish badge
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.GIST_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: |
+          jq -n --rawfile content .Build/coverage/badge.json \
+            '{files: {"badge.json": {content: $content}}}' \
+            | gh api "gists/$GIST_ID" --method PATCH --input -

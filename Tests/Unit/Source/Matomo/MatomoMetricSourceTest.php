@@ -226,4 +226,25 @@ final class MatomoMetricSourceTest extends TestCase
             self::assertSame(-1, $call['filter_limit']);
         }
     }
+
+    public function testFetchSkipsRowsWithoutAUsableUrl(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
+        $this->apiClient->method('request')->willReturn([
+            'not-a-row',
+            ['label' => '/no-url', 'nb_hits' => 5],
+            ['label' => '/empty-url', 'url' => '', 'nb_hits' => 5],
+            ['label' => '/numeric-url', 'url' => 12345, 'nb_hits' => 5],
+            ['label' => '/foo', 'url' => 'https://example.com/foo', 'nb_hits' => 10, 'nb_visits' => 7],
+        ]);
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+        $metrics = iterator_to_array($this->subject->fetch($this->site, $range), false);
+
+        foreach ($metrics as $metric) {
+            self::assertSame('https://example.com/foo', $metric->url);
+        }
+
+        self::assertNotSame([], $metrics);
+    }
 }

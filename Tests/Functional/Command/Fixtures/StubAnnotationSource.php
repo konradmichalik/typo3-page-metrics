@@ -22,13 +22,13 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class StubAnnotationSource implements AnnotationSourceInterface
+final readonly class StubAnnotationSource implements AnnotationSourceInterface
 {
     /**
      * @param list<Annotation> $annotations
      */
     public function __construct(
-        private readonly array $annotations,
+        private array $annotations,
     ) {}
 
     public function getIdentifier(): string

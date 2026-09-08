@@ -26,11 +26,11 @@ use function is_string;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class RedirectFollower
+final readonly class RedirectFollower
 {
     public function __construct(
-        private readonly ConnectionPool $connectionPool,
-        private readonly SiteFinder $siteFinder,
+        private ConnectionPool $connectionPool,
+        private SiteFinder $siteFinder,
     ) {}
 
     public function findTarget(string $host, string $path): ?string

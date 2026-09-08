@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Source\Matomo;
 
+use GuzzleHttp\Psr7\Utils;
 use KonradMichalik\Typo3PageMetrics\Exception\MatomoRequestFailedException;
 use KonradMichalik\Typo3PageMetrics\Source\Matomo\{MatomoApiClient, MatomoConfiguration};
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
+use RuntimeException;
 use TYPO3\CMS\Core\Http\RequestFactory;
 
 /**
@@ -134,6 +136,30 @@ final class MatomoApiClientTest extends TestCase
         ], $capturedOptions['form_params'] ?? null);
     }
 
+    public function testRequestWrapsTransportFailuresInADomainException(): void
+    {
+        $this->requestFactory->method('request')->willThrowException(new RuntimeException('Connection refused'));
+
+        $this->expectException(MatomoRequestFailedException::class);
+        $this->expectExceptionCode(1756000100);
+        $this->expectExceptionMessage('Connection refused');
+
+        $this->subject->request($this->configuration, ['method' => 'Actions.getPageUrls']);
+    }
+
+    public function testRequestThrowsWhenTheBodyIsNotJson(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(200);
+        $response->method('getBody')->willReturn(Utils::streamFor('<html>maintenance</html>'));
+        $this->requestFactory->method('request')->willReturn($response);
+
+        $this->expectException(MatomoRequestFailedException::class);
+        $this->expectExceptionCode(1756000102);
+
+        $this->subject->request($this->configuration, ['method' => 'Actions.getPageUrls']);
+    }
+
     /**
      * @param array<mixed> $payload
      */
@@ -141,7 +167,7 @@ final class MatomoApiClientTest extends TestCase
     {
         $response = $this->createMock(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn($statusCode);
-        $response->method('getBody')->willReturn(\GuzzleHttp\Psr7\Utils::streamFor(json_encode($payload, \JSON_THROW_ON_ERROR)));
+        $response->method('getBody')->willReturn(Utils::streamFor(json_encode($payload, \JSON_THROW_ON_ERROR)));
 
         return $response;
     }

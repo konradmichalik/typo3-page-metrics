@@ -24,12 +24,12 @@ ddev composer install
 
 ```bash
 # Everything
-ddev composer cgl
+ddev cgl
 
 # Specific tools
-ddev composer cgl lint:php
-ddev composer cgl fix:php
-ddev composer cgl sca:php
+ddev cgl lint:php
+ddev cgl fix:php
+ddev cgl sca:php
 ```
 
 ## Run tests
@@ -41,9 +41,20 @@ ddev composer test:unit
 # Functional tests
 ddev composer test:functional
 
-# All tests with code coverage
+# Both suites with merged code coverage (pcov is installed in the web image)
 ddev composer test:coverage
 ```
+
+`test:coverage` runs the unit and functional suites separately and merges
+the two results, because neither alone describes the extension. It writes
+`.Build/coverage/clover.xml` plus the shields.io endpoint JSON behind the
+README badge, and lists every file under `Classes/` that is not fully
+covered.
+
+The README's Coverage badge is only updated by CI on a push to `main` (and
+only once the `GIST_TOKEN` secret is configured) — until then, or on a
+pull request, it renders as "invalid" rather than a percentage. That is
+expected, not a broken pipeline.
 
 ## TYPO3 setup
 

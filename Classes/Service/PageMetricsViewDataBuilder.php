@@ -42,7 +42,7 @@ use function sprintf;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class PageMetricsViewDataBuilder
+final readonly class PageMetricsViewDataBuilder
 {
     /** @var list<int> */
     private const PERIOD_OPTIONS = [7, 30, 90];
@@ -65,14 +65,14 @@ final class PageMetricsViewDataBuilder
      * @param iterable<MetricSourceInterface> $sources
      */
     public function __construct(
-        private readonly SiteFinder $siteFinder,
-        private readonly DailyMetricsRepository $dailyMetricsRepository,
-        private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
-        private readonly AnnotationRepository $annotationRepository,
-        private readonly ManualAnnotationRepository $manualAnnotationRepository,
-        private readonly SitePageUidRepository $pageUidRepository,
-        private readonly EventDispatcherInterface $eventDispatcher,
-        private readonly iterable $sources,
+        private SiteFinder $siteFinder,
+        private DailyMetricsRepository $dailyMetricsRepository,
+        private UnresolvedUrlRepository $unresolvedUrlRepository,
+        private AnnotationRepository $annotationRepository,
+        private ManualAnnotationRepository $manualAnnotationRepository,
+        private SitePageUidRepository $pageUidRepository,
+        private EventDispatcherInterface $eventDispatcher,
+        private iterable $sources,
     ) {}
 
     public function build(int $pageId, int $languageId, int $requestedPeriodDays, bool $includeSubpages = false): PageMetricsViewData
@@ -240,8 +240,17 @@ final class PageMetricsViewDataBuilder
     {
         try {
             return (string) $site->getRouter()->generateUri($pageId, [], '', RouterInterface::ABSOLUTE_URL);
+            // @codeCoverageIgnoreStart
+            // generateUri() declares InvalidRouteArgumentsException, but no
+            // state reachable from a test produces it: verified against an
+            // existing page, a folder, a non-existent uid, a negative uid,
+            // uid 0 and a site without language configuration - every one
+            // returns a URL. The guard is for third-party route enhancers,
+            // which a functional test cannot install, so the two lines below
+            // are excluded from coverage rather than left permanently red.
         } catch (Throwable) {
             return null;
+            // @codeCoverageIgnoreEnd
         }
     }
 

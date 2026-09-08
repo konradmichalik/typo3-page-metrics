@@ -23,13 +23,13 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class StubMetricSource implements MetricSourceInterface
+final readonly class StubMetricSource implements MetricSourceInterface
 {
     /**
      * @param list<UrlMetric> $metrics
      */
     public function __construct(
-        private readonly array $metrics,
+        private array $metrics,
     ) {}
 
     public function getIdentifier(): string

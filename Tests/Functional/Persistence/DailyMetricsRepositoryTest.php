@@ -125,4 +125,29 @@ final class DailyMetricsRepositoryTest extends FunctionalTestCase
         self::assertSame(['2026-08-01' => 30], $this->subject->siteSeries([2, 3], 0, 'matomo.pageviews', new DateRange($date, $date)));
         self::assertSame(['2026-08-01' => 20], $this->subject->siteSeries([2, 3], 0, 'matomo.pageviews', new DateRange($date, $date), 'via_redirect'));
     }
+
+    public function testSumsByPageShortCircuitsOnAnEmptyPageList(): void
+    {
+        $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 42);
+
+        $sums = $this->subject->sumsByPage([], 0, 'matomo.pageviews', new DateRange(
+            new DateTimeImmutable('2026-08-01'),
+            new DateTimeImmutable('2026-08-01'),
+        ));
+
+        self::assertSame([], $sums);
+    }
+
+    public function testSumsByPageOnlyReturnsPagesThatHaveARow(): void
+    {
+        $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 42);
+        $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-02'), 'matomo.pageviews', 8);
+
+        $sums = $this->subject->sumsByPage([2, 3], 0, 'matomo.pageviews', new DateRange(
+            new DateTimeImmutable('2026-08-01'),
+            new DateTimeImmutable('2026-08-02'),
+        ));
+
+        self::assertSame([2 => 50], $sums);
+    }
 }

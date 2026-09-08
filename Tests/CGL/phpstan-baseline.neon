@@ -1,21 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			# typeCoverage.constantTypeCoverage only counts a class constant as
-			# "covered" when it uses a native typed constant declaration, which is a
-			# PHP 8.3+ feature. This project targets PHP 8.2 (see phpVersion in
-			# phpstan.neon and composer.json's require), so these constants use a
-			# docblock @var instead - the earliest fix that keeps PHP 8.2
-			# compatibility. Adding native typed constants here would reintroduce
-			# the PHP 8.2 parse-error bug this project fixed early in development.
-			identifier: typeCoverage.constantTypeCoverage
-			count: 2
-			path: ../../Classes/Command/ImportCommand.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 2
-			path: ../../Classes/Service/PageMetricsViewDataBuilder.php
-		-
 			# typePerfect flags handleRequest()'s ServerRequestInterface parameter
 			# as "too wide" because today only the concrete TYPO3\CMS\Core\Http\
 			# ServerRequest ever flows through the backend AJAX route dispatcher.
@@ -28,90 +13,6 @@ parameters:
 			identifier: typePerfect.narrowPublicClassMethodParamType
 			count: 1
 			path: ../../Classes/Controller/Ajax/PageMetricsTilesController.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Persistence/AnnotationRepository.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Persistence/DailyMetricsRepository.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Persistence/ImportStateRepository.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Persistence/UnresolvedUrlRepository.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Resolver/Normalizer.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 2
-			path: ../../Classes/Resolver/PathClassifier.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Resolver/Resolver.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 2
-			path: ../../Classes/Source/Matomo/MatomoApiClient.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Source/Matomo/MatomoAnnotationSource.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Source/Matomo/MatomoMetricSource.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 3
-			path: ../../Classes/Source/Ga4/Ga4ApiClient.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 5
-			path: ../../Classes/Source/Ga4/Ga4AuthTokenProvider.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Source/Ga4/Ga4MetricSource.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Widgets/PageMetricsWidget.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Persistence/SitePageUidRepository.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 2
-			path: ../../Classes/Service/SiteMetricsOverviewBuilder.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Widgets/PageMetricsChartWidget.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 2
-			path: ../../Classes/Widgets/TrendWidget.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Widgets/TopPagesWidget.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Classes/Persistence/ManualAnnotationRepository.php
-		-
-			identifier: typeCoverage.constantTypeCoverage
-			count: 1
-			path: ../../Tests/Functional/Persistence/ManualAnnotationRepositoryTest.php
 		-
 			# itemsProcFunc has a fixed, framework-mandated signature -
 			# array &$parameters passed by reference - the same contract TYPO3

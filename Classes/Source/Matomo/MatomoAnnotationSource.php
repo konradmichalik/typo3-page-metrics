@@ -32,13 +32,13 @@ use function sprintf;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class MatomoAnnotationSource implements AnnotationSourceInterface
+final readonly class MatomoAnnotationSource implements AnnotationSourceInterface
 {
     private const IDENTIFIER = 'matomo';
 
     public function __construct(
-        private readonly MatomoConfigurationResolver $configurationResolver,
-        private readonly MatomoApiClient $apiClient,
+        private MatomoConfigurationResolver $configurationResolver,
+        private MatomoApiClient $apiClient,
     ) {}
 
     public function getIdentifier(): string

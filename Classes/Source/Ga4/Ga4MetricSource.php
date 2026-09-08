@@ -41,13 +41,13 @@ use function str_starts_with;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class Ga4MetricSource implements MetricSourceInterface
+final readonly class Ga4MetricSource implements MetricSourceInterface
 {
     private const IDENTIFIER = 'ga4';
 
     public function __construct(
-        private readonly Ga4ConfigurationResolver $configurationResolver,
-        private readonly Ga4ApiClient $apiClient,
+        private Ga4ConfigurationResolver $configurationResolver,
+        private Ga4ApiClient $apiClient,
     ) {}
 
     public function getIdentifier(): string

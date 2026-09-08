@@ -30,14 +30,14 @@ use function sprintf;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class PartiallyFailingMetricSource implements MetricSourceInterface
+final readonly class PartiallyFailingMetricSource implements MetricSourceInterface
 {
     /**
      * @param list<UrlMetric> $metrics
      */
     public function __construct(
-        private readonly string $failingSiteIdentifier,
-        private readonly array $metrics,
+        private string $failingSiteIdentifier,
+        private array $metrics,
     ) {}
 
     public function getIdentifier(): string
@@ -68,7 +68,7 @@ final class PartiallyFailingMetricSource implements MetricSourceInterface
     public function fetch(Site $site, DateRange $range): iterable
     {
         if ($site->getIdentifier() === $this->failingSiteIdentifier) {
-            throw new RuntimeException(sprintf('Simulated source failure for site "%s".', $site->getIdentifier()));
+            throw new RuntimeException(sprintf('Simulated source failure for site "%s".', $site->getIdentifier()), 7370234399);
         }
 
         yield from $this->metrics;

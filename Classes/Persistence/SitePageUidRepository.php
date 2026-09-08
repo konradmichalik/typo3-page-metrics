@@ -31,12 +31,12 @@ use function array_push;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class SitePageUidRepository
+final readonly class SitePageUidRepository
 {
     private const TABLE = 'pages';
 
     public function __construct(
-        private readonly ConnectionPool $connectionPool,
+        private ConnectionPool $connectionPool,
     ) {}
 
     /**
@@ -81,7 +81,7 @@ final class SitePageUidRepository
                 ->executeQuery()
                 ->fetchFirstColumn();
 
-            $frontier = array_map('intval', $children);
+            $frontier = array_map(intval(...), $children);
             array_push($uids, ...$frontier);
         }
 
@@ -113,7 +113,7 @@ final class SitePageUidRepository
                 ->executeQuery()
                 ->fetchFirstColumn();
 
-            $frontier = array_map('intval', $children);
+            $frontier = array_map(intval(...), $children);
         }
 
         return $frontier;

@@ -5,6 +5,7 @@
 		"GPL-2.0-or-later"
 	],
 	"type": "typo3-cms-extension",
+	"version": "0.1.0",
 	"authors": [
 		{
 			"name": "Konrad Michalik",
@@ -14,21 +15,25 @@
 	],
 	"require": {
 		"php": "~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0",
+		"doctrine/dbal": "^4.0",
 		"firebase/php-jwt": "^7.0",
+		"psr/event-dispatcher": "^1.0",
 		"psr/http-message": "^1.0 || ^2.0",
 		"symfony/console": "^7.0 || ^8.0",
+		"symfony/dependency-injection": "^7.0 || ^8.0",
 		"typo3/cms-backend": "^13.4 || ^14.0",
-		"typo3/cms-core": "^13.4 || ^14.0",
-		"typo3/cms-extbase": "^13.4 || ^14.0",
-		"typo3/cms-frontend": "^13.4 || ^14.0",
-		"typo3fluid/fluid": "^4.2 || ^5.0"
+		"typo3/cms-core": "^13.4 || ^14.0"
 	},
 	"require-dev": {
+		"ext-openssl": "*",
 		"eliashaeussler/version-bumper": "^4.0.4",
+		"guzzlehttp/psr7": "^2.0",
 		"konradmichalik/ttt": "^0.4.0",
 		"phpunit/phpunit": "^11.0 || ^12.0 || ^13.0",
 		"typo3/cms-base-distribution": "^13.4 || ^14.0",
 		"typo3/cms-dashboard": "^13.4 || ^14.0",
+		"typo3/cms-extbase": "^13.4 || ^14.0",
+		"typo3/cms-frontend": "^13.4 || ^14.0",
 		"typo3/cms-lowlevel": "^13.4 || ^14.0",
 		"typo3/cms-redirects": "^13.4 || ^14.0",
 		"typo3/testing-framework": "^8.2 || ^9.0 || ^10.0"
@@ -43,6 +48,7 @@
 	},
 	"autoload-dev": {
 		"psr-4": {
+			"KonradMichalik\\PageMetricsDemoSource\\": "Tests/Functional/Service/Fixtures/Extensions/page_metrics_demo_source/Classes/",
 			"KonradMichalik\\PageMetricsDemoTiles\\": "Tests/Functional/Service/Fixtures/Extensions/page_metrics_demo_tiles/Classes/",
 			"KonradMichalik\\Typo3PageMetrics\\Tests\\": "Tests/"
 		}
@@ -65,6 +71,9 @@
 			"copyright": 2026
 		},
 		"typo3/cms": {
+			"Package": {
+				"providesPackages": {}
+			},
 			"cms-package-dir": "{$vendor-dir}/typo3/cms",
 			"extension-key": "typo3_page_metrics",
 			"web-dir": "public"
@@ -76,7 +85,14 @@
 		],
 		"cgl": "@composer -d Tests/CGL --",
 		"test": "@test:unit",
-		"test:coverage": "phpunit -c phpunit.xml",
+		"test:coverage": [
+			"@test:coverage:unit",
+			"@test:coverage:functional",
+			"@test:coverage:merge"
+		],
+		"test:coverage:functional": "phpunit -c phpunit.functional.xml --coverage-php .Build/coverage/functional.cov",
+		"test:coverage:merge": "@php Tests/Coverage/merge.php",
+		"test:coverage:unit": "phpunit -c phpunit.xml --coverage-php .Build/coverage/unit.cov",
 		"test:functional": "phpunit -c phpunit.functional.xml",
 		"test:unit": "phpunit -c phpunit.xml --no-coverage"
 	}

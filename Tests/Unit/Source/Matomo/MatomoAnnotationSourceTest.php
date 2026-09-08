@@ -125,4 +125,36 @@ final class MatomoAnnotationSourceTest extends TestCase
         self::assertSame('range', $calls[0]['period']);
         self::assertSame('2026-08-01,2026-08-07', $calls[0]['date']);
     }
+
+    public function testFetchYieldsNothingWhenTheSiteKeyDoesNotHoldAList(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
+        $this->apiClient->method('request')->willReturn(['3' => 'no annotations']);
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+
+        self::assertSame([], iterator_to_array($this->subject->fetch($this->site, $range)));
+    }
+
+    public function testFetchSkipsRowsThatAreMalformedOrLackAUsableId(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
+        $this->apiClient->method('request')->willReturn([
+            '3' => [
+                'not-a-row',
+                ['date' => '2026-08-02'],
+                ['date' => 20260802, 'note' => 'Numeric date', 'id' => 1],
+                ['date' => '2026-08-03', 'note' => 'No id at all'],
+                ['date' => '2026-08-04', 'note' => 'Array id', 'id' => ['nested']],
+                ['date' => '2026-08-05', 'note' => 'Kept', 'id' => 7],
+            ],
+        ]);
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+        $annotations = iterator_to_array($this->subject->fetch($this->site, $range), false);
+
+        self::assertCount(1, $annotations);
+        self::assertSame('7', $annotations[0]->id);
+        self::assertSame('Kept', $annotations[0]->text);
+    }
 }

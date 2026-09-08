@@ -104,8 +104,8 @@ final class SiteMatcher
         }
 
         return array_values(array_map(
-            static fn (string $host): string => strtolower($host),
-            array_filter($hosts, 'is_string'),
+            strtolower(...),
+            array_filter($hosts, is_string(...)),
         ));
     }
 }

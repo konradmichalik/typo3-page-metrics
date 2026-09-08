@@ -27,10 +27,10 @@ use TYPO3\CMS\Core\Site\SiteFinder;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class AnnotationSiteItemsProcFunc
+final readonly class AnnotationSiteItemsProcFunc
 {
     public function __construct(
-        private readonly SiteFinder $siteFinder,
+        private SiteFinder $siteFinder,
     ) {}
 
     /**

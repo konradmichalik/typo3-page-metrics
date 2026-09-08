@@ -135,4 +135,56 @@ final class SiteConfigurationReaderTest extends TestCase
 
         $this->subject->read($site);
     }
+
+    public function testThrowsWhenPageMetricsIsNotAMapping(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => 'yes please',
+        ]);
+
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionCode(1756000000);
+
+        $this->subject->read($site);
+    }
+
+    public function testThrowsWhenSourcesIsNotAMapping(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true, 'sources' => 'matomo'],
+        ]);
+
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionCode(1756000002);
+
+        $this->subject->read($site);
+    }
+
+    public function testThrowsWhenResolutionIsNotAMapping(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true, 'resolution' => 'strict'],
+        ]);
+
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionCode(1756000003);
+
+        $this->subject->read($site);
+    }
+
+    public function testThrowsWhenDropQueryStringIsNotBoolean(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true, 'resolution' => ['dropQueryString' => 'nope']],
+        ]);
+
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionCode(1756000004);
+
+        $this->subject->read($site);
+    }
 }

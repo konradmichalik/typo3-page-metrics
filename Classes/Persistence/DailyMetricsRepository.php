@@ -116,60 +116,11 @@ class DailyMetricsRepository
     }
 
     /**
-     * The highest-value pages for $metric over $range, summed across the
-     * whole range rather than per day - the "most viewed pages" widget's
-     * data source.
-     *
-     * @param list<int> $pageUids
-     *
-     * @return array<int, int> page_uid => summed value, ordered highest first
-     */
-    public function topPages(array $pageUids, int $languageUid, string $metric, DateRange $range, int $limit): array
-    {
-        if ([] === $pageUids) {
-            return [];
-        }
-
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
-        $rows = $queryBuilder
-            ->select('page_uid')
-            ->addSelectLiteral('SUM('.$queryBuilder->quoteIdentifier('value').') AS total')
-            ->from(self::TABLE)
-            ->where(
-                $queryBuilder->expr()->in('page_uid', $queryBuilder->createNamedParameter($pageUids, Connection::PARAM_INT_ARRAY)),
-                $queryBuilder->expr()->eq('sys_language_uid', $queryBuilder->createNamedParameter($languageUid, ParameterType::INTEGER)),
-                $queryBuilder->expr()->eq('metric', $queryBuilder->createNamedParameter($metric)),
-                $queryBuilder->expr()->eq('dimension', $queryBuilder->createNamedParameter('')),
-                $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($range->from->format('Y-m-d'))),
-                $queryBuilder->expr()->lte('date', $queryBuilder->createNamedParameter($range->until->format('Y-m-d'))),
-            )
-            ->groupBy('page_uid')
-            ->orderBy('total', 'DESC')
-            ->setMaxResults($limit)
-            ->executeQuery()
-            ->fetchAllAssociative();
-
-        $topPages = [];
-        foreach ($rows as $row) {
-            $value = (int) $row['total'];
-
-            if ($value <= 0) {
-                continue;
-            }
-
-            $topPages[(int) $row['page_uid']] = $value;
-        }
-
-        return $topPages;
-    }
-
-    /**
      * The summed value per page over $range, with no ordering, limit or
-     * positive-value filter - unlike topPages(), this is meant to be
-     * combined with a second call for a different range so the caller can
-     * compute a per-page trend (the "trend" widget's data source), where a
-     * page dropping to zero is exactly the interesting case a positive-only
-     * filter would hide.
+     * positive-value filter, so it can be combined with a second call for a
+     * different range and let the caller compute a per-page trend (the
+     * "trend" widget's data source), where a page dropping to zero is
+     * exactly the interesting case a positive-only filter would hide.
      *
      * @param list<int> $pageUids
      *

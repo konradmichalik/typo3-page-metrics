@@ -100,4 +100,34 @@ final class SiteMatcherTest extends TestCase
 
         self::assertNull($this->matcher->match('https://example.com/subfoo', [$site]));
     }
+
+    public function testReturnsNullForAUrlWithoutAHost(): void
+    {
+        $site = new Site('main', 1, ['base' => 'https://example.com/']);
+
+        self::assertNull($this->matcher->match('/no-host-here', [$site]));
+    }
+
+    public function testMatchesSiteByALanguageBaseOnADifferentHostThanTheSiteBase(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'languages' => [
+                ['languageId' => 0, 'locale' => 'de_DE.UTF-8', 'base' => 'https://example.com/'],
+                ['languageId' => 1, 'locale' => 'fr_FR.UTF-8', 'base' => 'https://example.fr/'],
+            ],
+        ]);
+
+        self::assertSame($site, $this->matcher->match('https://example.fr/page', [$site]));
+    }
+
+    public function testIgnoresAdditionalHostsThatAreNotAList(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['resolution' => ['additionalHosts' => 'www.example.com']],
+        ]);
+
+        self::assertNull($this->matcher->match('https://www.example.com/page', [$site]));
+    }
 }

@@ -115,7 +115,7 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
 
         $parts = [
             $languageService->sL($this->configuration->getTitle()),
-            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.setting.level.'.(null !== $level ? $level : 'all')),
+            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.setting.level.'.($level ?? 'all')),
         ];
 
         if (null !== $level && $includeSubpages) {
