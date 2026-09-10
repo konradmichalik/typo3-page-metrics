@@ -268,6 +268,28 @@
     cursor: crosshair;
 }
 
+.pagemetrics-sparkline-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 6px;
+    font-size: 0.75rem;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-sparkline-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.pagemetrics-sparkline-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
 /* The compact chart widget registration (height: small, a single 200px
    dashboard row) doesn't have room for the full-size sparkline above -
    scales it down instead of letting the card scroll. */
@@ -452,6 +474,12 @@
 
 .pagemetrics-sparkline-tooltip-above {
     transform: translate(-50%, -100%) translateY(-6px);
+}
+
+.pagemetrics-sparkline-tooltip-heading {
+    margin-bottom: 3px;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 .pagemetrics-sparkline-tooltip-value {

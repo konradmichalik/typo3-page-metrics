@@ -72,12 +72,14 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertInstanceOf(PageMetricsChartWidget::class, $widget);
 
         $definitions = $widget->getSettingsDefinitions();
-        self::assertCount(2, $definitions);
+        self::assertCount(3, $definitions);
         self::assertSame('metric', $definitions[0]->key);
         self::assertArrayHasKey('matomo.pageviews', $definitions[0]->enum);
         self::assertArrayHasKey('matomo.bounce_rate', $definitions[0]->enum);
-        self::assertSame('period', $definitions[1]->key);
-        self::assertArrayHasKey(30, $definitions[1]->enum);
+        self::assertSame('metric2', $definitions[1]->key);
+        self::assertArrayHasKey('matomo.pageviews', $definitions[1]->enum);
+        self::assertSame('period', $definitions[2]->key);
+        self::assertArrayHasKey(30, $definitions[2]->enum);
     }
 
     public function testChartWidgetMetricSettingOnlyOffersMetricsFromConfiguredSources(): void
@@ -120,6 +122,56 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringNotContainsString('Page views', (string) $result->label);
     }
 
+    public function testChartWidgetOverlaysAdditionalMetricsWhenConfigured(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 42);
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.visits', 7);
+
+        $result = $this->renderChartWidgetResult(['metric2' => 'matomo.visits']);
+
+        self::assertStringContainsString('Page views + Visits', (string) $result->label);
+
+        preg_match('/data-sparkline="([^"]*)"/', $result->content, $matches);
+        $series = json_decode(html_entity_decode($matches[1] ?? ''), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertCount(2, $series);
+        self::assertSame('Page views', $series[0]['label']);
+        self::assertSame('Visits', $series[1]['label']);
+        self::assertSame(7, $series[1]['values'][$today->format('Y-m-d')]);
+    }
+
+    /**
+     * The legend itself is built client-side in sparkline.js's
+     * initializeStaticCharts() from however many series data-sparkline
+     * carries - nothing to assert on server-rendered markup here, only that
+     * a single, unconfigured widget still only ever emits its one primary
+     * series.
+     */
+    public function testChartWidgetEmitsOnlyThePrimarySeriesByDefault(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 42);
+
+        $content = $this->renderChartWidget([]);
+
+        preg_match('/data-sparkline="([^"]*)"/', $content, $matches);
+        $series = json_decode(html_entity_decode($matches[1] ?? ''), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertCount(1, $series);
+        self::assertSame('Page views', $series[0]['label']);
+    }
+
+    public function testChartWidgetIgnoresAnUnsupportedSecondMetric(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 42);
+
+        $result = $this->renderChartWidgetResult(['metric2' => 'ga4.sessions']);
+
+        self::assertStringContainsString('Page views', (string) $result->label);
+        self::assertStringNotContainsString('+', (string) $result->label);
+    }
+
     public function testChartWidgetRespectsTheConfiguredPeriod(): void
     {
         $this->writeSiteConfiguration();
@@ -130,7 +182,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         preg_match('/data-sparkline="([^"]*)"/', $content, $matches);
         $raw = $matches[1] ?? self::fail('data-sparkline attribute not found in widget content');
         $series = json_decode(html_entity_decode($raw), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertCount(7, $series);
+        self::assertCount(7, $series[0]['values']);
     }
 
     public function testChartWidgetCanPlotARateMetric(): void

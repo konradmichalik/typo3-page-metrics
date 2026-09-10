@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, SiteMetricsOverview};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, SiteMetricsOverview};
 use KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Localization\LanguageService;
@@ -60,6 +60,8 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
      */
     public function getSettingsDefinitions(): array
     {
+        $availableMetrics = $this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites());
+
         return [
             new SettingDefinition(
                 'metric',
@@ -70,7 +72,19 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
                 false,
                 [
                     '' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric.auto',
-                    ...$this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites()),
+                    ...$availableMetrics,
+                ],
+            ),
+            new SettingDefinition(
+                'metric2',
+                'string',
+                '',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric2.label',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric2.description',
+                false,
+                [
+                    '' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric.none',
+                    ...$availableMetrics,
                 ],
             ),
             new SettingDefinition(
@@ -92,9 +106,11 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
     public function renderWidget(WidgetContext $context): WidgetResult
     {
         $metric = (string) $context->settings->get('metric');
+        $metric2 = (string) $context->settings->get('metric2');
+        $additionalMetrics = '' !== $metric2 ? [$metric2] : [];
         $period = (int) $context->settings->get('period');
         $period = in_array($period, self::PERIOD_OPTIONS, true) ? $period : 30;
-        $overviews = $this->collectOverviews($metric, $period);
+        $overviews = $this->collectOverviews($metric, $additionalMetrics, $period);
 
         $view = $this->backendViewFactory->create($context->request, ['konradmichalik/typo3-page-metrics', 'typo3/cms-dashboard']);
         $view->assignMultiple([
@@ -126,14 +142,14 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
      * The registered widget title alone doesn't tell two chart widgets with
      * different settings apart on the dashboard - appending the resolved
      * period, and (for a single-site widget) that site's resolved metric
-     * name, makes the settings a user picked visible without opening the
-     * settings dialog. Reads the metric name off the overview itself rather
-     * than the raw "metric" setting: a configured metric the site's source
-     * doesn't support falls back to the primary metric (see build()), and
-     * the label needs to reflect what's actually plotted, not what was
-     * asked for. A multi-site widget keeps its per-site labels in the
-     * content instead, since different sites can resolve to different
-     * metrics.
+     * name(s), makes the settings a user picked visible without opening the
+     * settings dialog. Reads the metric name(s) off the overview itself
+     * rather than the raw "metric"/"metric2" settings: a configured metric
+     * the site's source doesn't support falls back to the primary metric or
+     * is dropped (see build()), and the label needs to reflect what's
+     * actually plotted, not what was asked for. A multi-site widget keeps
+     * its per-site labels in the content instead, since different sites can
+     * resolve to different metrics.
      *
      * @param list<SiteMetricsOverview> $overviews
      */
@@ -146,7 +162,9 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
         ];
 
         if (1 === count($overviews)) {
-            $parts[] = $overviews[0]->chartLabel;
+            $overview = $overviews[0];
+            $metricLabels = [$overview->chartLabel, ...array_map(static fn (ChartSeries $series): string => $series->label, $overview->additionalChartSeries)];
+            $parts[] = implode(' + ', $metricLabels);
         }
 
         return implode(' · ', $parts);
@@ -158,14 +176,16 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
     }
 
     /**
+     * @param list<string> $additionalMetricIdentifiers
+     *
      * @return list<SiteMetricsOverview>
      */
-    private function collectOverviews(string $preferredMetricIdentifier, int $periodDays): array
+    private function collectOverviews(string $preferredMetricIdentifier, array $additionalMetricIdentifiers, int $periodDays): array
     {
         $result = [];
 
         foreach ($this->siteFinder->getAllSites() as $site) {
-            $overview = $this->overviewBuilder->build($site, 0, $periodDays, $preferredMetricIdentifier);
+            $overview = $this->overviewBuilder->build($site, 0, $periodDays, $preferredMetricIdentifier, $additionalMetricIdentifiers);
 
             if (!$overview->hasSource) {
                 continue;
@@ -202,6 +222,17 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
                     static fn (Annotation $annotation): array => ['date' => $annotation->date->format('Y-m-d'), 'text' => $annotation->text],
                     $overview->annotations,
                 ),
+                // The primary series first, so the JS always draws it as
+                // index 0 (relevant for e.g. picking which series still
+                // gets an area fill in the single-series case) - see
+                // initializeStaticCharts() in sparkline.js.
+                'series' => [
+                    ['label' => $overview->chartLabel, 'color' => $overview->chartColor, 'unit' => $overview->chartUnit->value, 'values' => $overview->chartSeries],
+                    ...array_map(
+                        static fn (ChartSeries $series): array => ['label' => $series->label, 'color' => $series->color, 'unit' => $series->unit->value, 'values' => $series->series],
+                        $overview->additionalChartSeries,
+                    ),
+                ],
             ],
             $overviews,
         )];

@@ -66,6 +66,56 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
         self::assertSame('Page views', $overview->chartLabel);
     }
 
+    public function testAdditionalChartSeriesAreBuiltForEachRequestedMetric(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.visits', 4);
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7, null, ['matomo.visits']);
+
+        self::assertCount(1, $overview->additionalChartSeries);
+        self::assertSame('Visits', $overview->additionalChartSeries[0]->label);
+        self::assertSame(4, $overview->additionalChartSeries[0]->series[$today->format('Y-m-d')]);
+    }
+
+    public function testAdditionalChartSeriesSupportsARateMetric(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.entry_bounces', 3);
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.entries', 4);
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7, null, ['matomo.bounce_rate']);
+
+        self::assertSame('Bounce rate', $overview->additionalChartSeries[0]->label);
+        self::assertSame(75, $overview->additionalChartSeries[0]->series[$today->format('Y-m-d')]);
+    }
+
+    public function testAdditionalChartSeriesDropsUnknownAndDuplicateIdentifiers(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.visits', 4);
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7, null, ['matomo.visits', 'matomo.visits', 'ga4.sessions']);
+
+        self::assertCount(1, $overview->additionalChartSeries);
+    }
+
+    public function testAdditionalChartSeriesIsEmptyWhenNoSiteConfigurationExists(): void
+    {
+        $this->writeSiteConfigurationWithoutSource();
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 30, null, ['matomo.visits']);
+
+        self::assertSame([], $overview->additionalChartSeries);
+    }
+
     public function testTopPagesAreRankedHighestFirstWithResolvedTitles(): void
     {
         $this->writeSiteConfiguration();

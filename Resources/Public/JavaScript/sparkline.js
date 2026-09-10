@@ -660,6 +660,264 @@ document.querySelectorAll('.pagemetrics-header-placeholder').forEach((container)
   loadTiles(container, container.dataset.period || '30', container.dataset.includeSubpages === '1');
 });
 
+// Linear-interpolated percentile of an already-sorted array, used by
+// scaleBounds() below to find a robust (outlier-tolerant) [low, high] pair
+// instead of the plain min/max - see the comment there for why.
+function percentile(sortedValues, p) {
+  if (sortedValues.length === 1) {
+    return sortedValues[0];
+  }
+
+  const index = p * (sortedValues.length - 1);
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+
+  return sortedValues[lower] + (sortedValues[upper] - sortedValues[lower]) * (index - lower);
+}
+
+// The 5th/95th percentile rather than the plain min/max: a single extreme
+// day (most often "today", still an incomplete/partial import - a rate
+// metric like "Avg. time on page" falls back to 0 when its denominator is
+// still 0, see computeRatio() in SiteMetricsOverviewBuilder.php) would
+// otherwise stretch that one outlier across the whole chart height and
+// squash every other, actually-typical day into a barely-visible sliver at
+// the opposite end. Values outside the percentile band still get plotted -
+// see the y-coordinate clamp below - just clipped to the top/bottom edge
+// instead of driving the whole scale.
+function scaleBounds(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const low = percentile(sorted, 0.05);
+  const high = percentile(sorted, 0.95);
+
+  // Degenerates back to the plain min/max when the percentile band is flat
+  // (e.g. very short periods, or a series that barely varies) - a zero
+  // range would otherwise hide every point at the same edge.
+  return low === high ? [sorted[0], sorted[sorted.length - 1]] : [low, high];
+}
+
+// Each series is scaled against its own range rather than a shared
+// [0, max]: metrics like "Visits" and "Bounce rate" live on wildly
+// different scales, and overlaying them is about comparing shape/trend
+// over time, not reading them off one shared axis. For a single series
+// this is the same tight-range behaviour the chart always had, just
+// outlier-tolerant now (see scaleBounds()).
+function computePlottedSeries(seriesList, dates, step) {
+  return seriesList.map((series) => {
+    const values = dates.map((date) => series.values[date] ?? 0);
+    const [low, high] = scaleBounds(values);
+    const range = high - low || 1;
+    const points = values.map((value, index) => {
+      const fraction = Math.min(1, Math.max(0, (value - low) / range));
+      return [index * step, SPARKLINE_HEIGHT - fraction * SPARKLINE_HEIGHT];
+    });
+    return { ...series, values, points };
+  });
+}
+
+function renderSeriesLines(svg, plotted, width) {
+  const isMultiSeries = plotted.length > 1;
+
+  // The area fill only makes sense for a single line - overlaid, it would
+  // just muddy the overlap between series - so it's kept for the (still
+  // most common) single-metric case only.
+  if (!isMultiSeries) {
+    const [series] = plotted;
+    const area = document.createElementNS(SVG_NS, 'polygon');
+    const areaPoints = [...series.points, [width, SPARKLINE_HEIGHT], [0, SPARKLINE_HEIGHT]];
+    area.setAttribute('points', areaPoints.map((point) => point.join(',')).join(' '));
+    area.setAttribute('fill', 'currentColor');
+    area.setAttribute('fill-opacity', '0.2');
+    area.setAttribute('stroke', 'none');
+    svg.appendChild(area);
+  }
+
+  plotted.forEach((series) => {
+    const polyline = document.createElementNS(SVG_NS, 'polyline');
+    polyline.setAttribute('points', series.points.map((point) => point.join(',')).join(' '));
+    polyline.setAttribute('fill', 'none');
+    // A single series still relies on the surrounding --pm-accent CSS
+    // custom property (currentColor) rather than its own color, so it
+    // keeps picking up the compact/trend-direction color overrides other
+    // rules apply to that property (see page-metrics.css) instead of only
+    // ever drawing in the metric's own fixed color.
+    polyline.setAttribute('stroke', isMultiSeries ? series.color : 'currentColor');
+    polyline.setAttribute('stroke-width', '1');
+    polyline.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.appendChild(polyline);
+  });
+}
+
+// Same dashed annotation markers as the tile sparkline (see
+// buildSparklineSvg() above) - the list is embedded on this same element
+// rather than looked up via getAnnotations()/closest(), since this chart
+// has no surrounding .pagemetrics-tiles container. Returns the parsed
+// date => text map so the tooltip (built later, see attachChartInteractivity())
+// can look up the hovered date's annotation without re-parsing it.
+function renderAnnotationMarkers(svg, container, dates, step) {
+  const annotationTextByDate = new Map(JSON.parse(container.dataset.annotations || '[]').map((annotation) => [annotation.date, annotation.text]));
+
+  annotationTextByDate.forEach((text, date) => {
+    const index = dates.indexOf(date);
+    if (index === -1) {
+      return;
+    }
+
+    const x = index * step;
+    const marker = document.createElementNS(SVG_NS, 'line');
+    marker.setAttribute('x1', x);
+    marker.setAttribute('x2', x);
+    marker.setAttribute('y1', '0');
+    marker.setAttribute('y2', String(SPARKLINE_HEIGHT));
+    marker.setAttribute('class', 'pagemetrics-sparkline-annotation');
+    marker.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.appendChild(marker);
+  });
+
+  return annotationTextByDate;
+}
+
+// One position marker per series - with a single series this is exactly
+// the same lone dot the chart always drew.
+function buildSeriesMarkers(plotted) {
+  const isMultiSeries = plotted.length > 1;
+
+  return plotted.map((series) => {
+    const marker = document.createElement('div');
+    marker.className = 'pagemetrics-sparkline-marker';
+    marker.hidden = true;
+    if (isMultiSeries) {
+      marker.style.background = series.color;
+    }
+    return marker;
+  });
+}
+
+// The tooltip's DOM skeleton - a heading (shown only once there's more than
+// one series, to carry the hovered date since the per-series rows show
+// their label instead - see attachChartInteractivity()), one value row per
+// series, and a trailing annotation row. Everything here starts empty and
+// is filled in on each mousemove.
+function buildTooltip(plotted) {
+  const isMultiSeries = plotted.length > 1;
+
+  const tooltip = document.createElement('div');
+  tooltip.className = 'pagemetrics-sparkline-tooltip';
+  tooltip.hidden = true;
+
+  const heading = document.createElement('div');
+  heading.className = 'pagemetrics-sparkline-tooltip-heading';
+  heading.hidden = !isMultiSeries;
+  tooltip.appendChild(heading);
+
+  const values = plotted.map(() => {
+    const row = document.createElement('div');
+    row.className = 'pagemetrics-sparkline-tooltip-value';
+    tooltip.appendChild(row);
+    return row;
+  });
+
+  const annotation = document.createElement('div');
+  annotation.className = 'pagemetrics-sparkline-tooltip-annotation';
+  tooltip.appendChild(annotation);
+
+  return { tooltip, heading, values, annotation };
+}
+
+// Wires up hover interactivity: on mousemove, positions every series'
+// marker and fills in the shared tooltip for whichever date the cursor is
+// nearest to; on mouseleave, hides all of it again.
+function attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotationTextByDate, dates, step, width }) {
+  const { tooltip, heading, values: tooltipValues, annotation: tooltipAnnotation } = tooltipParts;
+  const isMultiSeries = plotted.length > 1;
+
+  svg.addEventListener('mousemove', (event) => {
+    const rect = svg.getBoundingClientRect();
+    const relativeX = ((event.clientX - rect.left) / rect.width) * width;
+    const index = Math.max(0, Math.min(dates.length - 1, step > 0 ? Math.round(relativeX / step) : 0));
+    const date = dates[index];
+    const centerX = ((index * step) / width) * rect.width;
+    let centerY = rect.height / 2;
+
+    plotted.forEach((series, seriesIndex) => {
+      const [, y] = series.points[index];
+      const markerCenterY = (y / SPARKLINE_HEIGHT) * rect.height;
+      markers[seriesIndex].style.left = `${centerX}px`;
+      markers[seriesIndex].style.top = `${markerCenterY}px`;
+      markers[seriesIndex].hidden = false;
+
+      const tooltipPrefix = isMultiSeries ? series.label : date;
+      tooltipValues[seriesIndex].textContent = `${tooltipPrefix}: ${formatValueForUnit(series.values[index], series.unit)}`;
+
+      if (0 === seriesIndex) {
+        centerY = markerCenterY;
+      }
+    });
+
+    heading.textContent = date;
+
+    const annotationText = annotationTextByDate.get(date);
+    tooltipAnnotation.textContent = annotationText ?? '';
+    tooltipAnnotation.hidden = !annotationText;
+    tooltip.hidden = false;
+    tooltip.style.top = `${centerY}px`;
+
+    // Below the cursor by default (see .pagemetrics-sparkline-tooltip),
+    // but a hover point near the chart's own bottom edge - the most common
+    // case with a multi-series tooltip, which is taller than the
+    // single-value one this chart used to only ever show - pushes it past
+    // the widget card's bottom, off-screen until the page is scrolled.
+    // Flip to above only when that would actually happen, mirroring
+    // PageMetricsTile's own popover-edge clamping above.
+    //
+    // Always measured from the default "below" state, never from whatever
+    // class the previous mousemove event left behind - checking against
+    // last frame's already-flipped position turns this into a feedback
+    // loop (each frame's verdict based on the other position), which reads
+    // as the tooltip flickering between above/below on every move instead
+    // of settling.
+    tooltip.classList.remove('pagemetrics-sparkline-tooltip-above');
+    const overflowsBelow = tooltip.getBoundingClientRect().bottom > container.getBoundingClientRect().bottom;
+    tooltip.classList.toggle('pagemetrics-sparkline-tooltip-above', overflowsBelow);
+
+    const halfTooltipWidth = tooltip.offsetWidth / 2;
+    const clampedX = Math.min(Math.max(centerX, halfTooltipWidth), rect.width - halfTooltipWidth);
+    tooltip.style.left = `${clampedX}px`;
+  });
+
+  svg.addEventListener('mouseleave', () => {
+    markers.forEach((marker) => {
+      marker.hidden = true;
+    });
+    tooltip.hidden = true;
+  });
+}
+
+// The color-dot + label row shown under the chart once there's more than
+// one series to disambiguate - a single series already carries its label
+// in the widget's own heading, so there's nothing to add here.
+function buildLegend(plotted) {
+  if (plotted.length <= 1) {
+    return null;
+  }
+
+  const legend = document.createElement('div');
+  legend.className = 'pagemetrics-sparkline-legend';
+
+  plotted.forEach((series) => {
+    const dot = document.createElement('span');
+    dot.className = 'pagemetrics-sparkline-legend-dot';
+    dot.style.background = series.color;
+
+    const item = document.createElement('div');
+    item.className = 'pagemetrics-sparkline-legend-item';
+    item.appendChild(dot);
+    item.appendChild(document.createTextNode(series.label));
+    legend.appendChild(item);
+  });
+
+  return legend;
+}
+
 // The dashboard chart widget's markup is static (server-rendered, no AJAX
 // reload/popover like the tile), so it only needs the same SVG-building
 // math as PageMetricsTile.buildSparklineSvg() - not the click/popover
@@ -670,122 +928,38 @@ function initializeStaticCharts(root) {
   root.querySelectorAll('.pagemetrics-widget-chart:not([data-initialized])').forEach((container) => {
     container.dataset.initialized = 'true';
 
-    const data = JSON.parse(container.dataset.sparkline || '{}');
-    const entries = Object.entries(data);
-    if (entries.length === 0) {
+    const seriesList = JSON.parse(container.dataset.sparkline || '[]');
+    const dates = seriesList.length > 0 ? Object.keys(seriesList[0].values) : [];
+    if (dates.length === 0) {
       return;
     }
 
-    const values = entries.map(([, value]) => value);
-    // Scaled against the data's own [min, max] rather than [0, max]: this
-    // chart is the widget's only content (unlike the tile's popover
-    // sparkline, shown alongside an exact numeric value), so a tight
-    // real-world range - e.g. 800-950 pageviews/day - should fill the
-    // chart's height instead of reading as a nearly flat line pinned near
-    // the top of a 0-based axis.
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
     const width = SPARKLINE_WIDTH * 3;
-    const step = entries.length > 1 ? width / (entries.length - 1) : 0;
-    const points = entries.map(([, value], index) => [index * step, SPARKLINE_HEIGHT - ((value - min) / range) * SPARKLINE_HEIGHT]);
+    const step = dates.length > 1 ? width / (dates.length - 1) : 0;
+    const plotted = computePlottedSeries(seriesList, dates, step);
 
     const svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${width} ${SPARKLINE_HEIGHT}`);
     svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('class', 'pagemetrics-sparkline');
+    renderSeriesLines(svg, plotted, width);
+    const annotationTextByDate = renderAnnotationMarkers(svg, container, dates, step);
 
-    const area = document.createElementNS(SVG_NS, 'polygon');
-    const areaPoints = [...points, [width, SPARKLINE_HEIGHT], [0, SPARKLINE_HEIGHT]];
-    area.setAttribute('points', areaPoints.map((point) => point.join(',')).join(' '));
-    area.setAttribute('fill', 'currentColor');
-    area.setAttribute('fill-opacity', '0.2');
-    area.setAttribute('stroke', 'none');
-    svg.appendChild(area);
-
-    const polyline = document.createElementNS(SVG_NS, 'polyline');
-    polyline.setAttribute('points', points.map((point) => point.join(',')).join(' '));
-    polyline.setAttribute('fill', 'none');
-    polyline.setAttribute('stroke', 'currentColor');
-    polyline.setAttribute('stroke-width', '1');
-    polyline.setAttribute('vector-effect', 'non-scaling-stroke');
-    svg.appendChild(polyline);
-
-    // Same dashed annotation markers as the tile sparkline (see
-    // buildSparklineSvg() above) - the list is embedded on this same
-    // element rather than looked up via getAnnotations()/closest(), since
-    // this chart has no surrounding .pagemetrics-tiles container.
-    const annotationTextByDate = new Map(JSON.parse(container.dataset.annotations || '[]').map((annotation) => [annotation.date, annotation.text]));
-
-    annotationTextByDate.forEach((text, date) => {
-      const index = entries.findIndex(([entryDate]) => entryDate === date);
-      if (index === -1) {
-        return;
-      }
-
-      const [x] = points[index];
-      const marker = document.createElementNS(SVG_NS, 'line');
-      marker.setAttribute('x1', x);
-      marker.setAttribute('x2', x);
-      marker.setAttribute('y1', '0');
-      marker.setAttribute('y2', String(SPARKLINE_HEIGHT));
-      marker.setAttribute('class', 'pagemetrics-sparkline-annotation');
-      marker.setAttribute('vector-effect', 'non-scaling-stroke');
-      svg.appendChild(marker);
-    });
-
-    const marker = document.createElement('div');
-    marker.className = 'pagemetrics-sparkline-marker';
-    marker.hidden = true;
-
-    const tooltip = document.createElement('div');
-    tooltip.className = 'pagemetrics-sparkline-tooltip';
-    tooltip.hidden = true;
-
-    const tooltipValue = document.createElement('div');
-    tooltipValue.className = 'pagemetrics-sparkline-tooltip-value';
-    tooltip.appendChild(tooltipValue);
-
-    const tooltipAnnotation = document.createElement('div');
-    tooltipAnnotation.className = 'pagemetrics-sparkline-tooltip-annotation';
-    tooltip.appendChild(tooltipAnnotation);
-
-    svg.addEventListener('mousemove', (event) => {
-      const rect = svg.getBoundingClientRect();
-      const relativeX = ((event.clientX - rect.left) / rect.width) * width;
-      const index = Math.max(0, Math.min(entries.length - 1, step > 0 ? Math.round(relativeX / step) : 0));
-      const [date, value] = entries[index];
-      const [x, y] = points[index];
-
-      const centerX = (x / width) * rect.width;
-      const centerY = (y / SPARKLINE_HEIGHT) * rect.height;
-
-      marker.style.left = `${centerX}px`;
-      marker.style.top = `${centerY}px`;
-      marker.hidden = false;
-
-      const annotationText = annotationTextByDate.get(date);
-      tooltipValue.textContent = `${date}: ${formatValueForUnit(value, container.dataset.unit)}`;
-      tooltipAnnotation.textContent = annotationText ?? '';
-      tooltipAnnotation.hidden = !annotationText;
-      tooltip.hidden = false;
-
-      const halfTooltipWidth = tooltip.offsetWidth / 2;
-      const clampedX = Math.min(Math.max(centerX, halfTooltipWidth), rect.width - halfTooltipWidth);
-      tooltip.style.left = `${clampedX}px`;
-      tooltip.style.top = `${centerY}px`;
-    });
-
-    svg.addEventListener('mouseleave', () => {
-      marker.hidden = true;
-      tooltip.hidden = true;
-    });
+    const markers = buildSeriesMarkers(plotted);
+    const tooltipParts = buildTooltip(plotted);
+    attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotationTextByDate, dates, step, width });
 
     const wrapper = document.createElement('div');
     wrapper.className = 'pagemetrics-sparkline-wrapper';
     wrapper.appendChild(svg);
-    wrapper.appendChild(marker);
-    wrapper.appendChild(tooltip);
+    markers.forEach((marker) => wrapper.appendChild(marker));
+    wrapper.appendChild(tooltipParts.tooltip);
+
+    const legend = buildLegend(plotted);
+    if (legend) {
+      container.appendChild(legend);
+    }
+
     container.appendChild(wrapper);
   });
 }

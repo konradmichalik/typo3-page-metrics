@@ -29,10 +29,11 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 final readonly class SiteMetricsOverview
 {
     /**
-     * @param array<string, int>         $chartSeries    Y-m-d => summed value, covers the same period as topPages/unresolvedUrls
+     * @param array<string, int>         $chartSeries           Y-m-d => summed value, covers the same period as topPages/unresolvedUrls
      * @param list<TopPage>              $topPages
      * @param list<UnresolvedUrlSummary> $unresolvedUrls
      * @param list<Annotation>           $annotations
+     * @param list<ChartSeries>          $additionalChartSeries metrics overlaid on the chart alongside the primary one (see PageMetricsChartWidget's metric2 setting) - empty for every other site-metrics widget
      */
     public function __construct(
         public Site $site,
@@ -45,5 +46,6 @@ final readonly class SiteMetricsOverview
         public array $topPages,
         public array $unresolvedUrls,
         public array $annotations,
+        public array $additionalChartSeries = [],
     ) {}
 }

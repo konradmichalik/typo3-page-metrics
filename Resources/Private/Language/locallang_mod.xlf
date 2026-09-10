@@ -63,6 +63,15 @@
             <trans-unit id="widget.chart.setting.metric.auto" resname="widget.chart.setting.metric.auto">
                 <source>Automatic (site's primary metric)</source>
             </trans-unit>
+            <trans-unit id="widget.chart.setting.metric.none" resname="widget.chart.setting.metric.none">
+                <source>None</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.setting.metric2.label" resname="widget.chart.setting.metric2.label">
+                <source>Second metric</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.setting.metric2.description" resname="widget.chart.setting.metric2.description">
+                <source>An optional second metric, overlaid on the same chart for comparison.</source>
+            </trans-unit>
             <trans-unit id="widget.chart.setting.period.label" resname="widget.chart.setting.period.label">
                 <source>Period</source>
             </trans-unit>

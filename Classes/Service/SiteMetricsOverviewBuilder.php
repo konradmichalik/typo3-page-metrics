@@ -15,11 +15,12 @@ namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection, UnresolvedReason};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
+use function in_array;
 use function sprintf;
 use function ucfirst;
 
@@ -56,7 +57,10 @@ final readonly class SiteMetricsOverviewBuilder
         private iterable $sources,
     ) {}
 
-    public function build(Site $site, int $languageId, int $periodDays, ?string $preferredMetricIdentifier = null): SiteMetricsOverview
+    /**
+     * @param list<string> $additionalMetricIdentifiers overlaid on the chart alongside $preferredMetricIdentifier (see PageMetricsChartWidget's metric2 setting) - an identifier not belonging to this site's own source is silently dropped, the same fallback buildAdditionalChartSeries() already applies to $preferredMetricIdentifier
+     */
+    public function build(Site $site, int $languageId, int $periodDays, ?string $preferredMetricIdentifier = null, array $additionalMetricIdentifiers = []): SiteMetricsOverview
     {
         $source = $this->resolveSource($site);
 
@@ -81,6 +85,7 @@ final readonly class SiteMetricsOverviewBuilder
             $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT),
             $this->buildUnresolvedUrls($site),
             $this->buildAnnotations($site->getIdentifier(), $currentRange),
+            $this->buildAdditionalChartSeries($source, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange),
         );
     }
 
@@ -297,6 +302,41 @@ final readonly class SiteMetricsOverviewBuilder
         $series = [];
         foreach ($numerator as $date => $numeratorValue) {
             $series[$date] = $this->computeRatio($numeratorValue, $denominator[$date] ?? 0, $metric->unit);
+        }
+
+        return $series;
+    }
+
+    /**
+     * Resolves each of $metricIdentifiers against $source the same way the
+     * primary chart metric is resolved (see resolveChartMetric()) - an
+     * identifier not belonging to this site's own source, or a duplicate of
+     * one already resolved, is silently dropped rather than surfaced as an
+     * error, matching the existing single-metric fallback behaviour.
+     *
+     * @param list<string> $metricIdentifiers
+     * @param list<int>    $pageUids
+     *
+     * @return list<ChartSeries>
+     */
+    private function buildAdditionalChartSeries(MetricSourceInterface $source, array $metricIdentifiers, array $pageUids, int $languageId, DateRange $range): array
+    {
+        $series = [];
+        $seenIdentifiers = [];
+
+        foreach ($metricIdentifiers as $identifier) {
+            if (in_array($identifier, $seenIdentifiers, true)) {
+                continue;
+            }
+
+            $metric = $this->resolveChartMetric($source, $identifier);
+
+            if (null === $metric) {
+                continue;
+            }
+
+            $seenIdentifiers[] = $identifier;
+            $series[] = new ChartSeries($metric->label, $metric->color, $metric->unit, $this->buildChartSeries($metric, $pageUids, $languageId, $range));
         }
 
         return $series;
