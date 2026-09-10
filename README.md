@@ -15,10 +15,11 @@ Page-level metrics inside the TYPO3 backend, from an analytics provider you
 already run.
 
 No tracking code, no third-party service, no subscription: the extension reads
-your existing Matomo or GA4 data and resolves every URL it reports — through
-redirect chains and multilingual slugs — back to a TYPO3 page UID, then stores
-per-page daily aggregates so editors can see "how is this page doing" without
-leaving the backend.
+your existing Matomo or GA4 data — or your web server's own access log,
+without any analytics service at all — and resolves every URL it reports —
+through redirect chains and multilingual slugs — back to a TYPO3 page UID,
+then stores per-page daily aggregates so editors can see "how is this page
+doing" without leaving the backend.
 
 ![Page metrics tiles below the page title, with the period switch above them](docs/img/page-tiles.png)
 
@@ -38,7 +39,8 @@ leaving the backend.
 - Site-wide annotations, imported (e.g. Matomo release markers) or created by
   hand, marked on every sparkline — see
   [Annotations](docs/page-tiles.md#annotations)
-- Matomo and GA4 as pluggable providers, extensible with your own — see
+- Matomo, GA4 and your own web server access log as pluggable providers,
+  extensible with your own — see
   [Registering custom tiles](docs/extending.md)
 
 ## 🔥 Installation
@@ -47,8 +49,8 @@ leaving the backend.
 
 - PHP 8.2, 8.3, 8.4 or 8.5
 - TYPO3 13.4 or 14.0+
-- A Matomo instance with API access, and/or a GA4 property with a
-  service-account key
+- A Matomo instance with API access, a GA4 property with a service-account
+  key, and/or read access to your web server's own access log
 
 ### Composer setup
 
@@ -65,6 +67,7 @@ Each provider has its own settings and setup notes:
 
 - [Matomo](docs/providers/matomo.md)
 - [GA4](docs/providers/ga4.md)
+- [Access log](docs/providers/accesslog.md)
 
 ## ⚡ Usage
 
@@ -90,6 +93,7 @@ widgets.
 | --- | --- |
 | [Matomo provider](docs/providers/matomo.md) | Site configuration, `additionalHosts` for Dev/Stage instances |
 | [GA4 provider](docs/providers/ga4.md) | Site configuration, the service-account key file, known GA4 caveats |
+| [Access log provider](docs/providers/accesslog.md) | Site configuration, what it can and cannot measure, bot/asset filtering |
 | [Dashboard widgets](docs/dashboard-widgets.md) | The full EXT:dashboard widget catalog, their settings and the bundled preset |
 | [Page module tiles](docs/page-tiles.md) | The period switch, the subpages toggle, sparkline popovers and annotations |
 | [Security](docs/security.md) | Restricting tile visibility per backend user group |

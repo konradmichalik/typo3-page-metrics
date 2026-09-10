@@ -54,5 +54,5 @@ period the built-in tiles use.
 
 For a provider that needs its own daily-import step, its own configurable
 retention and to participate in the dashboard widgets, implement
-`MetricProviderInterface` instead, see the `Matomo` and `Ga4` providers under
-`Classes/Provider/` for a full example.
+`MetricProviderInterface` instead, see the `Matomo`, `Ga4` and `AccessLog`
+providers under `Classes/Provider/` for a full example.

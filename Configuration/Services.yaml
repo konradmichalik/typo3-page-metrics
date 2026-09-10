@@ -47,6 +47,11 @@ services:
 
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Provider\AccessLog\AccessLogConfigurationResolver:
+        public: true
+
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
     KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository:
         public: true
 
@@ -106,6 +111,10 @@ services:
             - name: page_metrics.metric_provider
 
     KonradMichalik\Typo3PageMetrics\Provider\Ga4\Ga4MetricProvider:
+        tags:
+            - name: page_metrics.metric_provider
+
+    KonradMichalik\Typo3PageMetrics\Provider\AccessLog\AccessLogMetricProvider:
         tags:
             - name: page_metrics.metric_provider
 
