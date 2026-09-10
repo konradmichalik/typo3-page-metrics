@@ -53,6 +53,18 @@ SELECT * FROM (
         -- landing flat: a page whose traffic is rising dilutes its average
         -- engagement and its bounce share, and vice versa - every tile ends
         -- up with a visible, page-specific trend instead of just pageviews.
+        --
+        -- The day-to-day noise is a sum of three sine waves at incommensurate
+        -- frequencies (0.35/0.9/1.6) rather than a single "(a * day_offset +
+        -- b) % spread" term: a linear ramp wrapping on a modulus draws a
+        -- perfect, regularly repeating sawtooth once plotted, which reads as
+        -- obviously synthetic on the chart widget - three summed sines with
+        -- page_uid-dependent phase offsets settle into a smoothly wandering,
+        -- non-repeating-looking curve over the 60-day window instead, still
+        -- fully deterministic (no RAND()) so re-running `ddev install`
+        -- reproduces the same numbers. Weights (0.25/0.15/0.10) sum to 0.5,
+        -- so the whole term still stays within [0, spread] - the same range
+        -- the modulo version covered.
         GREATEST(1, metrics.base + (100 - pages.page_uid * 20)
             + (CASE
                 WHEN metrics.metric = 'matomo.pageviews' THEN (CASE WHEN day_offset < 30 THEN trends.pageviews_delta ELSE -trends.pageviews_delta END)
@@ -60,7 +72,12 @@ SELECT * FROM (
                 WHEN metrics.metric = 'matomo.entries' THEN (CASE WHEN day_offset < 30 THEN trends.entries_delta ELSE -trends.entries_delta END)
                 ELSE 0
             END)
-            + ((day_offset * 7 + pages.page_uid * 13) % (metrics.spread + 1))) AS value
+            + ROUND(metrics.spread * (
+                0.5
+                + 0.25 * SIN(day_offset * 0.35 + pages.page_uid)
+                + 0.15 * SIN(day_offset * 0.9 + pages.page_uid * 2.3)
+                + 0.10 * SIN(day_offset * 1.6 + pages.page_uid * 3.7)
+            ))) AS value
     FROM days
     CROSS JOIN (
         SELECT 1 AS page_uid UNION ALL
