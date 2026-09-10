@@ -32,13 +32,13 @@ class UnresolvedUrlRepository
         private readonly ConnectionPool $connectionPool,
     ) {}
 
-    public function record(string $source, DateTimeImmutable $date, string $url, string $metric, UnresolvedReason $reason, int $value, int $capPerDay): void
+    public function record(string $provider, DateTimeImmutable $date, string $url, string $metric, UnresolvedReason $reason, int $value, int $capPerDay): void
     {
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $dateString = $date->format('Y-m-d');
         $identity = [
             'date' => $dateString,
-            'source' => $source,
+            'provider' => $provider,
             // Truncated to match the varchar(40) column, same length as a full SHA-1
             // digest would occupy, without using the disallowed sha1() function.
             'url_hash' => substr(hash('sha256', $url), 0, 40),
@@ -55,7 +55,7 @@ class UnresolvedUrlRepository
 
         $connection->insert(self::TABLE, array_merge($identity, ['url' => $url, 'reason' => $reason->value, 'value' => $value]));
 
-        $this->trimToCap($source, $dateString, $capPerDay);
+        $this->trimToCap($provider, $dateString, $capPerDay);
     }
 
     public function countForSite(string $host, DateTimeImmutable $since): int
@@ -110,14 +110,14 @@ class UnresolvedUrlRepository
      * Keeps the $capPerDay highest-value rows for the day, deletes the rest -
      * the lowest-value entries are the least actionable ones to lose.
      */
-    private function trimToCap(string $source, string $date, int $capPerDay): void
+    private function trimToCap(string $provider, string $date, int $capPerDay): void
     {
         $selectQueryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $uids = $selectQueryBuilder
             ->select('uid')
             ->from(self::TABLE)
             ->where(
-                $selectQueryBuilder->expr()->eq('source', $selectQueryBuilder->createNamedParameter($source)),
+                $selectQueryBuilder->expr()->eq('provider', $selectQueryBuilder->createNamedParameter($provider)),
                 $selectQueryBuilder->expr()->eq('date', $selectQueryBuilder->createNamedParameter($date)),
             )
             ->orderBy('value', 'DESC')

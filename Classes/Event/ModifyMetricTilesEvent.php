@@ -19,10 +19,10 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 /**
  * ModifyMetricTilesEvent.
  *
- * Dispatched once per page-header render after the built-in MetricSourceInterface
- * sources have contributed their tiles. Any extension can listen for this event
+ * Dispatched once per page-header render after the built-in MetricProviderInterface
+ * providers have contributed their tiles. Any extension can listen for this event
  * and call addTile() to contribute one more tile without implementing the full
- * MetricSourceInterface contract (fetch/supports/definitions) - useful when the
+ * MetricProviderInterface contract (fetch/supports/definitions) - useful when the
  * data behind a tile does not need the daily-import pipeline at all.
  *
  * @api

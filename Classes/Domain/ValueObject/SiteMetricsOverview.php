@@ -37,7 +37,7 @@ final readonly class SiteMetricsOverview
      */
     public function __construct(
         public Site $site,
-        public bool $hasSource,
+        public bool $hasProvider,
         public string $chartLabel,
         public string $chartIcon,
         public string $chartColor,

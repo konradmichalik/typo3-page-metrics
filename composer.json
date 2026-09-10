@@ -1,6 +1,6 @@
 {
 	"name": "konradmichalik/typo3-page-metrics",
-	"description": "Page-level metrics inside the TYPO3 backend, resolved from arbitrary URLs to page UIDs, from swappable data sources.",
+	"description": "Page-level metrics inside the TYPO3 backend, resolved from arbitrary URLs to page UIDs, from swappable data providers.",
 	"license": [
 		"GPL-2.0-or-later"
 	],
@@ -48,7 +48,7 @@
 	},
 	"autoload-dev": {
 		"psr-4": {
-			"KonradMichalik\\PageMetricsDemoSource\\": "Tests/Functional/Service/Fixtures/Extensions/page_metrics_demo_source/Classes/",
+			"KonradMichalik\\PageMetricsDemoProvider\\": "Tests/Functional/Service/Fixtures/Extensions/page_metrics_demo_provider/Classes/",
 			"KonradMichalik\\PageMetricsDemoTiles\\": "Tests/Functional/Service/Fixtures/Extensions/page_metrics_demo_tiles/Classes/",
 			"KonradMichalik\\Typo3PageMetrics\\Tests\\": "Tests/"
 		}

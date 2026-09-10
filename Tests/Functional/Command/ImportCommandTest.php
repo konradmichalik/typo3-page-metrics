@@ -18,9 +18,9 @@ use KonradMichalik\Typo3PageMetrics\Command\ImportCommand;
 use KonradMichalik\Typo3PageMetrics\Configuration\SiteConfigurationReader;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, UrlMetric};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Provider\{AnnotationProviderInterface, MetricProviderInterface};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
-use KonradMichalik\Typo3PageMetrics\Source\{AnnotationSourceInterface, MetricSourceInterface};
-use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{PartiallyFailingAnnotationSource, PartiallyFailingMetricSource, StubAnnotationSource, StubMetricSource, UnsupportedAnnotationSource, UnsupportedMetricSource};
+use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{PartiallyFailingAnnotationProvider, PartiallyFailingMetricProvider, StubAnnotationProvider, StubMetricProvider, UnsupportedAnnotationProvider, UnsupportedMetricProvider};
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -79,7 +79,7 @@ final class ImportCommandTest extends FunctionalTestCase
     public function testImportsResolvedMetricsIntoTheDailyTable(): void
     {
         $today = new DateTimeImmutable('today');
-        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
+        $stub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
 
         $exitCode = $this->runImport([$stub]);
 
@@ -91,7 +91,7 @@ final class ImportCommandTest extends FunctionalTestCase
     public function testRecordsUnresolvedUrlsSeparately(): void
     {
         $today = new DateTimeImmutable('today');
-        $stub = new StubMetricSource([new UrlMetric('https://example.com/gone-page', $today, 'stub.hits', 7)]);
+        $stub = new StubMetricProvider([new UrlMetric('https://example.com/gone-page', $today, 'stub.hits', 7)]);
 
         $this->runImport([$stub]);
 
@@ -112,10 +112,10 @@ final class ImportCommandTest extends FunctionalTestCase
         // a same-day rerun must revisit today rather than freezing it at
         // whatever partial value the first (e.g. early-morning) run saw.
         $today = new DateTimeImmutable('today');
-        $firstStub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
+        $firstStub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
         $this->runImport([$firstStub]);
 
-        $secondStub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 999)]);
+        $secondStub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 999)]);
         $this->runImport([$secondStub]);
 
         $series = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today));
@@ -125,7 +125,7 @@ final class ImportCommandTest extends FunctionalTestCase
     public function testFirstRunMarksYesterdayNotTodayAsTheLastImportedDate(): void
     {
         $today = new DateTimeImmutable('today');
-        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
+        $stub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
         $this->runImport([$stub]);
 
         $lastImported = $this->importStateRepository->getLastImportedDate('stub', 'main');
@@ -136,10 +136,10 @@ final class ImportCommandTest extends FunctionalTestCase
     public function testForceReimportsEvenWhenAlreadyImportedToday(): void
     {
         $today = new DateTimeImmutable('today');
-        $firstStub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
+        $firstStub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
         $this->runImport([$firstStub]);
 
-        $secondStub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 999)]);
+        $secondStub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 999)]);
         $this->runImport([$secondStub], true);
 
         $series = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today));
@@ -149,7 +149,7 @@ final class ImportCommandTest extends FunctionalTestCase
     public function testTwoUrlsResolvingToTheSamePageAndDaySumInsteadOfOverwriting(): void
     {
         $today = new DateTimeImmutable('today');
-        $stub = new StubMetricSource([
+        $stub = new StubMetricProvider([
             new UrlMetric('https://example.com/about', $today, 'stub.hits', 10),
             new UrlMetric('https://example.com/about?utm_source=x', $today, 'stub.hits', 7),
         ]);
@@ -164,7 +164,7 @@ final class ImportCommandTest extends FunctionalTestCase
     {
         $this->importCSVDataSet(__DIR__.'/Fixtures/sys_redirect.csv');
         $today = new DateTimeImmutable('today');
-        $stub = new StubMetricSource([new UrlMetric('https://example.com/old-about', $today, 'stub.hits', 15)]);
+        $stub = new StubMetricProvider([new UrlMetric('https://example.com/old-about', $today, 'stub.hits', 15)]);
 
         $this->runImport([$stub]);
 
@@ -177,7 +177,7 @@ final class ImportCommandTest extends FunctionalTestCase
     public function testResolvingDirectlyDoesNotWriteAViaRedirectDimensionRow(): void
     {
         $today = new DateTimeImmutable('today');
-        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
+        $stub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
 
         $this->runImport([$stub]);
 
@@ -185,7 +185,7 @@ final class ImportCommandTest extends FunctionalTestCase
         self::assertSame([$today->format('Y-m-d') => 0], $viaRedirect);
     }
 
-    public function testOneSitesSourceFailureDoesNotAbortImportForOtherSites(): void
+    public function testOneSitesProviderFailureDoesNotAbortImportForOtherSites(): void
     {
         $this->get(SiteWriter::class)->write('other', [
             'rootPageId' => 10,
@@ -207,21 +207,21 @@ final class ImportCommandTest extends FunctionalTestCase
         ]);
 
         $today = new DateTimeImmutable('today');
-        $source = new PartiallyFailingMetricSource('other', [new UrlMetric('https://example.com/about', $today, 'partial.hits', 5)]);
+        $provider = new PartiallyFailingMetricProvider('other', [new UrlMetric('https://example.com/about', $today, 'partial.hits', 5)]);
 
-        $exitCode = $this->runImport([$source]);
+        $exitCode = $this->runImport([$provider]);
 
         self::assertSame(Command::FAILURE, $exitCode);
         $series = $this->dailyMetricsRepository->dailySeries(2, 0, 'partial.hits', new DateRange($today, $today));
         self::assertSame([$today->format('Y-m-d') => 5], $series);
     }
 
-    public function testImportsAnnotationsForTheSiteRegardlessOfMetricSources(): void
+    public function testImportsAnnotationsForTheSiteRegardlessOfMetricProviders(): void
     {
         $annotation = new Annotation('1', new DateTimeImmutable('today'), 'Release 2.0');
-        $annotationSource = new StubAnnotationSource([$annotation]);
+        $annotationProvider = new StubAnnotationProvider([$annotation]);
 
-        $exitCode = $this->runImport([], false, [$annotationSource]);
+        $exitCode = $this->runImport([], false, [$annotationProvider]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
         $stored = $this->annotationRepository->forSiteAndRange('main', new DateRange(
@@ -232,12 +232,12 @@ final class ImportCommandTest extends FunctionalTestCase
         self::assertSame('Release 2.0', $stored[0]->text);
     }
 
-    public function testAFailingAnnotationSourceDoesNotAbortMetricImportForTheSameSite(): void
+    public function testAFailingAnnotationProviderDoesNotAbortMetricImportForTheSameSite(): void
     {
         $today = new DateTimeImmutable('today');
-        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
+        $stub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
 
-        $exitCode = $this->runImport([$stub], false, [new PartiallyFailingAnnotationSource()]);
+        $exitCode = $this->runImport([$stub], false, [new PartiallyFailingAnnotationProvider()]);
 
         self::assertSame(Command::FAILURE, $exitCode);
         $series = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today));
@@ -248,7 +248,7 @@ final class ImportCommandTest extends FunctionalTestCase
     {
         $this->writeDisabledSite();
         $today = new DateTimeImmutable('today');
-        $stub = new StubMetricSource([new UrlMetric('https://disabled.example.com/about', $today, 'stub.hits', 42)]);
+        $stub = new StubMetricProvider([new UrlMetric('https://disabled.example.com/about', $today, 'stub.hits', 42)]);
 
         $exitCode = $this->runImport([$stub]);
 
@@ -258,24 +258,24 @@ final class ImportCommandTest extends FunctionalTestCase
         self::assertNotNull($this->importStateRepository->getLastImportedDate('stub', 'main'));
     }
 
-    public function testSkipsSourcesThatDoNotSupportTheSite(): void
+    public function testSkipsProvidersThatDoNotSupportTheSite(): void
     {
         $today = new DateTimeImmutable('today');
-        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
+        $stub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
 
-        $exitCode = $this->runImport([new UnsupportedMetricSource(), $stub]);
+        $exitCode = $this->runImport([new UnsupportedMetricProvider(), $stub]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
         self::assertNull($this->importStateRepository->getLastImportedDate('unsupported', 'main'));
         self::assertNotNull($this->importStateRepository->getLastImportedDate('stub', 'main'));
     }
 
-    public function testSkipsAnnotationSourcesThatDoNotSupportTheSite(): void
+    public function testSkipsAnnotationProvidersThatDoNotSupportTheSite(): void
     {
         $today = new DateTimeImmutable('today');
-        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
+        $stub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
 
-        $exitCode = $this->runImport([$stub], false, [new UnsupportedAnnotationSource()]);
+        $exitCode = $this->runImport([$stub], false, [new UnsupportedAnnotationProvider()]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
         self::assertSame([], $this->annotationRepository->forSiteAndRange('main', new DateRange($today->modify('-5 days'), $today)));
@@ -285,7 +285,7 @@ final class ImportCommandTest extends FunctionalTestCase
     {
         $today = new DateTimeImmutable('today');
         $this->importStateRepository->markImported('stub', 'main', $today);
-        $stub = new StubMetricSource([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
+        $stub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
 
         $exitCode = $this->runImport([$stub]);
 
@@ -309,10 +309,10 @@ final class ImportCommandTest extends FunctionalTestCase
     }
 
     /**
-     * @param list<MetricSourceInterface>     $sources
-     * @param list<AnnotationSourceInterface> $annotationSources
+     * @param list<MetricProviderInterface>     $providers
+     * @param list<AnnotationProviderInterface> $annotationProviders
      */
-    private function runImport(array $sources, bool $force = false, array $annotationSources = []): int
+    private function runImport(array $providers, bool $force = false, array $annotationProviders = []): int
     {
         $command = new ImportCommand(
             $this->get(SiteFinder::class),
@@ -322,8 +322,8 @@ final class ImportCommandTest extends FunctionalTestCase
             $this->unresolvedUrlRepository,
             $this->importStateRepository,
             $this->annotationRepository,
-            $sources,
-            $annotationSources,
+            $providers,
+            $annotationProviders,
         );
 
         $tester = new CommandTester($command);

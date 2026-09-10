@@ -19,7 +19,7 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
  * MetricDefinition.
  *
  * Display and cardinality metadata for one metric identifier. The platform
- * never interprets what a metric means - only a source's MetricDefinition
+ * never interprets what a metric means - only a provider's MetricDefinition
  * does, via label/icon/unit.
  *
  * @api

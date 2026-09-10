@@ -23,7 +23,7 @@ use TYPO3\CMS\Core\Attribute\AsEventListener;
  *
  * Proves that a third-party extension can contribute a tile purely by
  * listening to ModifyMetricTilesEvent, without implementing
- * MetricSourceInterface (no fetch/supports/definitions needed) - it just
+ * MetricProviderInterface (no fetch/supports/definitions needed) - it just
  * builds its own MetricTile and appends it.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>

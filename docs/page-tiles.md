@@ -37,14 +37,14 @@ text in the tooltip alongside that day's value.
 ## Annotations
 
 Annotations are site-wide, point-in-time events, from two independent
-sources that are always merged together:
+providers that are always merged together:
 
 - **Imported**, via the same `page-metrics:import` command, from any
-  registered `AnnotationSourceInterface` (mirroring
-  `MetricSourceInterface`'s extensibility, but for events rather than
-  per-URL metrics). The bundled Matomo source imports Matomo's own
+  registered `AnnotationProviderInterface` (mirroring
+  `MetricProviderInterface`'s extensibility, but for events rather than
+  per-URL metrics). The bundled Matomo provider imports Matomo's own
   annotations (e.g. release markers) — no extra configuration beyond an
-  already-configured `sources.matomo` is needed. GA4 has no equivalent API
+  already-configured `providers.matomo` is needed. GA4 has no equivalent API
   to import from.
 - **Manual**, created directly in the TYPO3 backend as a "Page metrics
   annotation" record — pick the site, a date and a text. An annotation is

@@ -39,7 +39,7 @@ final class SiteConfigurationReaderTest extends TestCase
         $configuration = $this->subject->read($site);
 
         self::assertFalse($configuration->enabled);
-        self::assertSame([], $configuration->sources);
+        self::assertSame([], $configuration->providers);
         self::assertTrue($configuration->dropQueryString);
         self::assertSame([], $configuration->keepQueryParams);
         self::assertSame(400, $configuration->retentionDays);
@@ -52,7 +52,7 @@ final class SiteConfigurationReaderTest extends TestCase
             'base' => 'https://example.com/',
             'pageMetrics' => [
                 'enabled' => true,
-                'sources' => [
+                'providers' => [
                     'matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 3],
                 ],
                 'resolution' => [
@@ -66,7 +66,7 @@ final class SiteConfigurationReaderTest extends TestCase
         $configuration = $this->subject->read($site);
 
         self::assertTrue($configuration->enabled);
-        self::assertSame(['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 3]], $configuration->sources);
+        self::assertSame(['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 3]], $configuration->providers);
         self::assertSame(['tx_solr[q]'], $configuration->keepQueryParams);
         self::assertSame(90, $configuration->retentionDays);
     }
@@ -149,11 +149,11 @@ final class SiteConfigurationReaderTest extends TestCase
         $this->subject->read($site);
     }
 
-    public function testThrowsWhenSourcesIsNotAMapping(): void
+    public function testThrowsWhenProvidersIsNotAMapping(): void
     {
         $site = new Site('main', 1, [
             'base' => 'https://example.com/',
-            'pageMetrics' => ['enabled' => true, 'sources' => 'matomo'],
+            'pageMetrics' => ['enabled' => true, 'providers' => 'matomo'],
         ]);
 
         $this->expectException(InvalidSiteConfigurationException::class);

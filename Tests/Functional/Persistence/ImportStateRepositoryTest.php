@@ -67,7 +67,7 @@ final class ImportStateRepositoryTest extends FunctionalTestCase
         self::assertSame(1, $rowCount);
     }
 
-    public function testTracksStatePerSourceAndSiteIndependently(): void
+    public function testTracksStatePerProviderAndSiteIndependently(): void
     {
         $this->subject->markImported('matomo', 'main', new DateTimeImmutable('2026-08-01'));
         $this->subject->markImported('accesslog', 'main', new DateTimeImmutable('2026-08-02'));

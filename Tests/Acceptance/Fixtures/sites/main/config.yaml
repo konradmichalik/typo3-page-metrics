@@ -16,7 +16,7 @@ rootPageId: 1
 routes: {  }
 pageMetrics:
   enabled: true
-  sources:
+  providers:
     matomo:
       # Never-resolving TLD by design - the demo data below is seeded
       # directly into tx_typo3pagemetrics_daily/tx_typo3pagemetrics_annotation, no

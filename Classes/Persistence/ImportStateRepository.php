@@ -31,14 +31,14 @@ class ImportStateRepository
         private readonly Context $context,
     ) {}
 
-    public function getLastImportedDate(string $source, string $siteIdentifier): ?DateTimeImmutable
+    public function getLastImportedDate(string $provider, string $siteIdentifier): ?DateTimeImmutable
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $value = $queryBuilder
             ->select('last_imported_date')
             ->from(self::TABLE)
             ->where(
-                $queryBuilder->expr()->eq('source', $queryBuilder->createNamedParameter($source)),
+                $queryBuilder->expr()->eq('provider', $queryBuilder->createNamedParameter($provider)),
                 $queryBuilder->expr()->eq('site_identifier', $queryBuilder->createNamedParameter($siteIdentifier)),
             )
             ->executeQuery()
@@ -47,10 +47,10 @@ class ImportStateRepository
         return false === $value ? null : new DateTimeImmutable((string) $value);
     }
 
-    public function markImported(string $source, string $siteIdentifier, DateTimeImmutable $date): void
+    public function markImported(string $provider, string $siteIdentifier, DateTimeImmutable $date): void
     {
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
-        $identity = ['source' => $source, 'site_identifier' => $siteIdentifier];
+        $identity = ['provider' => $provider, 'site_identifier' => $siteIdentifier];
         $existingUid = $connection->select(['uid'], self::TABLE, $identity)->fetchOne();
         $values = [
             'last_imported_date' => $date->format('Y-m-d'),

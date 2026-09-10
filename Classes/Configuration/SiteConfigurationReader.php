@@ -49,9 +49,9 @@ final class SiteConfigurationReader
             throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.enabled" must be a boolean.', $site->getIdentifier()), 1756000001);
         }
 
-        $sources = $raw['sources'] ?? [];
-        if (!is_array($sources)) {
-            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.sources" must be a mapping.', $site->getIdentifier()), 1756000002);
+        $providers = $raw['providers'] ?? [];
+        if (!is_array($providers)) {
+            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.providers" must be a mapping.', $site->getIdentifier()), 1756000002);
         }
 
         $resolution = $raw['resolution'] ?? [];
@@ -79,9 +79,9 @@ final class SiteConfigurationReader
             throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.resolution.additionalHosts" must be a list.', $site->getIdentifier()), 1756000007);
         }
 
-        /* @var array<string, array<string, mixed>> $sources */
+        /* @var array<string, array<string, mixed>> $providers */
         /* @var list<string> $keepQueryParams */
         /* @var list<string> $additionalHosts */
-        return new PageMetricsSiteConfiguration($enabled, $sources, $dropQueryString, $keepQueryParams, $retentionDays, $additionalHosts);
+        return new PageMetricsSiteConfiguration($enabled, $providers, $dropQueryString, $keepQueryParams, $retentionDays, $additionalHosts);
     }
 }

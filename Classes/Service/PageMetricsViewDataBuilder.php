@@ -18,7 +18,7 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricDefinition, MetricTile, PageMetricsViewData, RateMetricDefinition};
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
-use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
+use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Throwable;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
@@ -62,7 +62,7 @@ final readonly class PageMetricsViewDataBuilder
     ];
 
     /**
-     * @param iterable<MetricSourceInterface> $sources
+     * @param iterable<MetricProviderInterface> $providers
      */
     public function __construct(
         private SiteFinder $siteFinder,
@@ -72,7 +72,7 @@ final readonly class PageMetricsViewDataBuilder
         private ManualAnnotationRepository $manualAnnotationRepository,
         private SitePageUidRepository $pageUidRepository,
         private EventDispatcherInterface $eventDispatcher,
-        private iterable $sources,
+        private iterable $providers,
     ) {}
 
     public function build(int $pageId, int $languageId, int $requestedPeriodDays, bool $includeSubpages = false): PageMetricsViewData
@@ -191,7 +191,7 @@ final readonly class PageMetricsViewDataBuilder
         $tiles = array_map(static fn (array $entry): MetricTile => $entry['tile'], $ordered);
 
         // Lets any extension contribute a tile without implementing the full
-        // MetricSourceInterface contract - appended after the built-in tiles,
+        // MetricProviderInterface contract - appended after the built-in tiles,
         // in listener registration order, rather than merged into the sort
         // above (a listener-added tile has no MetricDefinition::$sortOrder).
         // sparklineRange is kept as its own event property for API stability,
@@ -215,19 +215,19 @@ final readonly class PageMetricsViewDataBuilder
         /** @var array<string, ?string> $externalLinkByIdentifier */
         $externalLinkByIdentifier = [];
 
-        foreach ($this->sources as $source) {
-            if (!$source->supports($site)) {
+        foreach ($this->providers as $provider) {
+            if (!$provider->supports($site)) {
                 continue;
             }
 
-            $externalLink = null !== $pageUrl ? $source->getExternalLink($site, $pageUrl, $tileRange) : null;
+            $externalLink = null !== $pageUrl ? $provider->getExternalLink($site, $pageUrl, $tileRange) : null;
 
-            foreach ($source->getMetricDefinitions() as $definition) {
+            foreach ($provider->getMetricDefinitions() as $definition) {
                 $definitionsByIdentifier[$definition->identifier] = $definition;
                 $externalLinkByIdentifier[$definition->identifier] = $externalLink;
             }
 
-            foreach ($source->getRateMetricDefinitions() as $rateDefinition) {
+            foreach ($provider->getRateMetricDefinitions() as $rateDefinition) {
                 $rateDefinitionsByIdentifier[$rateDefinition->identifier] = $rateDefinition;
                 $externalLinkByIdentifier[$rateDefinition->identifier] = $externalLink;
             }
