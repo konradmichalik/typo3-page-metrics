@@ -8,3 +8,4 @@ var
 .Build/
 .phpunit.result.cache
 .superpowers/
+.worktrees/
