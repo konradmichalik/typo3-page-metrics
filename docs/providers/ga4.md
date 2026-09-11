@@ -1,8 +1,8 @@
 # GA4 provider
 
-> [!WARNING]
-> GA4 support is untested against a live GA4 property. Please report issues
-> if you run into any.
+> [!NOTE]
+> Verified against a live GA4 property: authentication, the Data API's
+> `runReport` call, and the daily import all confirmed working end to end.
 
 GA4 is supported as an alternative provider, for sites without Matomo. Add to
 a site's `config/sites/<identifier>/config.yaml`.
@@ -25,3 +25,49 @@ GA4's Data API can take 24-48 hours to finalize a day's data, so its most
 recently imported days may be understated. Periodically re-run the import
 with `--force` (see the main [README](../../README.md#usage)) to pick up
 corrections to those days.
+
+<details>
+<summary><strong>Setting up GA4 access (click to expand)</strong></summary>
+
+A service account is Google's mechanism for server-to-server access, without
+a human user or a browser login involved. It needs to exist in a Google
+Cloud project and then be given read access to the specific GA4 property.
+
+1. **Enable the Data API.** In the
+   [Google Cloud Console](https://console.cloud.google.com), pick or create
+   a project, then under *APIs & Services → Library* enable the
+   **Google Analytics Data API**.
+2. **Create a service account.** Under *APIs & Services → Credentials →
+   Create Credentials → Service account*, give it any name (e.g.
+   `page-metrics-ga4-reader`). No project-level IAM role is required, GA4
+   access is granted separately in step 4.
+3. **Download a JSON key.** Open the new service account, tab *Keys → Add
+   key → Create new key → JSON*. This file contains `client_email` and
+   `private_key`, treat it exactly like a password.
+4. **Grant the service account access to the property.** In
+   [Google Analytics](https://analytics.google.com), go to *Admin → Property
+   Access Management* (or *Account Access Management* if the property-level
+   one is not visible), add the service account's email address (the
+   `...@<project>.iam.gserviceaccount.com` one from the JSON key) with role
+   **Viewer**. Without this step every import fails with an authentication
+   or permission error, the JSON key alone is not enough.
+5. **Note the property ID.** In *Admin → Property Details*, copy the numeric
+   property ID (not the "G-" measurement ID from the data stream).
+
+Place the downloaded key file outside the webroot and outside version
+control, then reference its path via an environment variable, never as a
+literal path or inline content in `config.yaml`. For local development with
+DDEV, `.env`/`.env.local` files are not always read by every project's
+dotenv setup (some, like `helhum/dotenv-connector`'s default adapter, only
+load a single `.env` file with no cascade); setting the variable in
+`.ddev/config.local.yaml` under `web_environment` works regardless of the
+project's own PHP-level environment loading, since it is injected at the
+container level.
+
+```yaml
+# .ddev/config.local.yaml (gitignored)
+web_environment:
+  - GA4_KEY_FILE_PATH=/var/www/html/config/ga4/service-account.json
+```
+
+</details>
