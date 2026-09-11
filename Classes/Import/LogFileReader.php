@@ -16,6 +16,7 @@ namespace KonradMichalik\Typo3PageMetrics\Import;
 use Generator;
 use RuntimeException;
 
+use function is_readable;
 use function sprintf;
 
 /**
@@ -45,11 +46,7 @@ final class LogFileReader
     public function readLinesWithOffset(string $path, int $fromOffset = 0): Generator
     {
         $isGzip = $this->isGzip($path);
-        $handle = $isGzip ? @gzopen($path, 'rb') : @fopen($path, 'r');
-
-        if (false === $handle) {
-            throw new RuntimeException(sprintf('Unable to open log file: %s', $path));
-        }
+        $handle = $this->open($path, $isGzip);
 
         try {
             if ($fromOffset > 0) {
@@ -65,9 +62,37 @@ final class LogFileReader
         }
     }
 
+    /**
+     * The is_readable() guard is what keeps a missing or unreadable path
+     * from raising a native PHP warning, which is why the open call itself
+     * needs no "@" suppression. The false check behind it stays as the
+     * defensive fallback for the residual race: the file can still
+     * disappear between the check and the open.
+     *
+     * @return resource
+     */
+    private function open(string $path, bool $isGzip): mixed
+    {
+        if (!is_readable($path)) {
+            throw new RuntimeException(sprintf('Unable to open log file: %s', $path));
+        }
+
+        $handle = $isGzip ? gzopen($path, 'rb') : fopen($path, 'r');
+
+        if (false === $handle) {
+            throw new RuntimeException(sprintf('Unable to open log file: %s', $path));
+        }
+
+        return $handle;
+    }
+
     private function isGzip(string $path): bool
     {
-        $handle = @fopen($path, 'r');
+        if (!is_readable($path)) {
+            return false;
+        }
+
+        $handle = fopen($path, 'r');
         if (false === $handle) {
             return false;
         }
