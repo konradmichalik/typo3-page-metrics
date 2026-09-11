@@ -82,8 +82,13 @@ final class ImportCommand extends Command
             // resolved URLs per instance. Reset once per site so a URL that
             // resolves differently under one site's configuration (e.g.
             // dropQueryString) never leaks a stale cache entry into the next
-            // site processed within the same command invocation.
+            // site processed within the same command invocation. The bot
+            // agent detail collector is reset for the same reason: it
+            // accumulates per provider run and is flushed under one site's
+            // identifier, so anything left over from the previous site must
+            // never be carried into this one's flush().
             $this->resolver->reset();
+            $this->botAgentDetailCollector->reset();
 
             foreach ($this->providers as $provider) {
                 if (!$provider->supports($site)) {
@@ -96,6 +101,12 @@ final class ImportCommand extends Command
                     // One site/provider failing (e.g. an unreachable Matomo
                     // instance) must never abort the whole run: report it and
                     // keep processing the remaining sites/providers.
+                    //
+                    // Whatever the failed provider already handed the
+                    // collector before throwing was never flushed and never
+                    // will be - drop it, so the next provider's flush() does
+                    // not write it out under its own identifier.
+                    $this->botAgentDetailCollector->reset();
                     $hasFailures = true;
                     $output->writeln(sprintf(
                         '<error>Failed to import provider "%s" for site "%s": %s</error>',

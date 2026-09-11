@@ -111,6 +111,43 @@ final class BotAgentDetailCollectorTest extends FunctionalTestCase
         self::assertSame(1, $this->countRows('main', 2, 'ai_crawler', 'GPTBot'));
     }
 
+    public function testResetDiscardsEverythingAccumulatedSoFarSoAFollowingFlushWritesNothing(): void
+    {
+        $date = new DateTimeImmutable('2026-10-10');
+        $this->subject->add($date, 'https://example.com/about', Bucket::AiCrawler, 'GPTBot', false);
+        $this->subject->add($date, 'https://example.com/about', Bucket::AiCrawler, 'GPTBot', true);
+        $this->subject->add($date, 'https://example.com/does-not-exist', Bucket::Tool, 'AhrefsBot', false);
+
+        $this->subject->reset();
+        $this->subject->flush('main', true, []);
+
+        self::assertSame(0, $this->totalRows());
+    }
+
+    public function testResetOnlyDropsWhatWasNotFlushedYet(): void
+    {
+        $date = new DateTimeImmutable('2026-10-10');
+        $this->subject->add($date, 'https://example.com/about', Bucket::AiCrawler, 'GPTBot', false);
+        $this->subject->flush('main', true, []);
+
+        $this->subject->add($date, 'https://example.com/does-not-exist', Bucket::Tool, 'AhrefsBot', false);
+        $this->subject->reset();
+        $this->subject->flush('main', true, []);
+
+        self::assertSame(1, $this->countRows('main', 2, 'ai_crawler', 'GPTBot'));
+        self::assertSame(0, $this->countRows('main', 0, 'tool', 'AhrefsBot'));
+    }
+
+    private function totalRows(): int
+    {
+        return (int) $this->get(ConnectionPool::class)
+            ->getQueryBuilderForTable('tx_typo3pagemetrics_bot_agent_daily')
+            ->count('uid')
+            ->from('tx_typo3pagemetrics_bot_agent_daily')
+            ->executeQuery()
+            ->fetchOne();
+    }
+
     private function countRows(string $siteIdentifier, int $pageUid, string $bucket, string $agent): int
     {
         $queryBuilder = $this->get(ConnectionPool::class)->getQueryBuilderForTable('tx_typo3pagemetrics_bot_agent_daily');

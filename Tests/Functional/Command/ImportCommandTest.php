@@ -22,7 +22,7 @@ use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetr
 use KonradMichalik\Typo3PageMetrics\Provider\{AnnotationProviderInterface, MetricProviderInterface};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
 use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
-use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{BotAwareStubMetricProvider, PartiallyFailingAnnotationProvider, PartiallyFailingMetricProvider, StubAnnotationProvider, StubMetricProvider, UnsupportedAnnotationProvider, UnsupportedMetricProvider};
+use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{BotAwareFailingMetricProvider, BotAwareStubMetricProvider, PartiallyFailingAnnotationProvider, PartiallyFailingMetricProvider, StubAnnotationProvider, StubMetricProvider, UnsupportedAnnotationProvider, UnsupportedMetricProvider};
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -359,6 +359,66 @@ final class ImportCommandTest extends FunctionalTestCase
         // still land on 1, not 2, proving replace-not-add semantics for the
         // bot-agent-daily table too.
         self::assertSame(1, $hits);
+    }
+
+    public function testAProviderThrowingMidFetchLeavesNoBotAgentDetailBehind(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $collector = $this->get(BotAgentDetailCollector::class);
+        $failing = new BotAwareFailingMetricProvider($collector, $today, 'https://example.com/about', Bucket::AiCrawler, 'GPTBot');
+
+        // The clean provider runs after the failing one and flushes the very
+        // same shared collector: without the catch block's reset(), the
+        // failing provider's partial hit would be written out here, under the
+        // wrong provider's run.
+        $clean = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
+
+        $exitCode = $this->runImport([$failing, $clean]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertSame(0, $this->countBotAgentRows());
+        // The clean provider itself still imported normally.
+        self::assertSame([$today->format('Y-m-d') => 10], $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today)));
+    }
+
+    public function testAProviderThrowingMidFetchLeavesNoBotAgentDetailForTheNextSiteEither(): void
+    {
+        $this->writeSecondSite();
+        $today = new DateTimeImmutable('today');
+        $collector = $this->get(BotAgentDetailCollector::class);
+        // The hit URL belongs to "main": were it carried into the "other"
+        // site's loop iteration, flush() would attribute it to "other".
+        $failing = new BotAwareFailingMetricProvider($collector, $today, 'https://example.com/about', Bucket::AiCrawler, 'GPTBot');
+        $clean = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 10)]);
+
+        $exitCode = $this->runImport([$failing, $clean]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertSame(0, $this->countBotAgentRows());
+    }
+
+    private function countBotAgentRows(): int
+    {
+        return (int) $this->get(ConnectionPool::class)
+            ->getQueryBuilderForTable('tx_typo3pagemetrics_bot_agent_daily')
+            ->count('uid')
+            ->from('tx_typo3pagemetrics_bot_agent_daily')
+            ->executeQuery()
+            ->fetchOne();
+    }
+
+    private function writeSecondSite(): void
+    {
+        $this->get(SiteWriter::class)->write('other', [
+            'rootPageId' => 10,
+            'base' => 'https://other.example.com/',
+            'languages' => [
+                0 => ['title' => 'English', 'enabled' => true, 'languageId' => 0, 'base' => '/', 'locale' => 'en_US.UTF-8', 'navigationTitle' => 'English', 'flag' => 'us'],
+            ],
+            'errorHandling' => [],
+            'routes' => [],
+            'pageMetrics' => ['enabled' => true, 'retentionDays' => 5],
+        ]);
     }
 
     private function writeDisabledSite(): void

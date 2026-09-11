@@ -82,6 +82,19 @@ class BotAgentDetailCollector
     }
 
     /**
+     * Drops everything accumulated so far without writing it. Callers use
+     * this wherever the accumulated state can no longer be attributed to
+     * the provider and site that produced it: between sites in one import
+     * run, and after a provider threw mid-fetch(), so a partially collected
+     * batch never ends up flushed under whatever provider or site runs next
+     * in the same command invocation.
+     */
+    public function reset(): void
+    {
+        $this->aggregated = [];
+    }
+
+    /**
      * @param list<string> $keepQueryParams
      */
     public function flush(string $siteIdentifier, bool $dropQueryString, array $keepQueryParams): void
