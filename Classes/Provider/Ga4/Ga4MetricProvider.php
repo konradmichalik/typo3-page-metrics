@@ -63,8 +63,8 @@ final readonly class Ga4MetricProvider implements MetricProviderInterface
     public function getMetricDefinitions(): array
     {
         return [
-            new MetricDefinition('ga4.pageviews', 'Page views', 'GA4 screenPageViews for this page in the selected period.', 'tabler-eye-search', MetricUnit::Count, 10, '#f9ab00'),
-            new MetricDefinition('ga4.sessions', 'Sessions', 'GA4 sessions that included this page in the selected period.', 'tabler-chart-dots', MetricUnit::Count, 20, '#e37400'),
+            new MetricDefinition('ga4.pageviews', 'Page views', 'GA4 screenPageViews for this page in the selected period.', 'tabler-eye-search', MetricUnit::Count, 10, '#0969da'),
+            new MetricDefinition('ga4.sessions', 'Sessions', 'GA4 sessions that included this page in the selected period.', 'tabler-chart-dots', MetricUnit::Count, 20, '#8250df'),
         ];
     }
 
@@ -78,7 +78,7 @@ final readonly class Ga4MetricProvider implements MetricProviderInterface
                 'tabler-clock',
                 MetricUnit::Seconds,
                 30,
-                '#f9ab00',
+                '#bf8700',
                 'ga4.engagement_time_seconds',
                 'ga4.sessions',
             ),
@@ -89,7 +89,7 @@ final readonly class Ga4MetricProvider implements MetricProviderInterface
                 'tabler-door-exit',
                 MetricUnit::Percent,
                 40,
-                '#e37400',
+                '#cf222e',
                 'ga4.landing_bounces',
                 'ga4.landing_sessions',
             ),
