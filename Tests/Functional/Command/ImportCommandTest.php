@@ -14,13 +14,15 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Command;
 
 use DateTimeImmutable;
+use KonradMichalik\Typo3PageMetrics\Analysis\Taxonomy\Bucket;
 use KonradMichalik\Typo3PageMetrics\Command\ImportCommand;
 use KonradMichalik\Typo3PageMetrics\Configuration\SiteConfigurationReader;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, UrlMetric};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\{AnnotationProviderInterface, MetricProviderInterface};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
-use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{PartiallyFailingAnnotationProvider, PartiallyFailingMetricProvider, StubAnnotationProvider, StubMetricProvider, UnsupportedAnnotationProvider, UnsupportedMetricProvider};
+use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
+use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{BotAwareStubMetricProvider, PartiallyFailingAnnotationProvider, PartiallyFailingMetricProvider, StubAnnotationProvider, StubMetricProvider, UnsupportedAnnotationProvider, UnsupportedMetricProvider};
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -294,6 +296,71 @@ final class ImportCommandTest extends FunctionalTestCase
         self::assertSame([$today->format('Y-m-d') => 0], $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today, $today)));
     }
 
+    public function testFlushesBotAgentDetailForABotAwareProviderAfterItsPersistenceStep(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $stub = new BotAwareStubMetricProvider(
+            [new UrlMetric('https://example.com/about', $today, 'bot.ai_crawler', 3)],
+            $this->get(BotAgentDetailCollector::class),
+            $today,
+            'https://example.com/about',
+            Bucket::AiCrawler,
+            'GPTBot',
+        );
+
+        $exitCode = $this->runImport([$stub]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $queryBuilder = $this->get(ConnectionPool::class)->getQueryBuilderForTable('tx_typo3pagemetrics_bot_agent_daily');
+        $hits = $queryBuilder
+            ->select('hits')
+            ->from('tx_typo3pagemetrics_bot_agent_daily')
+            ->where(
+                $queryBuilder->expr()->eq('page_uid', $queryBuilder->createNamedParameter(2)),
+                $queryBuilder->expr()->eq('bucket', $queryBuilder->createNamedParameter('ai_crawler')),
+                $queryBuilder->expr()->eq('agent', $queryBuilder->createNamedParameter('GPTBot')),
+            )
+            ->executeQuery()
+            ->fetchOne();
+
+        self::assertSame(1, $hits);
+    }
+
+    public function testRunningTheSameLogImportTwiceProducesIdenticalTotalsRatherThanDoubleCounting(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $urlMetric = new UrlMetric('https://example.com/about', $today, 'bot.ai_crawler', 3);
+        $collector = $this->get(BotAgentDetailCollector::class);
+
+        $firstRun = new BotAwareStubMetricProvider([$urlMetric], $collector, $today, 'https://example.com/about', Bucket::AiCrawler, 'GPTBot');
+        $this->runImport([$firstRun], true);
+
+        $secondRun = new BotAwareStubMetricProvider([$urlMetric], $collector, $today, 'https://example.com/about', Bucket::AiCrawler, 'GPTBot');
+        $this->runImport([$secondRun], true);
+
+        $series = $this->dailyMetricsRepository->dailySeries(2, 0, 'bot.ai_crawler', new DateRange($today, $today));
+        self::assertSame([$today->format('Y-m-d') => 3], $series);
+
+        $queryBuilder = $this->get(ConnectionPool::class)->getQueryBuilderForTable('tx_typo3pagemetrics_bot_agent_daily');
+        $hits = $queryBuilder
+            ->select('hits')
+            ->from('tx_typo3pagemetrics_bot_agent_daily')
+            ->where(
+                $queryBuilder->expr()->eq('page_uid', $queryBuilder->createNamedParameter(2)),
+                $queryBuilder->expr()->eq('bucket', $queryBuilder->createNamedParameter('ai_crawler')),
+                $queryBuilder->expr()->eq('agent', $queryBuilder->createNamedParameter('GPTBot')),
+            )
+            ->executeQuery()
+            ->fetchOne();
+
+        // The collector counts one hit per add() call, not the unrelated
+        // stub UrlMetric's value (3, asserted above for the daily-metrics
+        // table only) - re-running the same single classified hit must
+        // still land on 1, not 2, proving replace-not-add semantics for the
+        // bot-agent-daily table too.
+        self::assertSame(1, $hits);
+    }
+
     private function writeDisabledSite(): void
     {
         $this->get(SiteWriter::class)->write('disabled', [
@@ -322,6 +389,8 @@ final class ImportCommandTest extends FunctionalTestCase
             $this->unresolvedUrlRepository,
             $this->importStateRepository,
             $this->annotationRepository,
+            $this->get(BotAgentDetailCollector::class),
+            $this->get(ConnectionPool::class),
             $providers,
             $annotationProviders,
         );

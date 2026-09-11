@@ -19,10 +19,12 @@ use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, ResolvedUrl};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\{AnnotationProviderInterface, MetricProviderInterface};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
+use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\{InputInterface, InputOption};
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 
@@ -50,6 +52,8 @@ final class ImportCommand extends Command
         private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
         private readonly ImportStateRepository $importStateRepository,
         private readonly AnnotationRepository $annotationRepository,
+        private readonly BotAgentDetailCollector $botAgentDetailCollector,
+        private readonly ConnectionPool $connectionPool,
         private readonly iterable $providers,
         private readonly iterable $annotationProviders,
     ) {
@@ -191,15 +195,21 @@ final class ImportCommand extends Command
             }
         }
 
-        foreach ($aggregated as $row) {
-            $this->dailyMetricsRepository->upsert($row['pageUid'], $row['languageUid'], $identifier, $row['date'], $row['metric'], $row['value'], $row['dimension']);
-        }
+        $connection = $this->connectionPool->getConnectionForTable('tx_typo3pagemetrics_daily');
+        $connection->transactional(function () use ($aggregated, $identifier, $site, $configuration, $today): void {
+            foreach ($aggregated as $row) {
+                $this->dailyMetricsRepository->upsert($row['pageUid'], $row['languageUid'], $identifier, $row['date'], $row['metric'], $row['value'], $row['dimension']);
+            }
 
-        // Mark yesterday, not today, as the last complete imported day: a
-        // scheduled run may only capture part of today's traffic, so today
-        // must always be revisited (and safely re-upserted) by the next run
-        // until it is genuinely a fully elapsed prior day.
-        $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $today->modify('-1 day'));
+            $this->botAgentDetailCollector->flush($site->getIdentifier(), $configuration->dropQueryString, $configuration->keepQueryParams);
+
+            // Mark yesterday, not today, as the last complete imported day: a
+            // scheduled run may only capture part of today's traffic, so today
+            // must always be revisited (and safely re-upserted) by the next run
+            // until it is genuinely a fully elapsed prior day.
+            $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $today->modify('-1 day'));
+        });
+
         $output->writeln(sprintf('Imported "%s" for site "%s" from %s to %s.', $identifier, $site->getIdentifier(), $from->format('Y-m-d'), $today->format('Y-m-d')));
     }
 
