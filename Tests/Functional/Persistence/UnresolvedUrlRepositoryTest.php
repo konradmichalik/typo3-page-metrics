@@ -19,6 +19,8 @@ use KonradMichalik\Typo3PageMetrics\Persistence\UnresolvedUrlRepository;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
+use function array_column;
+
 /**
  * UnresolvedUrlRepositoryTest.
  *
@@ -87,6 +89,41 @@ final class UnresolvedUrlRepositoryTest extends FunctionalTestCase
         $this->subject->record('matomo', new DateTimeImmutable('2026-01-01'), 'https://example.com/old', 'matomo.pageviews', UnresolvedReason::Unknown, 1, 100);
 
         self::assertSame(0, $this->subject->countForSite('example.com', new DateTimeImmutable('2026-06-01')));
+    }
+
+    public function testCountForSiteExcludesBotMetrics(): void
+    {
+        $date = new DateTimeImmutable('today');
+        $this->subject->record('accesslog', $date, 'https://example.com/gone', 'accesslog.pageviews', UnresolvedReason::Unknown, 1, 100);
+        $this->subject->record('accesslog', $date, 'https://example.com/wp-login.php', 'bot.ai_crawler', UnresolvedReason::Unknown, 1, 100);
+
+        self::assertSame(2, $this->countRows());
+        self::assertSame(1, $this->subject->countForSite('example.com', $date->modify('-30 days')));
+    }
+
+    public function testListForSiteExcludesBotMetrics(): void
+    {
+        $date = new DateTimeImmutable('today');
+        $this->subject->record('accesslog', $date, 'https://example.com/gone', 'accesslog.pageviews', UnresolvedReason::Unknown, 1, 100);
+        $this->subject->record('accesslog', $date, 'https://example.com/wp-login.php', 'bot.ai_crawler', UnresolvedReason::Unknown, 99, 100);
+
+        $rows = $this->subject->listForSite('example.com', $date->modify('-30 days'), 10);
+
+        self::assertSame(
+            [['url' => 'https://example.com/gone', 'reason' => UnresolvedReason::Unknown->value, 'value' => 1]],
+            $rows,
+        );
+    }
+
+    public function testListForSiteReturnsTheHighestValueHumanUrlsFirst(): void
+    {
+        $date = new DateTimeImmutable('today');
+        $this->subject->record('matomo', $date, 'https://example.com/low', 'matomo.pageviews', UnresolvedReason::Unknown, 2, 100);
+        $this->subject->record('matomo', $date, 'https://example.com/high', 'matomo.pageviews', UnresolvedReason::Unknown, 40, 100);
+
+        $urls = array_column($this->subject->listForSite('example.com', $date->modify('-30 days'), 10), 'url');
+
+        self::assertSame(['https://example.com/high', 'https://example.com/low'], $urls);
     }
 
     private function countRows(): int

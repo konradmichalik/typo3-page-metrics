@@ -28,6 +28,12 @@ class UnresolvedUrlRepository
 {
     private const TABLE = 'tx_typo3pagemetrics_unresolved';
 
+    /**
+     * A real LIKE wildcard, not user input - passed through
+     * createNamedParameter() so the % reaches the database as written.
+     */
+    private const BOT_METRIC_PATTERN = 'bot.%';
+
     public function __construct(
         private readonly ConnectionPool $connectionPool,
     ) {}
@@ -58,6 +64,13 @@ class UnresolvedUrlRepository
         $this->trimToCap($provider, $dateString, $capPerDay);
     }
 
+    /**
+     * Bot metrics are excluded on purpose, here and in listForSite(): both
+     * feed human-facing "not found pages" surfaces, and an access log's bot
+     * traffic records an unresolved row for every dead link, /wp-login.php
+     * and /.env probe it carries, which would bury the handful of URLs a
+     * human actually needs to see. The bot side gets its own surface.
+     */
     public function countForSite(string $host, DateTimeImmutable $since): int
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
@@ -69,6 +82,7 @@ class UnresolvedUrlRepository
             ->where(
                 $queryBuilder->expr()->like('url', $queryBuilder->createNamedParameter($likePattern)),
                 $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($since->format('Y-m-d'))),
+                $queryBuilder->expr()->notLike('metric', $queryBuilder->createNamedParameter(self::BOT_METRIC_PATTERN)),
             )
             ->executeQuery()
             ->fetchOne();
@@ -77,7 +91,8 @@ class UnresolvedUrlRepository
     /**
      * The highest-value unresolved URLs for a site, one row per url+reason,
      * summed across every day in range - the "not found pages" widget's
-     * data source.
+     * data source. Bot metrics are excluded for the reason countForSite()
+     * spells out.
      *
      * @return list<array{url: string, reason: string, value: int}>
      */
@@ -93,6 +108,7 @@ class UnresolvedUrlRepository
             ->where(
                 $queryBuilder->expr()->like('url', $queryBuilder->createNamedParameter($likePattern)),
                 $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($since->format('Y-m-d'))),
+                $queryBuilder->expr()->notLike('metric', $queryBuilder->createNamedParameter(self::BOT_METRIC_PATTERN)),
             )
             ->groupBy('url', 'reason')
             ->orderBy('total', 'DESC')
