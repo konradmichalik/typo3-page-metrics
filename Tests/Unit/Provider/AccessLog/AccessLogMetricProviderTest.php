@@ -14,8 +14,12 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Provider\AccessLog;
 
 use DateTimeImmutable;
+use KonradMichalik\Typo3PageMetrics\Analysis\Guard\PathHeuristicGuard;
+use KonradMichalik\Typo3PageMetrics\Analysis\Parser\CombinedLogParser;
+use KonradMichalik\Typo3PageMetrics\Analysis\Taxonomy\{AgentMatcher, BotTaxonomy};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, UrlMetric};
-use KonradMichalik\Typo3PageMetrics\Provider\AccessLog\{AccessLogConfiguration, AccessLogConfigurationResolver, AccessLogLineParser, AccessLogMetricProvider, BotFilter};
+use KonradMichalik\Typo3PageMetrics\Provider\AccessLog\{AccessLogConfiguration, AccessLogConfigurationResolver, AccessLogMetricProvider};
+use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -41,6 +45,10 @@ final class AccessLogMetricProviderTest extends TestCase
 {
     /** @var AccessLogConfigurationResolver&\PHPUnit\Framework\MockObject\MockObject */
     private AccessLogConfigurationResolver $resolver;
+
+    /** @var BotAgentDetailCollector&\PHPUnit\Framework\MockObject\MockObject */
+    private BotAgentDetailCollector $collector;
+
     private AccessLogMetricProvider $subject;
     private Site $site;
 
@@ -50,7 +58,14 @@ final class AccessLogMetricProviderTest extends TestCase
     protected function setUp(): void
     {
         $this->resolver = $this->createMock(AccessLogConfigurationResolver::class);
-        $this->subject = new AccessLogMetricProvider($this->resolver, new AccessLogLineParser(), new BotFilter());
+        $this->collector = $this->createMock(BotAgentDetailCollector::class);
+        $this->subject = new AccessLogMetricProvider(
+            $this->resolver,
+            new CombinedLogParser(),
+            new BotTaxonomy(new AgentMatcher()),
+            new PathHeuristicGuard(),
+            $this->collector,
+        );
         $this->site = new Site('main', 1, ['base' => 'https://example.com/']);
     }
 
@@ -70,14 +85,17 @@ final class AccessLogMetricProviderTest extends TestCase
         self::assertSame('accesslog', $this->subject->getIdentifier());
     }
 
-    public function testGetMetricDefinitionsReturnsPageviewsAndVisits(): void
+    public function testGetMetricDefinitionsReturnsPageviewsVisitsAndTheFiveBotBuckets(): void
     {
         $identifiers = array_map(
             static fn ($definition) => $definition->identifier,
             $this->subject->getMetricDefinitions(),
         );
 
-        self::assertSame(['accesslog.pageviews', 'accesslog.visits'], $identifiers);
+        self::assertSame(
+            ['accesslog.pageviews', 'accesslog.visits', 'bot.ai_chatbot', 'bot.ai_crawler', 'bot.search', 'bot.social', 'bot.tool'],
+            $identifiers,
+        );
     }
 
     public function testGetRateMetricDefinitionsReturnsNoRateMetrics(): void
@@ -130,7 +148,7 @@ final class AccessLogMetricProviderTest extends TestCase
         self::assertSame(2, $metrics['accesslog.visits']['https://example.com/about'] ?? null);
     }
 
-    public function testFetchFiltersOutKnownBotUserAgents(): void
+    public function testFetchFiltersOutKnownBotUserAgentsFromHumanMetrics(): void
     {
         $file = $this->writeLogFile([
             $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'Mozilla/5.0 (compatible; Googlebot/2.1)'),
@@ -143,7 +161,7 @@ final class AccessLogMetricProviderTest extends TestCase
         self::assertSame(1, $metrics['accesslog.pageviews']['https://example.com/about'] ?? null);
     }
 
-    public function testFetchOnlyCountsSuccessfulGetRequests(): void
+    public function testFetchOnlyCountsSuccessfulGetRequestsAsHumanPageviews(): void
     {
         $file = $this->writeLogFile([
             $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'BrowserA'),
@@ -159,7 +177,7 @@ final class AccessLogMetricProviderTest extends TestCase
         self::assertSame(1, $metrics['accesslog.pageviews']['https://example.com/about'] ?? null);
     }
 
-    public function testFetchCountsA304NotModifiedAsAPageview(): void
+    public function testFetchCountsA304NotModifiedAsAHumanPageview(): void
     {
         $file = $this->writeLogFile([
             $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'BrowserA'),
@@ -172,7 +190,7 @@ final class AccessLogMetricProviderTest extends TestCase
         self::assertSame(2, $metrics['accesslog.pageviews']['https://example.com/about'] ?? null);
     }
 
-    public function testFetchFiltersOutStaticAssetsAndBackendPaths(): void
+    public function testFetchFiltersOutStaticAssetsAndBackendPathsFromHumanMetrics(): void
     {
         $file = $this->writeLogFile([
             $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/style.css', 200, 'BrowserA'),
@@ -232,6 +250,41 @@ final class AccessLogMetricProviderTest extends TestCase
         unlink($directory.'/access.log');
         unlink($directory.'/access.log.1');
         rmdir($directory);
+    }
+
+    public function testFetchYieldsABotBucketMetricForAClassifiedLineRegardlessOfStatus(): void
+    {
+        $file = $this->writeLogFile([
+            $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/gone', 404, 'GPTBot/1.0'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        self::assertSame(1, $metrics['bot.ai_crawler']['https://example.com/gone'] ?? null);
+    }
+
+    public function testFetchDoesNotCountAClassifiedLineAsAHumanPageview(): void
+    {
+        $file = $this->writeLogFile([
+            $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'GPTBot/1.0'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        self::assertArrayNotHasKey('https://example.com/about', $metrics['accesslog.pageviews'] ?? []);
+    }
+
+    public function testFetchTellsTheCollectorAboutEveryClassifiedLine(): void
+    {
+        $file = $this->writeLogFile([
+            $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'GPTBot/1.0'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+        $this->collector->expects(self::once())->method('add');
+
+        iterator_to_array($this->subject->fetch($this->site, $this->rangeCoveringOctober10th()));
     }
 
     private function rangeCoveringOctober10th(): DateRange
