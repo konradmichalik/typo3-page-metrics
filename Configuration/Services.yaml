@@ -143,3 +143,9 @@ services:
             - name: console.command
               command: 'page-metrics:import'
               description: 'Import page metrics from configured providers'
+
+    KonradMichalik\Typo3PageMetrics\Command\AnalyzeCommand:
+        tags:
+            - name: console.command
+              command: 'page-metrics:analyze'
+              description: 'Analyze access logs ad hoc, without writing to the database'
