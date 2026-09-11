@@ -52,6 +52,24 @@ CREATE TABLE tx_typo3pagemetrics_annotation (
 	UNIQUE KEY fact (provider,site_identifier,annotation_id)
 );
 
+CREATE TABLE tx_typo3pagemetrics_bot_agent_daily (
+	uid int(11) unsigned NOT NULL auto_increment,
+	date date NOT NULL,
+	site_identifier varchar(255) DEFAULT '' NOT NULL,
+	page_uid int(11) unsigned DEFAULT '0' NOT NULL,
+	sys_language_uid int(11) DEFAULT '0' NOT NULL,
+	bucket varchar(20) DEFAULT '' NOT NULL,
+	agent varchar(255) DEFAULT '' NOT NULL,
+	agent_hash char(40) DEFAULT '' NOT NULL,
+	hits int(11) unsigned DEFAULT '0' NOT NULL,
+	hits_suspicious int(11) unsigned DEFAULT '0' NOT NULL,
+
+	PRIMARY KEY (uid),
+	KEY site_date (site_identifier,date),
+	KEY page_date (page_uid,sys_language_uid,date),
+	UNIQUE KEY fact (date,site_identifier,page_uid,sys_language_uid,bucket,agent_hash)
+);
+
 # uid/pid and the standard ctrl fields (tstamp, crdate, cruser_id, deleted,
 # hidden) are added automatically from Configuration/TCA/tx_typo3pagemetrics_
 # manual_annotation.php by TYPO3's DefaultTcaSchema - only this table's own
