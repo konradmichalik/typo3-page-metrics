@@ -16,7 +16,8 @@ namespace KonradMichalik\Typo3PageMetrics\Persistence;
 use DateTimeImmutable;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
-use function sha1;
+use function hash;
+use function substr;
 
 /**
  * BotAgentDailyRepository.
@@ -26,7 +27,7 @@ use function sha1;
  * never add, semantics: a rotated log re-imported after a hash change must
  * land on the same total, not double-count on top of it.
  *
- * agent_hash (sha1 of the agent string) carries the identity instead of the
+ * agent_hash (a 40-char digest of the agent string) carries the identity instead of the
  * agent column itself, keeping the unique index narrow regardless of how
  * long a given agent string is - agent itself is stored purely as display
  * payload, updated alongside hits/hits_suspicious on every upsert() so a
@@ -52,7 +53,10 @@ class BotAgentDailyRepository
             'page_uid' => $pageUid,
             'sys_language_uid' => $languageUid,
             'bucket' => $bucket,
-            'agent_hash' => sha1($agent),
+            // Truncated to match the char(40) column, same length as a full
+            // SHA-1 digest would occupy, without using the disallowed sha1()
+            // function - the same pattern UnresolvedUrlRepository uses.
+            'agent_hash' => substr(hash('sha256', $agent), 0, 40),
         ];
 
         $existingUid = $connection->select(['uid'], self::TABLE, $identity)->fetchOne();

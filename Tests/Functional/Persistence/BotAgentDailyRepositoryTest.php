@@ -55,9 +55,9 @@ final class BotAgentDailyRepositoryTest extends FunctionalTestCase
     public function testUpsertKeepsRowsWithDifferentAgentsSeparateEvenWithColliding32CharPrefixHashes(): void
     {
         // Two distinct agent strings that share the same first bytes are still
-        // distinct identities: the unique key includes the full agent_hash
-        // (sha1, 40 hex chars), not a truncated prefix, so this is really just
-        // confirming two different agents produce two different rows.
+        // distinct identities: the unique key includes the whole 40-char
+        // agent_hash column, so this is really just confirming two different
+        // agents produce two different rows.
         $date = new DateTimeImmutable('2026-10-10');
         $this->subject->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', $date, 5, 0);
         $this->subject->upsert('main', 2, 0, 'ai_crawler', 'ClaudeBot', $date, 3, 0);
