@@ -15,6 +15,9 @@ services:
         exclude:
             - '../Classes/Widgets/*'
 
+    KonradMichalik\Typo3PageMetrics\Analysis\Guard\SpoofingGuardInterface:
+        alias: KonradMichalik\Typo3PageMetrics\Analysis\Guard\PathHeuristicGuard
+
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming service references it.
     KonradMichalik\Typo3PageMetrics\Resolver\SlugLookup:
