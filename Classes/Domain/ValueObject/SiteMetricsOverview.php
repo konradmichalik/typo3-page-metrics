@@ -46,6 +46,6 @@ final readonly class SiteMetricsOverview
         public array $topPages,
         public array $unresolvedUrls,
         public array $annotations,
-        public array $additionalChartSeries = [],
+        public array $additionalChartSeries,
     ) {}
 }

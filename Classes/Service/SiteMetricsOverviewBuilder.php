@@ -65,7 +65,7 @@ final readonly class SiteMetricsOverviewBuilder
         $provider = $this->resolveProvider($site);
 
         if (null === $provider) {
-            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], []);
+            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], []);
         }
 
         $primary = $this->primaryDefinition($provider);
