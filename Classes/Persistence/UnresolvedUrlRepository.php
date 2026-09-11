@@ -28,12 +28,6 @@ class UnresolvedUrlRepository
 {
     private const TABLE = 'tx_typo3pagemetrics_unresolved';
 
-    /**
-     * A real LIKE wildcard, not user input - passed through
-     * createNamedParameter() so the % reaches the database as written.
-     */
-    private const BOT_METRIC_PATTERN = 'bot.%';
-
     public function __construct(
         private readonly ConnectionPool $connectionPool,
     ) {}
@@ -82,7 +76,7 @@ class UnresolvedUrlRepository
             ->where(
                 $queryBuilder->expr()->like('url', $queryBuilder->createNamedParameter($likePattern)),
                 $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($since->format('Y-m-d'))),
-                $queryBuilder->expr()->notLike('metric', $queryBuilder->createNamedParameter(self::BOT_METRIC_PATTERN)),
+                $queryBuilder->expr()->notLike('metric', $queryBuilder->createNamedParameter('bot.%')),
             )
             ->executeQuery()
             ->fetchOne();
@@ -108,7 +102,7 @@ class UnresolvedUrlRepository
             ->where(
                 $queryBuilder->expr()->like('url', $queryBuilder->createNamedParameter($likePattern)),
                 $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($since->format('Y-m-d'))),
-                $queryBuilder->expr()->notLike('metric', $queryBuilder->createNamedParameter(self::BOT_METRIC_PATTERN)),
+                $queryBuilder->expr()->notLike('metric', $queryBuilder->createNamedParameter('bot.%')),
             )
             ->groupBy('url', 'reason')
             ->orderBy('total', 'DESC')
