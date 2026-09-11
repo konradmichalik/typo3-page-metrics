@@ -50,16 +50,16 @@ final class CombinedLogParser implements LogParserInterface
         $host = $this->nullIfEmptyOrDash($matches[8] ?? '');
 
         return new LogLine(
-            ip: $matches[1],
-            timestamp: $timestamp,
-            method: $method,
-            target: $target,
-            protocol: $protocol,
-            status: (int) $matches[4],
-            bytesSent: $bytesSent,
-            referer: $referer,
-            userAgent: $matches[7] ?? '',
-            host: $host,
+            $matches[1],
+            $timestamp,
+            $method,
+            $target,
+            $protocol,
+            (int) $matches[4],
+            $bytesSent,
+            $referer,
+            $matches[7] ?? '',
+            $host,
         );
     }
 

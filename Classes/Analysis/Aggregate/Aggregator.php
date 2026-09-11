@@ -55,13 +55,13 @@ final class Aggregator
     {
         return array_values(array_map(
             static fn (array $row): AgentDailyAggregate => new AgentDailyAggregate(
-                date: $row['date'],
-                bucket: $row['bucket'],
-                agent: $row['agent'],
-                hits: $row['hits'],
-                hitsOk: $row['hitsOk'],
-                hitsForbidden: $row['hitsForbidden'],
-                hitsSuspicious: $row['hitsSuspicious'],
+                $row['date'],
+                $row['bucket'],
+                $row['agent'],
+                $row['hits'],
+                $row['hitsOk'],
+                $row['hitsForbidden'],
+                $row['hitsSuspicious'],
             ),
             $this->agentTotals,
         ));
@@ -74,11 +74,11 @@ final class Aggregator
     {
         return array_values(array_map(
             static fn (array $row): UrlDailyAggregate => new UrlDailyAggregate(
-                date: $row['date'],
-                url: $row['url'],
-                bucket: $row['bucket'],
-                status: $row['status'],
-                hits: $row['hits'],
+                $row['date'],
+                $row['url'],
+                $row['bucket'],
+                $row['status'],
+                $row['hits'],
             ),
             $this->urlTotals,
         ));
