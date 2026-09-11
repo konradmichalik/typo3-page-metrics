@@ -23,6 +23,7 @@ use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
+use function array_keys;
 use function array_map;
 use function file_exists;
 use function file_put_contents;
@@ -159,6 +160,49 @@ final class AccessLogMetricProviderTest extends TestCase
         $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
 
         self::assertSame(1, $metrics['accesslog.pageviews']['https://example.com/about'] ?? null);
+    }
+
+    public function testFetchExcludesUnnamedGenericBotsFromHumanMetricsWithoutBucketingThem(): void
+    {
+        $file = $this->writeLogFile([
+            $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'SomeVendorCrawler/1.0'),
+            $this->logLine('10/Oct/2026:10:01:00 +0000', '203.0.113.2', 'GET', '/about', 200, 'WebSpider 3.2'),
+            $this->logLine('10/Oct/2026:10:02:00 +0000', '203.0.113.3', 'GET', '/about', 200, 'ACME-Monitor/2.0'),
+            $this->logLine('10/Oct/2026:10:03:00 +0000', '203.0.113.4', 'GET', '/about', 200, 'Mozilla/5.0 real browser'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        self::assertSame(1, $metrics['accesslog.pageviews']['https://example.com/about'] ?? null);
+        self::assertSame(1, $metrics['accesslog.visits']['https://example.com/about'] ?? null);
+        self::assertSame(['accesslog.pageviews', 'accesslog.visits'], array_keys($metrics));
+    }
+
+    public function testFetchExcludesAnEmptyUserAgentFromHumanMetricsWithoutBucketingIt(): void
+    {
+        $file = $this->writeLogFile([
+            $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, ''),
+            $this->logLine('10/Oct/2026:10:01:00 +0000', '203.0.113.2', 'GET', '/about', 200, 'Mozilla/5.0 real browser'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        self::assertSame(1, $metrics['accesslog.pageviews']['https://example.com/about'] ?? null);
+        self::assertSame(['accesslog.pageviews', 'accesslog.visits'], array_keys($metrics));
+    }
+
+    public function testFetchNeverTellsTheCollectorAboutAnUnnamedGenericBot(): void
+    {
+        $file = $this->writeLogFile([
+            $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'SomeVendorCrawler/1.0'),
+            $this->logLine('10/Oct/2026:10:01:00 +0000', '203.0.113.2', 'GET', '/about', 200, ''),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+        $this->collector->expects(self::never())->method('add');
+
+        iterator_to_array($this->subject->fetch($this->site, $this->rangeCoveringOctober10th()));
     }
 
     public function testFetchOnlyCountsSuccessfulGetRequestsAsHumanPageviews(): void

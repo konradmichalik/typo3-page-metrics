@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Provider\AccessLog;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Analysis\Guard\PathHeuristicGuard;
-use KonradMichalik\Typo3PageMetrics\Analysis\Parser\CombinedLogParser;
+use KonradMichalik\Typo3PageMetrics\Analysis\Parser\{CombinedLogParser, LogLine};
 use KonradMichalik\Typo3PageMetrics\Analysis\Taxonomy\BotTaxonomy;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, UrlMetric};
@@ -33,8 +33,11 @@ use function gzclose;
 use function gzeof;
 use function gzgets;
 use function gzopen;
+use function implode;
 use function in_array;
 use function pathinfo;
+use function preg_match;
+use function sprintf;
 use function str_ends_with;
 use function str_starts_with;
 use function strtolower;
@@ -73,6 +76,14 @@ use function strtolower;
  * BotAgentDetailCollector, flushed by ImportCommand once this provider's
  * fetch() has been fully consumed.
  *
+ * BotTaxonomy is a curated allowlist of named agents, so an unnamed vendor
+ * crawler, a generic curl/wget script or an empty user agent is never
+ * classified into a bucket - and must therefore not silently fall through
+ * into the human numbers either. GENERIC_BOT_SIGNATURES catches exactly
+ * that residue on the human branch alone (see isGenericBotNoise()): such a
+ * line counts toward neither pageviews/visits nor any bot.<bucket> metric,
+ * because there is no bucket for a bot nobody has a name for.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class AccessLogMetricProvider implements MetricProviderInterface
@@ -93,13 +104,36 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
         'zip', 'xml', 'json', 'txt',
     ];
 
+    /**
+     * A best-effort substring heuristic for the crawlers, monitors and
+     * generic HTTP clients BotTaxonomy's named allowlist cannot name, kept
+     * deliberately coarse: its only job is to keep them out of the human
+     * page-view counts they would otherwise dominate, not to attribute them
+     * to anyone. Applies only to lines BotTaxonomy left unclassified.
+     */
+    private const GENERIC_BOT_SIGNATURES = [
+        'bot', 'crawl', 'spider', 'slurp', 'archiver', 'facebookexternalhit',
+        'curl', 'wget', 'python-requests', 'python-urllib', 'go-http-client',
+        'okhttp', 'axios', 'libwww-perl', 'scrapy', 'headlesschrome',
+        'phantomjs', 'monitor', 'pingdom', 'uptimerobot', 'ahrefs', 'semrush',
+        'mj12', 'petalbot', 'dotbot', 'seznambot',
+    ];
+
+    // Built once per instance rather than on every isGenericBotNoise() call:
+    // that runs once per parsed log line, easily hundreds of thousands of
+    // times for a busy site's daily log, and the signature list never
+    // changes at runtime.
+    private string $genericBotPattern;
+
     public function __construct(
         private AccessLogConfigurationResolver $configurationResolver,
         private CombinedLogParser $lineParser,
         private BotTaxonomy $taxonomy,
         private PathHeuristicGuard $guard,
         private BotAgentDetailCollector $agentDetailCollector,
-    ) {}
+    ) {
+        $this->genericBotPattern = sprintf('/%s/i', implode('|', self::GENERIC_BOT_SIGNATURES));
+    }
 
     public function getIdentifier(): string
     {
@@ -181,7 +215,7 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
                 continue;
             }
 
-            if ('GET' !== $line->method || !$this->wasSuccessful($line->status) || !$this->isRelevantPath($line->target)) {
+            if (!$this->countsAsHumanPageview($line)) {
                 continue;
             }
 
@@ -208,6 +242,33 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
                 }
             }
         }
+    }
+
+    /**
+     * Only reached for a line BotTaxonomy left unclassified, i.e. one that
+     * has already been ruled out as named bot traffic. Everything it
+     * rejects here is discarded outright: it contributes to no bot bucket
+     * (there is none for it) and to no human metric either.
+     */
+    private function countsAsHumanPageview(LogLine $line): bool
+    {
+        return 'GET' === $line->method
+            && $this->wasSuccessful($line->status)
+            && $this->isRelevantPath($line->target)
+            && !$this->isGenericBotNoise($line->userAgent);
+    }
+
+    /**
+     * An empty user agent counts as a match: browsers always send one, so
+     * its absence is itself a signal of a script rather than a person.
+     */
+    private function isGenericBotNoise(string $userAgent): bool
+    {
+        if ('' === $userAgent) {
+            return true;
+        }
+
+        return 1 === preg_match($this->genericBotPattern, $userAgent);
     }
 
     /**
