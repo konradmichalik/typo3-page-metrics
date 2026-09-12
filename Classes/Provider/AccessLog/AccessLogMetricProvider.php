@@ -19,26 +19,19 @@ use KonradMichalik\Typo3PageMetrics\Analysis\Parser\{CombinedLogParser, LogLine}
 use KonradMichalik\Typo3PageMetrics\Analysis\Taxonomy\BotTaxonomy;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, UrlMetric};
+use KonradMichalik\Typo3PageMetrics\Import\LogFileReader;
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
+use RuntimeException;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
-use function count;
 use function explode;
-use function fclose;
-use function fgets;
-use function fopen;
 use function glob;
-use function gzclose;
-use function gzeof;
-use function gzgets;
-use function gzopen;
 use function implode;
 use function in_array;
 use function pathinfo;
 use function preg_match;
 use function sprintf;
-use function str_ends_with;
 use function str_starts_with;
 use function strtolower;
 
@@ -84,6 +77,15 @@ use function strtolower;
  * line counts toward neither pageviews/visits nor any bot.<bucket> metric,
  * because there is no bucket for a bot nobody has a name for.
  *
+ * Emission is incremental, one day at a time, rather than one aggregate
+ * over the whole requested range: retentionDays defaults to 400, and
+ * holding a distinct-visitor set per (day, path) for that long is millions
+ * of array entries on any real site. An out-of-memory error is not a
+ * Throwable, so ImportCommand's per-provider catch cannot contain it and no
+ * import state gets written - the next run then starts in the same place
+ * and dies the same way. See DailyAggregationBuffer::finishedDates() for how
+ * a day is decided to be finished, and what that costs.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class AccessLogMetricProvider implements MetricProviderInterface
@@ -98,6 +100,12 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
      * path; see the class docblock for why bot classification does not use
      * this filter.
      */
+    /**
+     * How many opening lines of a file may fail to parse before it is
+     * treated as undatable for ordering purposes.
+     */
+    private const ORDERING_PROBE_LINES = 10;
+
     private const STATIC_ASSET_EXTENSIONS = [
         'css', 'js', 'mjs', 'map', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp',
         'ico', 'woff', 'woff2', 'ttf', 'eot', 'otf', 'mp4', 'webm', 'pdf',
@@ -131,6 +139,7 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
         private BotTaxonomy $taxonomy,
         private PathHeuristicGuard $guard,
         private BotAgentDetailCollector $agentDetailCollector,
+        private LogFileReader $logFileReader,
     ) {
         $this->genericBotPattern = sprintf('/%s/i', implode('|', self::GENERIC_BOT_SIGNATURES));
     }
@@ -185,29 +194,22 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
         $base = $site->getBase();
         $baseUrl = $base->getScheme().'://'.$base->getAuthority();
 
-        [$pageviews, $visitors, $botHits] = $this->aggregate($configuration->pathPattern, $allowedDates, $baseUrl);
-
-        yield from $this->yieldPageviewMetrics($pageviews, $visitors, $baseUrl);
-        yield from $this->yieldBotMetrics($botHits);
+        yield from $this->aggregate($configuration->pathPattern, $allowedDates, $baseUrl);
     }
 
     /**
+     * Reads the log once and emits each day as soon as it is finished, so
+     * the buffer never holds more than about two days at a time. See
+     * DailyAggregationBuffer::finishedDates() for when a day counts as
+     * finished and what the rule gives up.
+     *
      * @param array<string, true> $allowedDates
      *
-     * @return array{
-     *     0: array<string, array<string, int>>,
-     *     1: array<string, array<string, array<string, true>>>,
-     *     2: array<string, array<string, array<string, int>>>,
-     * } [pageviews, visitors, botHits], each keyed date => ...
+     * @return iterable<UrlMetric>
      */
-    private function aggregate(string $pathPattern, array $allowedDates, string $baseUrl): array
+    private function aggregate(string $pathPattern, array $allowedDates, string $baseUrl): iterable
     {
-        /** @var array<string, array<string, int>> $pageviews date => path => hit count */
-        $pageviews = [];
-        /** @var array<string, array<string, array<string, true>>> $visitors date => path => "ip|userAgent" set */
-        $visitors = [];
-        /** @var array<string, array<string, array<string, int>>> $botHits date => bucket value => url => hit count */
-        $botHits = [];
+        $buffer = new DailyAggregationBuffer();
 
         foreach ($this->lines($pathPattern) as $rawLine) {
             $line = $this->lineParser->parseLine($rawLine);
@@ -222,60 +224,69 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
                 continue;
             }
 
-            $classification = $this->taxonomy->classify($line);
-            $url = $baseUrl.$line->target;
-
-            if (null !== $classification) {
-                $botHits[$date][$classification->bucket->value][$url] = ($botHits[$date][$classification->bucket->value][$url] ?? 0) + 1;
-                $this->agentDetailCollector->add($line->timestamp, $url, $classification->bucket, $classification->agent, $this->guard->isSuspicious($line));
-
-                continue;
+            if ($buffer->isClosed($date)) {
+                // The set is not in chronological order after all, so the
+                // incremental read cannot hold: this day has been written
+                // already and adding to it now would double-count it. Better
+                // to stop with a name and a reason than to finish with
+                // numbers nobody can audit.
+                throw new RuntimeException(sprintf('Access log for pattern "%s" is not in chronological order: an entry for %s appears after that day was already imported. Narrow the pattern so it matches one server\'s rotation set.', $pathPattern, $date), 1757700001);
             }
 
-            if (!$this->countsAsHumanPageview($line)) {
-                continue;
-            }
-
-            $pageviews[$date][$line->target] = ($pageviews[$date][$line->target] ?? 0) + 1;
-            $visitors[$date][$line->target][$line->ip.'|'.$line->userAgent] = true;
-        }
-
-        return [$pageviews, $visitors, $botHits];
-    }
-
-    /**
-     * @param array<string, array<string, int>>                 $pageviews date => path => hit count
-     * @param array<string, array<string, array<string, true>>> $visitors  date => path => "ip|userAgent" set
-     *
-     * @return iterable<UrlMetric>
-     */
-    private function yieldPageviewMetrics(array $pageviews, array $visitors, string $baseUrl): iterable
-    {
-        foreach ($pageviews as $date => $paths) {
-            $day = new DateTimeImmutable($date);
-
-            foreach ($paths as $path => $hits) {
-                $url = $baseUrl.$path;
-                yield new UrlMetric($url, $day, 'accesslog.pageviews', $hits);
-                yield new UrlMetric($url, $day, 'accesslog.visits', count($visitors[$date][$path] ?? []));
-            }
-        }
-    }
-
-    /**
-     * @param array<string, array<string, array<string, int>>> $botHits date => bucket value => url => hit count
-     *
-     * @return iterable<UrlMetric>
-     */
-    private function yieldBotMetrics(array $botHits): iterable
-    {
-        foreach ($botHits as $date => $byBucket) {
-            $day = new DateTimeImmutable($date);
-
-            foreach ($byBucket as $bucketValue => $urls) {
-                foreach ($urls as $url => $hits) {
-                    yield new UrlMetric($url, $day, 'bot.'.$bucketValue, $hits);
+            // Only when the watermark moved: a day's worth of lines all
+            // report the same date, and checking every one of them would put
+            // date arithmetic and a sort on the hot path of a million-line
+            // read for an answer that cannot have changed.
+            if ($buffer->advanceTo($date)) {
+                foreach ($buffer->finishedDates() as $finished) {
+                    yield from $this->yieldDay($finished, $buffer, $baseUrl);
+                    $buffer->forget($finished);
                 }
+            }
+
+            $this->record($buffer, $line, $date, $baseUrl);
+        }
+
+        foreach ($buffer->bufferedDates() as $remaining) {
+            yield from $this->yieldDay($remaining, $buffer, $baseUrl);
+        }
+    }
+
+    private function record(DailyAggregationBuffer $buffer, LogLine $line, string $date, string $baseUrl): void
+    {
+        $classification = $this->taxonomy->classify($line);
+        $url = $baseUrl.$line->target;
+
+        if (null !== $classification) {
+            $buffer->addBotHit($date, $classification->bucket->value, $url);
+            $this->agentDetailCollector->add($line->timestamp, $url, $classification->bucket, $classification->agent, $this->guard->isSuspicious($line));
+
+            return;
+        }
+
+        if (!$this->countsAsHumanPageview($line)) {
+            return;
+        }
+
+        $buffer->addPageview($date, $line->target, $line->ip.'|'.$line->userAgent);
+    }
+
+    /**
+     * @return iterable<UrlMetric>
+     */
+    private function yieldDay(string $date, DailyAggregationBuffer $buffer, string $baseUrl): iterable
+    {
+        $day = new DateTimeImmutable($date);
+
+        foreach ($buffer->pageviewsOn($date) as $path => $hits) {
+            $url = $baseUrl.$path;
+            yield new UrlMetric($url, $day, 'accesslog.pageviews', $hits);
+            yield new UrlMetric($url, $day, 'accesslog.visits', $buffer->visitorCountOn($date, $path));
+        }
+
+        foreach ($buffer->botHitsOn($date) as $bucketValue => $urls) {
+            foreach ($urls as $url => $hits) {
+                yield new UrlMetric($url, $day, 'bot.'.$bucketValue, $hits);
             }
         }
     }
@@ -339,52 +350,89 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
      */
     private function lines(string $pathPattern): iterable
     {
-        foreach (glob($pathPattern) ?: [] as $file) {
-            yield from str_ends_with($file, '.gz') ? $this->gzipLines($file) : $this->plainLines($file);
-        }
-    }
-
-    /**
-     * @return iterable<string>
-     */
-    private function plainLines(string $file): iterable
-    {
-        $handle = fopen($file, 'r');
-
-        if (false === $handle) {
-            return;
-        }
-
-        try {
-            while (false !== ($line = fgets($handle))) {
-                yield $line;
+        foreach ($this->orderedFiles($pathPattern) as $file) {
+            try {
+                yield from $this->logFileReader->readLines($file);
+            } catch (RuntimeException) {
+                // One unreadable file must not cost the site its whole
+                // import. A glob over a rotation directory routinely picks up
+                // a file the web user cannot read, and logrotate can delete
+                // or recompress one between the glob and the read of a long
+                // first run. The reader throws for both, and skipping keeps
+                // the behaviour the provider had before it used the reader.
+                continue;
             }
-        } finally {
-            fclose($handle);
         }
     }
 
     /**
-     * @return iterable<string>
+     * Oldest file first, by the date of the first entry each one contains.
+     *
+     * The order is not a nicety. A day is emitted once the reader has moved
+     * two days past it (see DailyAggregationBuffer::finishedDates()), so
+     * reading an older file after a newer one produces a day that was
+     * already written, which the buffer refuses outright.
+     *
+     * By content rather than by modification time: mtime looks like the
+     * obvious key and is not one. A restore from backup, an rsync without
+     * -t or a plain cp rewrites every mtime to the same instant, and the
+     * order silently becomes the glob's. File names are no better, since
+     * rotation schemes disagree (access.log.1, access.log-20261001.gz) and
+     * several of them sort the wrong way round alphabetically.
+     *
+     * Reading one line per file to find out costs a single decompression
+     * block on the gzipped ones, against a full read of every file straight
+     * afterwards.
+     *
+     * @return list<string>
      */
-    private function gzipLines(string $file): iterable
+    private function orderedFiles(string $pathPattern): array
     {
-        $handle = gzopen($file, 'rb');
+        $startDates = [];
 
-        if (false === $handle) {
-            return;
+        foreach (glob($pathPattern) ?: [] as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+
+            $startDates[$file] = $this->firstEntryDate($file);
         }
 
-        try {
-            while (!gzeof($handle)) {
-                $line = gzgets($handle);
+        // A file whose opening lines will not parse keeps its glob position,
+        // behind everything that could be dated: it cannot be placed, and
+        // guessing would be worse than leaving it where it was.
+        uasort($startDates, static fn (?string $left, ?string $right): int => [null === $left, $left] <=> [null === $right, $right]);
 
-                if (false !== $line) {
-                    yield $line;
+        return array_keys($startDates);
+    }
+
+    /**
+     * The date of the first entry this file contains, or null when none of
+     * its opening lines parse. A rotated log can begin with a truncated
+     * line, so this looks at a few before giving up.
+     */
+    private function firstEntryDate(string $file): ?string
+    {
+        $inspected = 0;
+
+        try {
+            foreach ($this->logFileReader->readLines($file) as $rawLine) {
+                $line = $this->lineParser->parseLine($rawLine);
+
+                if (null !== $line) {
+                    return $line->timestamp->format('Y-m-d');
+                }
+
+                if (++$inspected >= self::ORDERING_PROBE_LINES) {
+                    break;
                 }
             }
-        } finally {
-            gzclose($handle);
+        } catch (RuntimeException) {
+            // Unreadable here means unreadable in lines() too, where it is
+            // skipped; there is nothing to place.
+            return null;
         }
+
+        return null;
     }
 }

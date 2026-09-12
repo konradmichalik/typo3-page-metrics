@@ -11,10 +11,23 @@ pageMetrics:
       pathPattern: '/var/log/nginx/example.com-access.log*'
 ```
 
-`pathPattern` is passed to PHP's `glob()`, so a rotated set like
-`access.log`, `access.log.1`, `access.log-20261001.gz` is read as one set.
-`.gz` files are decompressed transparently; everything else is read as
-plain text.
+`pathPattern` is passed to PHP's `glob()`, so a rotated set like `access.log`, `access.log.1`, `access.log-20261001.gz` is read as one set. Gzip is detected by the file's own content rather than its name, so hosts that rotate into extensionless or oddly suffixed compressed files are read correctly too.
+
+The matched files are read oldest first, by modification time rather than by name: rotation schemes disagree about naming and several of them sort the wrong way round alphabetically.
+
+## How much it reads at once
+
+The import emits each day as soon as the reader has moved a full day past it, rather than aggregating the whole requested window first. It therefore holds about two days at a time regardless of how far back `retentionDays` reaches, which matters because the default is 400 days and a distinct-visitor set per day and page is millions of entries over that span.
+
+The one day of slack absorbs a log whose lines straddle midnight, or a rotated file that ends a few entries into the next day.
+
+Files are read in the order of the first entry each one contains, not by modification time or by name. Modification times look like the obvious key and are not one: a restore from backup, an `rsync` without `-t` or a plain `cp` rewrites them all to the same instant. Names are no better, since rotation schemes disagree (`access.log.1`, `access.log-20261001.gz`) and several of them sort the wrong way round alphabetically.
+
+If a log set still revisits a day that has already been written, the import for that provider stops with an error naming the day. That happens when one pattern matches logs from several servers, and it is deliberate: page views would be counted twice, the visit count's distinct set for the day is already gone, and the unresolved-URL store replaces rather than sums, so it would keep only the last fragment. Point the pattern at one server's rotation set.
+
+A file that cannot be read is skipped rather than failing the run, since a glob over a rotation directory routinely picks up one the web user has no access to.
+
+Note that the bot **agent** detail (which specific crawler, see below) is still collected for the whole run before it is written, so a first import over a very long window with heavy crawler traffic can still be memory-hungry.
 
 ## What it can and cannot measure
 
