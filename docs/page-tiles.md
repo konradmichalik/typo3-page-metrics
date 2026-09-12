@@ -36,6 +36,8 @@ text in the tooltip alongside that day's value.
 
 The sparkline is framed by its own axis: the bottom edge is zero and the top edge is the period's peak, which the stats row above already names. The first and last day of the period sit above it, so the chart closes the popover at its own bottom edge.
 
+Above the chart the popover shows the period's figures as an icon and a number each: the most recent day, the day before it, the peak, the average, and the share that arrived through a redirect. Hovering one shows its name and what it counts, in a tooltip of the extension's own rather than the browser's title attribute, which waits about a second and runs both together into one line. Keyboard focus shows the same tooltip, and a tap toggles it, since a touch device has no hover at all. The written name and explanation are in the markup either way, so a screen reader reads "Peak. The highest value a single day reached. 162" rather than a bare number. They are simply not drawn: five two-word labels wrapped the row onto three uneven lines and pushed one value out of alignment with the rest.
+
 No value labels are drawn on the popover's own chart. Peak and average are one line above it, and repeating the peak inside a 52 pixel tall chart would cost more room than it returns. The [dashboard chart](dashboard-widgets.md#reading-the-chart), which has no such stats beside it, does label its axis.
 
 ## Data age

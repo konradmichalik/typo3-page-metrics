@@ -54,6 +54,21 @@
             <trans-unit id="popover.previousDay" resname="popover.previousDay">
                 <source>Previous day</source>
             </trans-unit>
+            <trans-unit id="popover.lastDayHint" resname="popover.lastDayHint">
+                <source>The most recent day of the selected period</source>
+            </trans-unit>
+            <trans-unit id="popover.previousDayHint" resname="popover.previousDayHint">
+                <source>The day before the most recent one</source>
+            </trans-unit>
+            <trans-unit id="popover.peakHint" resname="popover.peakHint">
+                <source>The highest value a single day reached</source>
+            </trans-unit>
+            <trans-unit id="popover.averageHint" resname="popover.averageHint">
+                <source>The mean across the days that have data</source>
+            </trans-unit>
+            <trans-unit id="popover.viaRedirectsHint" resname="popover.viaRedirectsHint">
+                <source>The share of this metric that arrived through a redirect</source>
+            </trans-unit>
             <trans-unit id="popover.peak" resname="popover.peak">
                 <source>Peak</source>
             </trans-unit>

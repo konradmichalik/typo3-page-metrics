@@ -645,24 +645,89 @@
     color: var(--typo3-text-color-variant, #6a7085);
 }
 
+/* Each stat is an icon and its number, side by side like the period switch
+   above the tiles. The written label is still in the markup, it is just not
+   drawn: five two-word labels wrapped the row onto three uneven lines, and a
+   sixth stat is already coming (see the site-median work), so the row needs
+   a form that does not grow with the wording. */
 .pagemetrics-popover-stats {
     display: flex;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 4px;
     padding: 10px var(--typo3-spacing, 8px);
 }
 
 .pagemetrics-popover-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border: 0;
+    border-radius: var(--typo3-component-border-radius, 4px);
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 6%, transparent);
+    /* It is a button because the explanation has to be reachable by keyboard
+       and by touch, but it performs no action, so it reads as an explainable
+       thing rather than a control. */
+    cursor: help;
+}
+
+.pagemetrics-popover-stat:hover,
+.pagemetrics-popover-stat:focus-visible {
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 12%, transparent);
+}
+
+/* Its own element on <body>, because the popover clips its overflow. */
+.pagemetrics-stat-tooltip {
+    position: fixed;
+    z-index: 2100;
     display: flex;
     flex-direction: column;
     gap: 2px;
+    max-width: 240px;
+    padding: 6px 8px;
+    border-radius: var(--typo3-component-border-radius, 4px);
+    background: var(--typo3-component-bg, #fff);
+    border: 1px solid var(--typo3-component-border-color, #cbcbcb);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    color: var(--typo3-text-color-variant, #6a7085);
+    pointer-events: none;
 }
 
-.pagemetrics-popover-stat-label {
-    font-size: 0.6875rem;
+.pagemetrics-stat-tooltip-title {
+    font-weight: 600;
+    color: var(--typo3-text-color-base, #14213d);
+}
+
+.pagemetrics-popover-stat-icon {
+    display: inline-flex;
     color: var(--typo3-text-color-variant, #6a7085);
 }
 
+.pagemetrics-popover-stat-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Present for assistive technology, never drawn: the icon carries the
+   meaning visually and the title explains it on hover, but neither is a name
+   a screen reader can read out, so without this the row would be five bare
+   numbers. */
+.pagemetrics-popover-stat-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
 .pagemetrics-popover-stat-value {
+    font-size: 0.75rem;
     font-weight: 600;
     color: var(--typo3-text-color-base, #14213d);
 }

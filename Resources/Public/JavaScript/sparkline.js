@@ -23,6 +23,11 @@ const FALLBACK_LABELS = {
   peak: 'Peak',
   average: 'Average',
   viaRedirects: 'Via redirects',
+  lastDayHint: 'The most recent day of the selected period',
+  previousDayHint: 'The day before the most recent one',
+  peakHint: 'The highest value a single day reached',
+  averageHint: 'The mean across the days that have data',
+  viaRedirectsHint: 'The share of this metric that arrived through a redirect',
   noData: 'No data',
   externalLink: 'Open in analytics tool',
   sliderPrevious: 'Previous',
@@ -47,6 +52,22 @@ function getLabels(element) {
 
 const CHEVRON_LEFT_PATH = 'M15 6l-6 6l6 6';
 const CHEVRON_RIGHT_PATH = 'M9 6l6 6l-6 6';
+
+// Tabler Icons (MIT, see Resources/Public/Icons/TABLER_LICENSE.txt). Inline
+// rather than registered through Configuration/Icons.php: the popover is
+// built here in JavaScript, where TYPO3's icon API is not reachable, the
+// same reason the chevrons above are inline.
+const STAT_ICON_PATHS = {
+  lastDay: ['M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12', 'M16 3l0 4', 'M8 3l0 4', 'M4 11l16 0', 'M8 15h2v2h-2l0 -2'],
+  previousDay: ['M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v8', 'M16 3v4', 'M8 3v4', 'M4 11h16', 'M16 19h6'],
+  peak: ['M12 4l0 10', 'M12 4l4 4', 'M12 4l-4 4', 'M4 20l16 0'],
+  average: ['M3 21l18 -18', 'M4 12a8 8 0 1 0 16 0a8 8 0 1 0 -16 0'],
+  viaRedirects: ['M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0', 'M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4', 'M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5'],
+};
+
+function statIconSvg(paths) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${paths.map((path) => `<path d="${path}" />`).join('')}</svg>`;
+}
 
 function chevronSvg(path) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${path}" /></svg>`;
@@ -234,6 +255,8 @@ class PageMetricsTile {
     this.data = JSON.parse(element.dataset.sparkline || '{}');
     this.labels = getLabels(element);
     this.popover = null;
+    this.statTooltip = null;
+    this.statTooltipFor = null;
     element.addEventListener('click', (event) => {
       if (this.popover && this.popover.contains(event.target)) {
         return;
@@ -248,12 +271,76 @@ class PageMetricsTile {
     });
   }
 
+  // A tooltip of our own rather than the browser's title attribute: that one
+  // waits about a second, cannot be styled to match the backend, and shows a
+  // single run-on string. This one appears at once and keeps the name and the
+  // explanation apart, which matters here because the name is no longer drawn
+  // anywhere else.
+  //
+  // Appended to <body> like the popover itself: the popover clips its own
+  // overflow, so a tooltip inside it would be cut off at the card's edge.
+  showStatTooltip(button, name, hint) {
+    if (!this.statTooltip) {
+      this.statTooltip = document.createElement('div');
+      this.statTooltip.className = 'pagemetrics-stat-tooltip';
+      this.statTooltip.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(this.statTooltip);
+    }
+
+    this.statTooltip.replaceChildren();
+
+    const title = document.createElement('span');
+    title.className = 'pagemetrics-stat-tooltip-title';
+    title.textContent = name;
+    this.statTooltip.appendChild(title);
+
+    if ('' !== hint) {
+      const description = document.createElement('span');
+      description.textContent = hint;
+      this.statTooltip.appendChild(description);
+    }
+
+    this.statTooltip.hidden = false;
+    this.statTooltipFor = button;
+
+    const rect = button.getBoundingClientRect();
+    const margin = 8;
+    const width = this.statTooltip.offsetWidth;
+    // Above the chip by default, below it when there is no room, and always
+    // inside the viewport horizontally - the same clamping positionPopover()
+    // applies to the popover as a whole.
+    const above = rect.top - this.statTooltip.offsetHeight - 4;
+    this.statTooltip.style.top = `${above > margin ? above : rect.bottom + 4}px`;
+    this.statTooltip.style.left = `${Math.min(Math.max(margin, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - margin)}px`;
+  }
+
+  hideStatTooltip() {
+    if (this.statTooltip) {
+      this.statTooltip.hidden = true;
+      this.statTooltipFor = null;
+    }
+  }
+
+  toggleStatTooltip(button, name, hint) {
+    if (this.statTooltipFor === button && this.statTooltip && !this.statTooltip.hidden) {
+      this.hideStatTooltip();
+
+      return;
+    }
+
+    this.showStatTooltip(button, name, hint);
+  }
+
   closePopover() {
     if (!this.popover) {
       return;
     }
     this.popover.remove();
     this.popover = null;
+    // Lives on <body>, so closing the popover does not take it with it.
+    this.statTooltip?.remove();
+    this.statTooltip = null;
+    this.statTooltipFor = null;
     this.element.setAttribute('aria-expanded', 'false');
     openTiles.delete(this);
   }
@@ -484,25 +571,56 @@ class PageMetricsTile {
       this.popover.appendChild(description);
     }
 
-    // Built as nodes rather than an innerHTML string: the labels come from
-    // the XLF now, which a language pack or a locallangXMLOverride can
-    // replace, and that must not be able to inject markup here.
-    const stat = (label, value) => {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'pagemetrics-popover-stat';
+    // An icon carries each stat, with its name and its explanation in text
+    // that is there but not drawn. Five wrapping word pairs did not fit the
+    // row, and the fix is not to hide the meaning: the hidden text is the
+    // element's accessible name, so a screen reader reads "Peak. The highest
+    // value a single day reached. 162" rather than a bare number.
+    //
+    // A button, not a div: the explanation has to be reachable without a
+    // mouse. Hover shows it, so does keyboard focus, and a tap toggles it,
+    // which is the only one of the three a touch device has.
+    //
+    // Built as nodes rather than an innerHTML string for the text: the
+    // labels come from the XLF, which a language pack or a
+    // locallangXMLOverride can replace, and that must not be able to inject
+    // markup here. Only the icon, whose path data is a constant in this
+    // file, is set as markup.
+    const stat = (key, value) => {
+      const name = this.labels[key];
+      const hint = this.labels[`${key}Hint`] ?? '';
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'pagemetrics-popover-stat';
+
+      const icon = document.createElement('span');
+      icon.className = 'pagemetrics-popover-stat-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.innerHTML = statIconSvg(STAT_ICON_PATHS[key]);
 
       const labelElement = document.createElement('span');
       labelElement.className = 'pagemetrics-popover-stat-label';
-      labelElement.textContent = label;
+      labelElement.textContent = '' !== hint ? `${name}. ${hint}.` : name;
 
       const valueElement = document.createElement('span');
       valueElement.className = 'pagemetrics-popover-stat-value';
       valueElement.textContent = value === null ? this.labels.noData : value;
 
-      wrapper.appendChild(labelElement);
-      wrapper.appendChild(valueElement);
+      button.appendChild(icon);
+      button.appendChild(labelElement);
+      button.appendChild(valueElement);
 
-      return wrapper;
+      button.addEventListener('mouseenter', () => this.showStatTooltip(button, name, hint));
+      button.addEventListener('focus', () => this.showStatTooltip(button, name, hint));
+      button.addEventListener('mouseleave', () => this.hideStatTooltip());
+      button.addEventListener('blur', () => this.hideStatTooltip());
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        this.toggleStatTooltip(button, name, hint);
+      });
+
+      return button;
     };
 
     const formatted = (value) => (value === null ? null : formatValueForUnit(value, unit));
@@ -510,19 +628,19 @@ class PageMetricsTile {
     const stats = document.createElement('div');
     stats.className = 'pagemetrics-popover-stats';
     const statNodes = [
-      stat(this.labels.lastDay, formatted(lastDay)),
-      stat(this.labels.previousDay, formatted(previousDay)),
-      stat(this.labels.peak, formatted(peak)),
+      stat('lastDay', formatted(lastDay)),
+      stat('previousDay', formatted(previousDay)),
+      stat('peak', formatted(peak)),
       // For a rate tile this is the simple mean of the daily rates, which
       // can differ from the tile's own headline value (a weighted average:
       // sum of numerator / sum of denominator over the period) on a page
       // with uneven day-to-day traffic - that divergence is itself useful
       // information, not redundant with the headline number.
-      stat(this.labels.average, formatted(average)),
+      stat('average', formatted(average)),
     ];
 
     if (redirectShare > 0) {
-      statNodes.push(stat(this.labels.viaRedirects, `${redirectShare}%`));
+      statNodes.push(stat('viaRedirects', `${redirectShare}%`));
     }
 
     statNodes.forEach((node) => stats.appendChild(node));
