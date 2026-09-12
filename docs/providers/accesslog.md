@@ -42,9 +42,11 @@ one.
 
 ## Bot traffic metrics
 
-Every line this provider filters out of pageviews/visits as bot traffic is
-not simply discarded - it is classified into one of five buckets and
-reported as its own per-page, per-day metric:
+Every line classified by `BotTaxonomy` is not simply discarded - it is
+sorted into one of five buckets and reported as its own per-page, per-day
+metric. Traffic `BotTaxonomy` cannot name (an unnamed vendor crawler, a
+generic script, an empty user agent) falls into neither a bucket nor the
+human metrics - there is no bucket for a bot nobody has a name for.
 
 - **`bot.ai_chatbot`**: AI chatbots fetching this page live in response to
   a specific user request.
@@ -60,9 +62,13 @@ These are counted differently from `accesslog.pageviews` on purpose:
 pageviews only count successful (2xx) `GET` requests, but a bot hit counts
 regardless of HTTP status or method. A bot hitting a dead link, a
 redirect, or a backend probe is exactly the traffic these metrics exist to
-surface, not traffic to discard before it can be measured. The same
-static-asset exclusion as pageviews still applies, so a bot's own
-CSS/JS/image requests are never counted toward any bucket.
+surface, not traffic to discard before it can be measured. A similar (but not
+identical) static-asset exclusion to pageviews' still applies, so a bot's own
+CSS/JS/image requests are never counted toward any bucket - the two lists
+differ slightly (for example pageviews also excludes `.pdf`/`.xml`/`.json`/
+`.txt`, which the bot-side filter does not), so a path like `/robots.txt`
+can still be bucketed as bot traffic even though it is excluded from
+pageviews.
 
 The five tiles only show a total per page per day. Which specific bot
 made those hits, and whether its request path looked spoofed (a known
