@@ -40,7 +40,7 @@
 		"typo3/cms-frontend": "^13.4 || ^14.0",
 		"typo3/cms-lowlevel": "^13.4 || ^14.0",
 		"typo3/cms-redirects": "^13.4 || ^14.0",
-		"typo3/testing-framework": "^8.2 || ^9.0 || ^10.0"
+		"typo3/testing-framework": "^8.2 || ^9.0.3 || ^10.0"
 	},
 	"suggest": {
 		"typo3/cms-dashboard": "Enables the 'Page metrics' dashboard widget, showing each site's homepage tiles at a glance."
