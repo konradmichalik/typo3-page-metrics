@@ -6,6 +6,10 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    /* The date joined this row, so it has to be able to drop to its own line
+       on a narrow viewport or at high zoom instead of squeezing the period
+       switch. */
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 8px;
 }
@@ -137,6 +141,46 @@
     border-color: var(--typo3-text-color-base, #14213d);
     background: var(--typo3-text-color-base, #14213d);
     color: var(--typo3-component-bg, #fff);
+}
+
+/* The data's own date, so a stalled scheduler is visible from the backend
+   instead of the tiles quietly repeating their last numbers forever. The
+   stale state is carried by an icon and its own wording as well as the
+   colour, never by the colour alone. Colours come from the TYPO3 tokens so
+   the dark scheme is handled by the backend, not by a second rule here. */
+.pagemetrics-freshness {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-freshness-stale {
+    color: var(--typo3-state-warning-color, var(--typo3-text-color-base, #14213d));
+    font-weight: 600;
+}
+
+.pagemetrics-freshness-icon {
+    display: inline-flex;
+}
+
+.pagemetrics-freshness-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.pagemetrics-freshness-note::before {
+    content: '\00b7';
+    margin: 0 3px;
+}
+
+/* In a widget the date belongs under the widget's own content, not wedged
+   against it. */
+.pagemetrics-widget-site .pagemetrics-freshness,
+.pagemetrics-widget-chart + .pagemetrics-freshness {
+    margin-top: 8px;
 }
 
 .pagemetrics-slider {

@@ -15,8 +15,8 @@ namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection, UnresolvedReason};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, DataFreshness, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -56,6 +56,7 @@ final readonly class SiteMetricsOverviewBuilder
         private PageTrendCalculator $trendCalculator,
         private RateSeriesCalculator $rateSeriesCalculator,
         private ImportCoverage $importCoverage,
+        private ImportStateRepository $importStateRepository,
         private iterable $providers,
     ) {}
 
@@ -67,7 +68,7 @@ final readonly class SiteMetricsOverviewBuilder
         $provider = $this->resolveProvider($site);
 
         if (null === $provider) {
-            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], []);
+            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], [], null);
         }
 
         $primary = $this->primaryDefinition($provider);
@@ -89,7 +90,34 @@ final readonly class SiteMetricsOverviewBuilder
             $this->buildUnresolvedUrls($site),
             $this->buildAnnotations($site->getIdentifier(), $currentRange),
             $this->buildAdditionalChartSeries($provider, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange, $coverage),
+            $this->dataFreshnessFor($site),
         );
+    }
+
+    /**
+     * The last day this site's numbers are complete up to. Null when no
+     * provider supports the site, or when the one that does has never run.
+     *
+     * Read from the resume cursor rather than the covered window, for the
+     * same reason as PageMetricsViewDataBuilder::resolveDataFreshness():
+     * every run records the cursor, while the window can legitimately be
+     * unknown, and "no date" is the wrong thing to say about a scheduler
+     * that may have stopped.
+     *
+     * Takes no period: every period this extension offers ends today, so
+     * there is nothing for one to change here.
+     */
+    public function dataFreshnessFor(Site $site): ?DataFreshness
+    {
+        $provider = $this->resolveProvider($site);
+
+        if (null === $provider) {
+            return null;
+        }
+
+        $lastImported = $this->importStateRepository->getLastImportedDate($provider->getIdentifier(), $site->getIdentifier());
+
+        return null !== $lastImported ? new DataFreshness($lastImported, new DateTimeImmutable('today')) : null;
     }
 
     /**

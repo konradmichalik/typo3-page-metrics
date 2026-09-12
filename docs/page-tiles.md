@@ -32,7 +32,19 @@ vertical markers on the sparkline mark any [annotation](#annotations) that
 falls in the shown range; hovering or focusing a marker's date shows its
 text in the tooltip alongside that day's value.
 
-![Sparkline popover for the Visits tile, showing today/yesterday/peak/average and a dated tooltip](img/page-tiles-sparkline-popover.png)
+![Sparkline popover for the Visits tile, showing last day/previous day/peak/average and a dated tooltip](img/page-tiles-sparkline-popover.png)
+
+## Data age
+
+The toolbar above the tiles says which day the numbers are from, as "As of <date>". That day is the last one the import treats as complete, which is not today: a scheduled run may only catch part of today, so it always revisits it and marks the previous day instead. The tiles therefore trail the calendar by a day even when everything is working.
+
+Where a site has more than one provider the earliest of their days is shown, because the row is only as current as its oldest number. A provider that has never run at all contributes no day, since its tiles are empty anyway and letting it decide would hide how fresh the working provider is.
+
+The date comes from the import's own resume cursor, which every run records, rather than from the window described under [Days without data](#days-without-data). That window can legitimately be unknown on a healthy installation, and saying nothing about the data's age is exactly the wrong answer to give about a scheduler that may have stopped.
+
+More than two days behind, the date is marked as stale with an icon and a note. At that point a scheduled import that simply has not run yet is no longer the likely explanation, and without this the backend would go on showing the last numbers it was given indefinitely, without ever saying they had stopped moving.
+
+This is also why the popover's first two figures are called "Last day" and "Previous day" rather than "Today" and "Yesterday": they are the last two days of the selected period, which is rarely today and yesterday.
 
 ## Days without data
 

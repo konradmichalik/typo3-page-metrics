@@ -42,8 +42,8 @@ final readonly class SparklineLabelProvider
         $languageService = $this->getLanguageService();
 
         $keys = [
-            'popover.today' => 'today',
-            'popover.yesterday' => 'yesterday',
+            'popover.lastDay' => 'lastDay',
+            'popover.previousDay' => 'previousDay',
             'popover.peak' => 'peak',
             'popover.average' => 'average',
             'popover.viaRedirects' => 'viaRedirects',

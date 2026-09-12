@@ -215,6 +215,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
         return ['sites' => array_map(
             static fn (SiteMetricsOverview $overview): array => [
                 'site' => $overview->site,
+                'dataFreshness' => $overview->dataFreshness,
                 'chartLabel' => $overview->chartLabel,
                 'chartIcon' => $overview->chartIcon,
                 'chartColor' => $overview->chartColor,

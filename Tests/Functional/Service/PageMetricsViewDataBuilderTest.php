@@ -125,6 +125,72 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         self::assertNotContains(null, $tile->sparkline);
     }
 
+    public function testReportsTheLastDayTheImportHasNumbersFor(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today->modify('-1 day'), new DateRange($today->modify('-30 days'), $today->modify('-1 day')), true);
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
+
+        self::assertNotNull($viewData->dataFreshness);
+        self::assertSame($today->modify('-1 day')->format('Y-m-d'), $viewData->dataFreshness->date->format('Y-m-d'));
+        self::assertFalse($viewData->dataFreshness->isStale);
+    }
+
+    public function testReportsNoFreshnessBeforeAnythingHasBeenImported(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+
+        self::assertNull($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30)->dataFreshness);
+    }
+
+    public function testMarksTheDataStaleOnceTheImportIsMoreThanTwoDaysBehind(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today->modify('-4 days'), new DateRange($today->modify('-30 days'), $today->modify('-3 days')), true);
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
+
+        self::assertTrue($viewData->dataFreshness?->isStale);
+    }
+
+    public function testTheStalestProviderDecidesTheRowsFreshness(): void
+    {
+        // The tile row mixes providers, and it is only as current as its
+        // oldest number - reporting the newest would vouch for figures that
+        // are days behind it.
+        $this->writeSiteConfigurationWithTwoProviders();
+        $today = new DateTimeImmutable('today');
+        $importState = $this->get(ImportStateRepository::class);
+        $importState->markImported('matomo', 'main', $today->modify('-1 day'), new DateRange($today->modify('-30 days'), $today), true);
+        $importState->markImported('accesslog', 'main', $today->modify('-6 days'), new DateRange($today->modify('-30 days'), $today->modify('-5 days')), true);
+
+        $freshness = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30)->dataFreshness;
+
+        self::assertNotNull($freshness);
+        // The resume cursor, not the covered window: it is the last day the
+        // import treats as complete, and it is what every run records.
+        self::assertSame($today->modify('-6 days')->format('Y-m-d'), $freshness->date->format('Y-m-d'));
+        self::assertTrue($freshness->isStale);
+    }
+
+    public function testAProviderThatHasNeverImportedDoesNotHideTheOthersFreshness(): void
+    {
+        // Its tiles are empty, which shows on its own. Letting it veto the
+        // date would lose the freshness of the provider that does work.
+        $this->writeSiteConfigurationWithTwoProviders();
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today->modify('-1 day'), new DateRange($today->modify('-30 days'), $today), true);
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
+
+        self::assertNotNull($viewData->dataFreshness);
+        self::assertSame($today->modify('-1 day')->format('Y-m-d'), $viewData->dataFreshness->date->format('Y-m-d'));
+        self::assertFalse($viewData->dataFreshness->isStale);
+    }
+
     public function testExposesTheCurrentAndPreviousPeriodAsDateRangeLabels(): void
     {
         $this->writeSiteConfiguration(1, 'https://example.com/');
@@ -397,7 +463,19 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         self::fail(sprintf('No tile found for metric identifier "%s".', $identifier));
     }
 
-    private function writeSiteConfiguration(int $rootPageId, string $base): void
+    private function writeSiteConfigurationWithTwoProviders(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/', [
+            'matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x'],
+            'accesslog' => ['pathPattern' => '/var/log/nginx/access.log'],
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed>|null $providers defaults to Matomo alone, the shape every test but the
+     *                                             multi-provider freshness ones needs
+     */
+    private function writeSiteConfiguration(int $rootPageId, string $base, ?array $providers = null): void
     {
         $this->get(SiteWriter::class)->write('main', [
             'rootPageId' => $rootPageId,
@@ -415,7 +493,7 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
             ],
             'errorHandling' => [],
             'routes' => [],
-            'pageMetrics' => ['providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
+            'pageMetrics' => ['providers' => $providers ?? ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
         ]);
     }
 }

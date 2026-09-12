@@ -14,7 +14,8 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Widgets;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository};
 use KonradMichalik\Typo3PageMetrics\Widgets\{PageMetricsChartWidget, TopPagesWidget, TrendWidget};
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
@@ -63,6 +64,22 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         $this->importCSVDataSet(__DIR__.'/../Service/Fixtures/be_users.csv');
         $backendUser = $this->setUpBackendUser(1);
         $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
+    }
+
+    public function testChartWidgetShowsTheDayItsNumbersAreFrom(): void
+    {
+        // The value travels through buildViewVariables()'s flat array, which
+        // silently dropped it once: the overview carried it, the template
+        // asked for it, and nothing in between mapped it across.
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today->modify('-1 day'), new DateRange($today->modify('-30 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 5);
+
+        $content = $this->renderChartWidget([]);
+
+        self::assertStringContainsString('pagemetrics-freshness', $content);
+        self::assertStringContainsString($today->modify('-1 day')->format('Y-m-d'), $content);
     }
 
     public function testChartWidgetOffersEveryRegisteredMetricAsASetting(): void

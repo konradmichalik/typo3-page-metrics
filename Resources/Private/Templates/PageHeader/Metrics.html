@@ -2,6 +2,7 @@
 <f:variable name="includeSubpagesToggleValue"><f:if condition="{includeSubpages}" then="0" else="1" /></f:variable>
 <f:variable name="includeSubpagesDataValue"><f:if condition="{includeSubpages}" then="1" else="0" /></f:variable>
 <div class="pagemetrics-toolbar">
+    <f:render partial="DataFreshness" arguments="{freshness: dataFreshness}" />
     <nav class="pagemetrics-period" aria-label="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:period.label', default: 'Period')}">
         <f:for each="{periodOptions}" as="option">
             <f:be.link route="web_layout" parameters="{id: pageId, tx_typo3pagemetrics_period: option}" additionalAttributes="{'data-period': option}" class="pagemetrics-period-link{f:if(condition: '{option} == {periodDays}', then: ' pagemetrics-period-link-active')}">{option} <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:period.days" default="days" /></f:be.link>

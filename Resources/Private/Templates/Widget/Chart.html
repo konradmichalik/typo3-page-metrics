@@ -21,6 +21,7 @@
                             data-annotations="{f:format.json(value: overview.annotations)}"
                             style="--pm-accent: {overview.chartColor}"
                         ></div>
+                        <f:render partial="DataFreshness" arguments="{freshness: overview.dataFreshness}" />
                     </div>
                 </f:for>
             </div>

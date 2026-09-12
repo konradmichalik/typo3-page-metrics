@@ -70,6 +70,7 @@ final readonly class PageMetricsTilesController
             'previousRangeLabel' => $viewData->previousRangeLabel,
             'includeSubpages' => $viewData->includeSubpages,
             'hasSubpages' => $viewData->hasSubpages,
+            'dataFreshness' => $viewData->dataFreshness,
             'annotations' => array_map(
                 static fn ($annotation) => ['date' => $annotation->date->format('Y-m-d'), 'text' => $annotation->text],
                 $viewData->annotations,

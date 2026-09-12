@@ -15,7 +15,8 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Controller\Ajax;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsTilesController;
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository};
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Backend\Routing\Route;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -54,6 +55,42 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         // from: this same markup is rendered for GA4 and access-log tiles.
         self::assertStringContainsString('Open in analytics tool', $body);
         self::assertStringNotContainsString('Open in Matomo', $body);
+    }
+
+    public function testRendersTheDayTheNumbersAreFrom(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today->modify('-1 day'), new DateRange($today->modify('-30 days'), $today->modify('-1 day')), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-1 day'), 'matomo.pageviews', 7);
+
+        $body = (string) $this->dispatch(['id' => '2', 'period' => '30'])->getBody();
+
+        self::assertStringContainsString('pagemetrics-freshness', $body);
+        self::assertStringContainsString($today->modify('-1 day')->format('Y-m-d'), $body);
+        self::assertStringNotContainsString('pagemetrics-freshness-stale', $body);
+    }
+
+    public function testMarksTheDateStaleOnceTheImportIsMoreThanTwoDaysBehind(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today->modify('-4 days'), new DateRange($today->modify('-30 days'), $today->modify('-3 days')), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-3 days'), 'matomo.pageviews', 7);
+
+        $body = (string) $this->dispatch(['id' => '2', 'period' => '30'])->getBody();
+
+        self::assertStringContainsString('pagemetrics-freshness-stale', $body);
+    }
+
+    public function testRendersNoDateBeforeAnythingHasBeenImported(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 7);
+
+        $body = (string) $this->dispatch(['id' => '2', 'period' => '30'])->getBody();
+
+        self::assertStringNotContainsString('pagemetrics-freshness', $body);
     }
 
     public function testRendersEmptyResponseWhenNoPageIsSelected(): void

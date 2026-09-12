@@ -18,8 +18,8 @@ const openTiles = new Set();
 // The fallbacks are not a translation, they are what keeps a sparkline
 // readable if the attribute is ever missing or malformed.
 const FALLBACK_LABELS = {
-  today: 'Today',
-  yesterday: 'Yesterday',
+  lastDay: 'Last day',
+  previousDay: 'Previous day',
   peak: 'Peak',
   average: 'Average',
   viaRedirects: 'Via redirects',
@@ -328,12 +328,18 @@ class PageMetricsTile {
 
     openTiles.forEach((tile) => tile.closePopover());
 
-    // Today and yesterday are positions in the period, so they read the
-    // series as it is - filtering first would silently relabel the last two
-    // days that happen to have data as "today" and "yesterday".
+    // The last two days of the selected period, which is not the same as
+    // today and yesterday: the import marks a day complete only once it has
+    // elapsed, so the final point is routinely still empty, and after a
+    // stalled scheduler it can be much older. Calling these "Today" and
+    // "Yesterday" claimed a freshness the pipeline does not have.
+    //
+    // They are positions, so they read the series as it is - filtering the
+    // empty days out first would silently relabel whichever two days happen
+    // to carry data.
     const allValues = Object.values(this.data);
-    const today = allValues.at(-1) ?? null;
-    const yesterday = allValues.at(-2) ?? null;
+    const lastDay = allValues.at(-1) ?? null;
+    const previousDay = allValues.at(-2) ?? null;
 
     // Peak and average, by contrast, are statements about the data that
     // exists: counting an uncovered day as zero would drag the average down
@@ -409,8 +415,8 @@ class PageMetricsTile {
     const stats = document.createElement('div');
     stats.className = 'pagemetrics-popover-stats';
     const statNodes = [
-      stat(this.labels.today, formatted(today)),
-      stat(this.labels.yesterday, formatted(yesterday)),
+      stat(this.labels.lastDay, formatted(lastDay)),
+      stat(this.labels.previousDay, formatted(previousDay)),
       stat(this.labels.peak, formatted(peak)),
       // For a rate tile this is the simple mean of the daily rates, which
       // can differ from the tile's own headline value (a weighted average:

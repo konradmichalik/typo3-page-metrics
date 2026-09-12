@@ -131,7 +131,7 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
     }
 
     /**
-     * @return list<array{site: Site, topPages: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\TopPage>}>
+     * @return list<array{site: Site, topPages: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\TopPage>, dataFreshness: ?\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DataFreshness}>
      */
     private function collectTopPages(?int $level, bool $includeSubpages): array
     {
@@ -144,7 +144,7 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
                 continue;
             }
 
-            $result[] = ['site' => $site, 'topPages' => $topPages];
+            $result[] = ['site' => $site, 'topPages' => $topPages, 'dataFreshness' => $this->overviewBuilder->dataFreshnessFor($site)];
         }
 
         return $result;

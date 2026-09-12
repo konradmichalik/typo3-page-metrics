@@ -92,7 +92,7 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
     }
 
     /**
-     * @return list<array{site: Site, tiles: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricTile>, annotations: list<array{date: string, text: string}>}>
+     * @return list<array{site: Site, tiles: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricTile>, annotations: list<array{date: string, text: string}>, dataFreshness: ?\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DataFreshness}>
      */
     private function collectSiteTiles(): array
     {
@@ -112,6 +112,7 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
                     static fn (Annotation $annotation): array => ['date' => $annotation->date->format('Y-m-d'), 'text' => $annotation->text],
                     $viewData->annotations,
                 ),
+                'dataFreshness' => $viewData->dataFreshness,
             ];
         }
 

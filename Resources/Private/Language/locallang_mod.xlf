@@ -27,6 +27,12 @@
             <trans-unit id="dashboardPreset.description" resname="dashboardPreset.description">
                 <source>All page metrics widgets: tiles, chart, most viewed pages, trend, not found pages and annotations.</source>
             </trans-unit>
+            <trans-unit id="freshness.asOf" resname="freshness.asOf">
+                <source>As of %1$s</source>
+            </trans-unit>
+            <trans-unit id="freshness.stale" resname="freshness.stale">
+                <source>import may have stopped</source>
+            </trans-unit>
             <trans-unit id="slider.previous" resname="slider.previous">
                 <source>Previous</source>
             </trans-unit>
@@ -36,11 +42,11 @@
             <trans-unit id="slider.page" resname="slider.page">
                 <source>Page %1$s</source>
             </trans-unit>
-            <trans-unit id="popover.today" resname="popover.today">
-                <source>Today</source>
+            <trans-unit id="popover.lastDay" resname="popover.lastDay">
+                <source>Last day</source>
             </trans-unit>
-            <trans-unit id="popover.yesterday" resname="popover.yesterday">
-                <source>Yesterday</source>
+            <trans-unit id="popover.previousDay" resname="popover.previousDay">
+                <source>Previous day</source>
             </trans-unit>
             <trans-unit id="popover.peak" resname="popover.peak">
                 <source>Peak</source>

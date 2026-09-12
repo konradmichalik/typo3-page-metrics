@@ -1,0 +1,16 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:if condition="{freshness}">
+    <f:variable name="freshnessDate"><f:format.date date="{freshness.date}" format="Y-m-d" /></f:variable>
+    <p class="pagemetrics-freshness{f:if(condition: freshness.isStale, then: ' pagemetrics-freshness-stale')}">
+        <f:if condition="{freshness.isStale}">
+            <span class="pagemetrics-freshness-icon" aria-hidden="true"><core:icon identifier="tabler-clock" size="small" alternativeMarkupIdentifier="inline" /></span>
+        </f:if>
+        <span>
+            <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.asOf" arguments="{0: freshnessDate}">As of {freshnessDate}</f:translate>
+            <f:if condition="{freshness.isStale}">
+                <span class="pagemetrics-freshness-note"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.stale" default="import may have stopped" /></span>
+            </f:if>
+        </span>
+    </p>
+</f:if>
+</html>

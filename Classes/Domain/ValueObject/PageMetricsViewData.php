@@ -21,9 +21,11 @@ namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 final readonly class PageMetricsViewData
 {
     /**
-     * @param list<MetricTile> $tiles
-     * @param list<int>        $periodOptions
-     * @param list<Annotation> $annotations
+     * @param list<MetricTile>   $tiles
+     * @param list<int>          $periodOptions
+     * @param list<Annotation>   $annotations
+     * @param DataFreshness|null $dataFreshness the last day these tiles have numbers for, null when no provider
+     *                                          of this site has recorded an imported window yet
      */
     public function __construct(
         public bool $hasPage,
@@ -37,5 +39,6 @@ final readonly class PageMetricsViewData
         public array $annotations,
         public bool $includeSubpages,
         public bool $hasSubpages,
+        public ?DataFreshness $dataFreshness,
     ) {}
 }

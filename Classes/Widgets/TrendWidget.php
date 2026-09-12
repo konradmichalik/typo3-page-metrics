@@ -164,7 +164,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
     }
 
     /**
-     * @return list<array{site: Site, topPages: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\TopPage>}>
+     * @return list<array{site: Site, topPages: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\TopPage>, dataFreshness: ?\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DataFreshness}>
      */
     private function collectTrendPages(string $metricIdentifier, TrendDirection $direction, int $period): array
     {
@@ -178,7 +178,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
                 continue;
             }
 
-            $result[] = ['site' => $site, 'topPages' => $topPages];
+            $result[] = ['site' => $site, 'topPages' => $topPages, 'dataFreshness' => $this->overviewBuilder->dataFreshnessFor($site)];
         }
 
         return $result;

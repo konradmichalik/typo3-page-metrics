@@ -25,6 +25,12 @@ Every widget except the site-homepage tiles reads from the same
 `SiteMetricsOverviewBuilder`, aggregated across all pages of a site rather
 than a single one.
 
+## Data age
+
+Every widget that shows imported numbers (tiles, chart, most viewed pages, trend) prints the day its data is from underneath, and marks it as stale once the import is more than two days behind. See [Data age](page-tiles.md#data-age) for what that date means and why it is normally not today.
+
+Unlike the page module, a dashboard widget covers one site per row, so its date is that site's own provider's and never a compromise between several.
+
 ## Chart and trend metric selection
 
 The chart and trend widgets' **Metric** setting both default to each

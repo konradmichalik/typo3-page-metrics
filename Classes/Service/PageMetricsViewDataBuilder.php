@@ -15,9 +15,9 @@ namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricDefinition, MetricTile, PageMetricsViewData, RateMetricDefinition};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DataFreshness, DateRange, MetricDefinition, MetricTile, PageMetricsViewData, RateMetricDefinition};
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Throwable;
@@ -73,6 +73,7 @@ final readonly class PageMetricsViewDataBuilder
         private SitePageUidRepository $pageUidRepository,
         private RateSeriesCalculator $rateSeriesCalculator,
         private ImportCoverage $importCoverage,
+        private ImportStateRepository $importStateRepository,
         private EventDispatcherInterface $eventDispatcher,
         private iterable $providers,
     ) {}
@@ -98,16 +99,27 @@ final readonly class PageMetricsViewDataBuilder
         $hasPage = $pageId > 0 && null !== $site;
         [$tileRange, $previousRange] = $this->computeRanges($periodDays);
 
-        $unresolvedCount = null !== $site
-            ? $this->unresolvedUrlRepository->countForSite($site->getBase()->getHost(), (new DateTimeImmutable('today'))->modify('-30 days'))
-            : 0;
-        $annotations = null !== $site ? $this->buildAnnotations($site->getIdentifier(), $tileRange) : [];
-        $hasSubpages = null !== $site && $this->pageUidRepository->hasChildren($pageId);
+        // Everything below this point needs a site. Collected in one branch
+        // rather than as a condition per field, which is the same decision
+        // asked five times over.
+        $tiles = [];
+        $unresolvedCount = 0;
+        $annotations = [];
+        $hasSubpages = false;
+        $dataFreshness = null;
+
+        if (null !== $site) {
+            $tiles = $this->buildTiles($site, $pageId, $languageId, $tileRange, $previousRange, $includeSubpages);
+            $unresolvedCount = $this->unresolvedUrlRepository->countForSite($site->getBase()->getHost(), (new DateTimeImmutable('today'))->modify('-30 days'));
+            $annotations = $this->buildAnnotations($site->getIdentifier(), $tileRange);
+            $hasSubpages = $this->pageUidRepository->hasChildren($pageId);
+            $dataFreshness = $this->resolveDataFreshness($site, $tileRange->until);
+        }
 
         return new PageMetricsViewData(
             $hasPage,
             $pageId,
-            null !== $site ? $this->buildTiles($site, $pageId, $languageId, $tileRange, $previousRange, $includeSubpages) : [],
+            $tiles,
             $unresolvedCount,
             $periodDays,
             self::PERIOD_OPTIONS,
@@ -116,7 +128,44 @@ final readonly class PageMetricsViewDataBuilder
             $annotations,
             $includeSubpages,
             $hasSubpages,
+            $dataFreshness,
         );
+    }
+
+    /**
+     * The tile row is only as fresh as its stalest number, so a site whose
+     * providers are at different days reports the earliest of them rather
+     * than flattering itself with the newest.
+     *
+     * A provider that has never imported contributes no day at all: its
+     * tiles are empty, which is visible on its own, and letting it veto the
+     * whole row's date would hide the freshness of the providers that do
+     * work. Only when no provider has ever run is the answer unknown.
+     *
+     * Read from the resume cursor, not from the covered window: the cursor
+     * is the last day the import considers complete, which is what "the
+     * numbers are current up to here" means, and it is recorded by every run
+     * including one that returned nothing. The covered window can be unknown
+     * on a perfectly healthy installation, and a missing date is exactly the
+     * wrong answer to give about a scheduler that may have stopped.
+     */
+    private function resolveDataFreshness(Site $site, DateTimeImmutable $today): ?DataFreshness
+    {
+        $earliest = null;
+
+        foreach ($this->providers as $provider) {
+            if (!$provider->supports($site)) {
+                continue;
+            }
+
+            $lastImported = $this->importStateRepository->getLastImportedDate($provider->getIdentifier(), $site->getIdentifier());
+
+            if (null !== $lastImported && (null === $earliest || $lastImported < $earliest)) {
+                $earliest = $lastImported;
+            }
+        }
+
+        return null !== $earliest ? new DataFreshness($earliest, $today) : null;
     }
 
     /**
