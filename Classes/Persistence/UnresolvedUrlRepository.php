@@ -18,6 +18,7 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
 use TYPO3\CMS\Core\Database\{Connection, ConnectionPool};
 
 use function array_slice;
+use function str_starts_with;
 
 /**
  * UnresolvedUrlRepository.
@@ -119,12 +120,18 @@ class UnresolvedUrlRepository
     /**
      * Keeps the $capPerDay highest-value rows for the day, deletes the rest -
      * the lowest-value entries are the least actionable ones to lose.
+     *
+     * Bot metrics (`bot.%`) and human metrics are capped separately, each
+     * against the full $capPerDay budget: they feed entirely different
+     * surfaces (see countForSite()'s docblock), so a flood of bot-probed
+     * URLs must never be able to evict a human unresolved URL from the cap,
+     * even though both share the same provider+date bucket in this table.
      */
     private function trimToCap(string $provider, string $date, int $capPerDay): void
     {
         $selectQueryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
-        $uids = $selectQueryBuilder
-            ->select('uid')
+        $rows = $selectQueryBuilder
+            ->select('uid', 'metric')
             ->from(self::TABLE)
             ->where(
                 $selectQueryBuilder->expr()->eq('provider', $selectQueryBuilder->createNamedParameter($provider)),
@@ -133,9 +140,19 @@ class UnresolvedUrlRepository
             ->orderBy('value', 'DESC')
             ->addOrderBy('uid', 'ASC')
             ->executeQuery()
-            ->fetchFirstColumn();
+            ->fetchAllAssociative();
 
-        $excessUids = array_slice($uids, $capPerDay);
+        $botUids = [];
+        $humanUids = [];
+        foreach ($rows as $row) {
+            if (str_starts_with((string) $row['metric'], 'bot.')) {
+                $botUids[] = (int) $row['uid'];
+            } else {
+                $humanUids[] = (int) $row['uid'];
+            }
+        }
+
+        $excessUids = [...array_slice($botUids, $capPerDay), ...array_slice($humanUids, $capPerDay)];
 
         if ([] === $excessUids) {
             return;

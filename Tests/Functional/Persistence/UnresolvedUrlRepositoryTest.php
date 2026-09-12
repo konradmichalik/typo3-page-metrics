@@ -74,6 +74,26 @@ final class UnresolvedUrlRepositoryTest extends FunctionalTestCase
         self::assertSame(['https://example.com/b', 'https://example.com/c'], $remainingUrls);
     }
 
+    public function testTrimsBotAndHumanMetricsAgainstSeparateCapsSoBotRowsCannotEvictHumanRows(): void
+    {
+        $date = new DateTimeImmutable('2026-08-01');
+        $this->subject->record('accesslog', $date, 'https://example.com/human', 'accesslog.pageviews', UnresolvedReason::Unknown, 1, 1);
+        $this->subject->record('accesslog', $date, 'https://example.com/probe-a', 'bot.ai_crawler', UnresolvedReason::Unknown, 100, 1);
+        $this->subject->record('accesslog', $date, 'https://example.com/probe-b', 'bot.ai_crawler', UnresolvedReason::Unknown, 50, 1);
+
+        self::assertSame(2, $this->countRows());
+
+        $remainingUrls = $this->get(ConnectionPool::class)
+            ->getQueryBuilderForTable('tx_typo3pagemetrics_unresolved')
+            ->select('url')
+            ->from('tx_typo3pagemetrics_unresolved')
+            ->executeQuery()
+            ->fetchFirstColumn();
+
+        sort($remainingUrls);
+        self::assertSame(['https://example.com/human', 'https://example.com/probe-a'], $remainingUrls);
+    }
+
     public function testCountForSiteCountsOnlyUrlsOnThatHost(): void
     {
         $date = new DateTimeImmutable('today');
