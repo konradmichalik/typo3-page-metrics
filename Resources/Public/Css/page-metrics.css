@@ -24,27 +24,23 @@
 }
 
 .pagemetrics-header {
+    position: relative;
     margin-bottom: 8px;
 }
 
-/* Pinned to the header's top right, outside the region it folds away, so it
-   is still there once the block is gone. It shares .pagemetrics-options-trigger
-   with the button beside it and only adds the placement, since two controls in
-   the same row that look different are two controls. */
-.pagemetrics-header {
-    position: relative;
-}
-
+/* Pinned into the toolbar's own row, outside the region it folds away, so it
+   is still there once the block is gone and costs no height while the block
+   is open. The left end of that row is the empty one: the freshness mark, the
+   period chips and the options button all sit at the right, and squeezing a
+   sixth control in among them would crowd the group an editor actually uses.
+   It shares .pagemetrics-options-trigger with the options button and only adds
+   the placement, since two controls in the same row that look different are
+   two controls. */
 .pagemetrics-collapse-toggle {
     position: absolute;
     top: 0;
-    right: 0;
+    left: 0;
     z-index: 1;
-}
-
-/* Room for it, so the options button does not end up underneath. */
-.pagemetrics-toolbar {
-    padding-right: 32px;
 }
 
 /* Collapsed there is nothing but the button, which is absolutely positioned
@@ -73,6 +69,10 @@
        switch. */
     flex-wrap: wrap;
     gap: 8px;
+    /* Room for the fold-away control, which is positioned over this row's left
+       end rather than laid out in it. Everything here is right-aligned, so the
+       padding only matters once the row wraps. */
+    padding-left: 32px;
     margin-bottom: 8px;
 }
 
