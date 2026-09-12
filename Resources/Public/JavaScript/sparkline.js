@@ -1,5 +1,12 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SPARKLINE_HEIGHT = 52;
+
+// Breathing room above and below the plotted line, see plotAgainstBounds().
+// Deeper at the bottom: the area is filled down to the chart's own edge, so a
+// lowest value sitting on the floor would read as zero rather than as the
+// smallest number in the period.
+const PLOT_INSET_TOP = 3;
+const PLOT_INSET_BOTTOM = 9;
 // Fixed total width regardless of how many days are plotted (7/30/90, per
 // the period selector): points get closer together for a longer period
 // rather than the popover growing wider. 29 * 4px matches the previous
@@ -90,6 +97,7 @@ function getAnnotations(tileElement) {
 // than dive to the baseline, which is what made the first day of an import
 // history, or any day the analytics source was unreachable, read as a
 // traffic collapse.
+
 function segmentsOf(points) {
   const segments = [];
   let current = [];
@@ -136,6 +144,8 @@ function appendSeriesPath(svg, points, { stroke, withArea }) {
       const [firstX] = segment[0];
       const [lastX] = segment[segment.length - 1];
       const area = document.createElementNS(SVG_NS, 'polygon');
+      // Closed to the bottom of the viewBox rather than to the inset the
+      // line is drawn within, so the fill reaches the chart's own edge.
       const areaPoints = [...segment, [lastX, SPARKLINE_HEIGHT], [firstX, SPARKLINE_HEIGHT]];
       area.setAttribute('points', areaPoints.map((point) => point.join(',')).join(' '));
       area.setAttribute('fill', 'currentColor');
@@ -144,6 +154,8 @@ function appendSeriesPath(svg, points, { stroke, withArea }) {
       svg.appendChild(area);
     }
 
+    // Drawn over the area in the same colour at full strength, so it reads
+    // as the darker edge of the shape rather than as a second element.
     const polyline = document.createElementNS(SVG_NS, 'polyline');
     polyline.setAttribute('points', segment.map((point) => point.join(',')).join(' '));
     polyline.setAttribute('fill', 'none');
@@ -174,6 +186,47 @@ function boundsOf(values) {
   return present.length > 0 ? [Math.min(...present), Math.max(...present)] : null;
 }
 
+// Where a day's value sits in the plot area, for both the popover sparkline
+// and the dashboard chart, so the two cannot disagree about the same data.
+//
+// The bounds come from scaleBounds()'s percentile band rather than zero to
+// the peak. A zero baseline sounds like the honest choice and is not one
+// here: a page holding steady between 446 and 457 views puts its entire
+// variation into the top 2% of the height and draws as a flat line, which
+// tells the reader nothing the numbers above it have not already said. The
+// chart's job on these surfaces is the shape.
+//
+// The axis is therefore truncated and carries no scale of its own: the chart
+// is a silhouette of the period, and the numbers that give it magnitude are
+// on the row directly above it.
+function plotAgainstBounds(values, step) {
+  const [scaleLow, scaleHigh] = scaleBounds(values.filter((value) => value !== null));
+  const range = scaleHigh - scaleLow;
+  // Inset so neither edge clips what is drawn on it. A 1px stroke sitting on
+  // the viewBox boundary loses half its width to the SVG's own clip, and the
+  // hover marker is a dot centred on the point, so a bottom-edge day lost its
+  // lower half to the popover's overflow. Under the old zero-based scale only
+  // a zero day ever reached that edge; under a percentile band every day at
+  // or below the fifth percentile does.
+  const plotHeight = SPARKLINE_HEIGHT - PLOT_INSET_TOP - PLOT_INSET_BOTTOM;
+
+  const points = values.map((value, index) => {
+    if (value === null) {
+      return null;
+    }
+
+    // A band with no width means every day carried the same number. Pinning
+    // those to an edge would draw the flat line this scaling exists to avoid,
+    // and at the bottom it would be invisible; centred, it reads as what it
+    // is.
+    const fraction = 0 === range ? 0.5 : Math.min(1, Math.max(0, (value - scaleLow) / range));
+
+    return [index * step, SPARKLINE_HEIGHT - PLOT_INSET_BOTTOM - fraction * plotHeight];
+  });
+
+  return { points, scaleLow, scaleHigh, bounds: boundsOf(values) };
+}
+
 // The two numbers at the top and bottom of the plot area.
 //
 // They are the bounds the geometry actually maps against, not the series' own
@@ -184,35 +237,6 @@ function boundsOf(values) {
 // [82, 108] and an ordinary day sits at 71% of the height. Under a "3000" top
 // label that day reads as about 2100.
 //
-// Values outside the band are clamped onto the edge they exceed, so the label
-// there states a bound rather than a value. The comparison sign says so, and
-// without it the two clamped days at 120 and at 3000 would look identical
-// under a number that belongs to neither.
-//
-// Hidden from assistive technology because the wrapper's own aria-label says
-// the same thing in a sentence; two bare numbers would only repeat it without
-// the context that makes them mean anything.
-function buildValueAxis(series, unit) {
-  const axis = document.createElement('div');
-  axis.className = 'pagemetrics-sparkline-axis';
-  axis.setAttribute('aria-hidden', 'true');
-
-  const [seriesLow, seriesHigh] = series.bounds;
-  const edges = [
-    [series.scaleHigh, seriesHigh > series.scaleHigh ? '\u2265\u202f' : ''],
-    [series.scaleLow, seriesLow < series.scaleLow ? '\u2264\u202f' : ''],
-  ];
-
-  edges.forEach(([value, sign]) => {
-    const label = document.createElement('span');
-    label.className = 'pagemetrics-sparkline-axis-value';
-    label.textContent = sign + formatValueForUnit(Math.round(value), unit);
-    axis.appendChild(label);
-  });
-
-  return axis;
-}
-
 // First and last day under the chart. Without them the curve says how the
 // numbers moved but not over what, and the period selector sits far enough
 // away (above the tiles, or in the widget's settings) to be no answer.
@@ -222,10 +246,15 @@ function buildDateAxis(dates) {
   axis.setAttribute('aria-hidden', 'true');
 
   const shown = dates.length > 1 ? [dates[0], dates[dates.length - 1]] : [dates[0]];
+  // The year is dropped while the period stays inside one, which is every
+  // period this extension offers except one that happens to straddle New
+  // Year. Truncated from the left rather than reformatted, so the reading
+  // order stays the one every other date in the backend uses.
+  const sameYear = shown[0].slice(0, 4) === shown[shown.length - 1].slice(0, 4);
 
   shown.forEach((date) => {
     const label = document.createElement('span');
-    label.textContent = date;
+    label.textContent = sameYear ? date.slice(5) : date;
     axis.appendChild(label);
   });
 
@@ -365,13 +394,10 @@ class PageMetricsTile {
     }
 
     const values = entries.map(([, value]) => value);
-    const max = Math.max(...values.filter((value) => value !== null), 1);
     const width = SPARKLINE_WIDTH;
     const step = entries.length > 1 ? width / (entries.length - 1) : 0;
-
-    const points = entries.map(([, value], index) =>
-      value === null ? null : [index * step, SPARKLINE_HEIGHT - (value / max) * SPARKLINE_HEIGHT],
-    );
+    const plotted = plotAgainstBounds(values, step);
+    const points = plotted.points;
 
     const svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${width} ${SPARKLINE_HEIGHT}`);
@@ -490,11 +516,8 @@ class PageMetricsTile {
 
     const wrapper = document.createElement('div');
     wrapper.className = 'pagemetrics-sparkline-wrapper';
-    // Only the period is stated here, not the value range: the stats row
-    // directly above already gives the peak and the average, and the axis is
-    // [0, peak], so repeating it would add nothing.
     wrapper.setAttribute('role', 'img');
-    wrapper.setAttribute('aria-label', buildChartSummary(this.labels, entries.map(([date]) => date), null, this.element.dataset.unit));
+    wrapper.setAttribute('aria-label', buildChartSummary(this.labels, entries.map(([date]) => date), plotted.bounds, this.element.dataset.unit));
     wrapper.appendChild(svg);
     wrapper.appendChild(marker);
     wrapper.appendChild(tooltip);
@@ -1068,17 +1091,8 @@ function scaleBounds(values) {
 function computePlottedSeries(seriesList, dates, step) {
   return seriesList.map((series) => {
     const values = dates.map((date) => series.values[date] ?? null);
-    const [low, high] = scaleBounds(values.filter((value) => value !== null));
-    const range = high - low || 1;
-    const bounds = boundsOf(values);
-    const points = values.map((value, index) => {
-      if (value === null) {
-        return null;
-      }
-      const fraction = Math.min(1, Math.max(0, (value - low) / range));
-      return [index * step, SPARKLINE_HEIGHT - fraction * SPARKLINE_HEIGHT];
-    });
-    return { ...series, values, points, scaleLow: low, scaleHigh: high, bounds };
+
+    return { ...series, values, ...plotAgainstBounds(values, step) };
   });
 }
 
@@ -1093,9 +1107,8 @@ function renderSeriesLines(svg, plotted) {
       // rules apply to that property (see page-metrics.css) instead of only
       // ever drawing in the metric's own fixed color.
       stroke: isMultiSeries ? series.color : 'currentColor',
-      // The area fill only makes sense for a single line - overlaid, it
-      // would just muddy the overlap between series - so it's kept for the
-      // (still most common) single-metric case only.
+      // Overlaid, a fill would just muddy the overlap between series, so it
+      // stays with the single-metric case.
       withArea: !isMultiSeries,
     });
   });
@@ -1320,10 +1333,6 @@ function initializeStaticCharts(root) {
     wrapper.appendChild(svg);
     markers.forEach((marker) => wrapper.appendChild(marker));
     wrapper.appendChild(tooltipParts.tooltip);
-
-    if (null !== bounds) {
-      wrapper.appendChild(buildValueAxis(plotted[0], plotted[0].unit));
-    }
 
     const legend = buildLegend(plotted);
     if (legend) {

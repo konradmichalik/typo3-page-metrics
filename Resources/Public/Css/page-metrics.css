@@ -462,54 +462,15 @@
     width: 100%;
 }
 
-/* The top and bottom of the value axis, drawn as the SVG's own border rather
-   than as lines inside it: the chart sets preserveAspectRatio="none", which
-   stretches everything in the viewBox non-uniformly, so a line drawn there
-   would thin or thicken with the container and one sitting on the very edge
-   would be half-clipped by the viewport. box-sizing keeps the declared
-   heights below exact rather than growing them by the two borders.
-
-   Deliberately faint: gridlines are orientation, not content, and the curve
-   has to stay the thing the eye lands on. */
-.pagemetrics-sparkline {
-    box-sizing: border-box;
-    border-top: 1px solid color-mix(in srgb, var(--typo3-text-color-variant, #6a7085) 30%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--typo3-text-color-variant, #6a7085) 30%, transparent);
-}
-
-/* Spans the wrapper, which holds nothing but the SVG in normal flow, so the
-   two labels land exactly on the plot area's edges. */
-.pagemetrics-sparkline-axis {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    /* The chart underneath is a crosshair hover target across its whole
-       width; the labels must not punch two holes in it. */
-    pointer-events: none;
-}
-
-.pagemetrics-sparkline-axis-value {
-    align-self: flex-start;
-    padding: 0 3px;
-    border-radius: 2px;
-    /* An opaque chip rather than bare text: the label sits over the area
-       fill and, at the top of a rising series, over the line itself. */
-    background: var(--typo3-component-bg, #fff);
-    font-size: 0.6875rem;
-    line-height: 1.4;
-    color: var(--typo3-text-color-variant, #6a7085);
-}
-
+/* Deliberately small: they are a caption telling you what the silhouette
+   spans, not a reading of it. */
 .pagemetrics-sparkline-dates {
     display: flex;
     justify-content: space-between;
     gap: 8px;
     margin-top: 4px;
-    font-size: 0.6875rem;
+    font-size: 0.625rem;
+    line-height: 1.3;
     color: var(--typo3-text-color-variant, #6a7085);
 }
 

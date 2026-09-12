@@ -34,11 +34,13 @@ text in the tooltip alongside that day's value.
 
 ![Sparkline popover for the Visits tile, showing last day/previous day/peak/average and a dated tooltip](img/page-tiles-sparkline-popover.png)
 
-The sparkline is framed by its own axis: the bottom edge is zero and the top edge is the period's peak, which the stats row above already names. The first and last day of the period sit above it, so the chart closes the popover at its own bottom edge.
+The sparkline carries no scale of its own. It is a filled silhouette of the period with its own outline, and the numbers that give it magnitude are the row of figures directly above it. The first and last day sit above it too, so the chart closes the popover at its own bottom edge.
 
 Above the chart the popover shows the period's figures as an icon and a number each: the most recent day, the day before it, the peak, the average, and the share that arrived through a redirect. Hovering one shows its name and what it counts, in a tooltip of the extension's own rather than the browser's title attribute, which waits about a second and runs both together into one line. Keyboard focus shows the same tooltip, and a tap toggles it, since a touch device has no hover at all. The written name and explanation are in the markup either way, so a screen reader reads "Peak. The highest value a single day reached. 162" rather than a bare number. They are simply not drawn: five two-word labels wrapped the row onto three uneven lines and pushed one value out of alignment with the rest.
 
-No value labels are drawn on the popover's own chart. Peak and average are one line above it, and repeating the peak inside a 52 pixel tall chart would cost more room than it returns. The [dashboard chart](dashboard-widgets.md#reading-the-chart), which has no such stats beside it, does label its axis.
+The axis does not start at zero. It uses the same percentile band as the [dashboard chart](dashboard-widgets.md#reading-the-chart), for the same reason: a page holding steady between 446 and 457 views a day puts its whole variation into the top two percent of a zero-based chart and draws as a flat line. The magnitude is already spelled out as numbers on the row above; what the chart is there for is the shape.
+
+The lowest value of the period is drawn clear of the bottom edge rather than on it, so a page whose quietest day still had traffic does not read as having dropped to nothing.
 
 ## Data age
 

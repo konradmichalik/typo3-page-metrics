@@ -41,11 +41,11 @@ A metric with no polarity of its own, such as an average time on page, has no im
 
 Each chart scales to its own data, so the shape of the curve says nothing about how big the numbers behind it are. The preset makes that concrete by putting two compact charts side by side: without a scale, a few dozen visits and a few thousand draw the same picture.
 
-The chart therefore labels the top and bottom of its plot area, formatted for the metric's unit, and the first and last day underneath. The two numbers are the bounds the curve is actually drawn against, which is what makes the height in between readable.
+The chart therefore scales to the range its own data occupies rather than from zero, and names the first and last day underneath. What it shows is the shape of the period; the figures behind it are in the tiles and in the popover.
 
-Those bounds come from the 5th and 95th percentile rather than the plain extremes, so one freak day cannot flatten every ordinary one into a sliver. Days outside that band are drawn clamped to the edge they exceed, and the label there is prefixed with ≥ or ≤ to say it states a bound rather than a value. Without that a day at 120 and a day at 3000 would sit on the same edge under a number belonging to neither.
+Those bounds come from the 5th and 95th percentile rather than the plain extremes, so one freak day cannot flatten every ordinary one into a sliver. A day outside that band is drawn clamped to the edge it exceeds, which keeps the chart readable at the cost of understating that one day. The figure itself is in the popover's peak, and in the chart's spoken summary.
 
-Overlaying a second metric drops the value labels. Each series then has its own scale, so any single pair of numbers in the corner would belong to one of them and misdescribe the other. The legend tells the series apart instead, and the dates stay.
+Overlaying a second metric drops the area fill and leaves the two outlines, since two filled shapes would just muddy where they overlap. Each series keeps its own scale, so the legend is what tells them apart.
 
 ## Chart and trend metric selection
 
