@@ -14,16 +14,23 @@ skipped entirely for sites without one.
 | Widget | Identifier | Shows | Fixed period | Configurable |
 | --- | --- | --- | --- | --- |
 | Page metrics | `pageMetrics` | Each site's homepage tiles: page views, visits, avg. time on page, bounce rate | 7 days | — |
-| Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers | — | Metric, period (7/30/90 days) |
-| Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days) |
+| Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers and a key to the kinds drawn | — | Metric, period (7/30/90 days), marker category |
+| Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days), marker category |
 | Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level, include subpages |
 | Page metrics trend | `pageMetricsTrend` | Pages that improved or declined most against the previous period | 7/30/90 days | Metric, movement (declines/improvements), period |
 | Not found pages | `pageMetricsNotFoundPages` | URLs the daily import could not resolve to a page, with the reason | 30 days | — |
-| Page metrics annotations | `pageMetricsAnnotations` | Recent site-wide annotations, such as Matomo release markers | 90 days | — |
+| Page metrics annotations | `pageMetricsAnnotations` | Recent annotations with their kind and, for one that ran for a while, its last day | 90 days | — |
 
 Every widget except the site-homepage tiles reads from the same
 `SiteMetricsOverviewBuilder`, aggregated across all pages of a site rather
-than a single one.
+than a single one. That includes annotations: a dashboard covers the whole
+site, so it shows every marker regardless of the page one may be scoped to
+(see [Page scope](page-tiles.md#page-scope)).
+
+The chart widget's **Marker category** setting narrows its markers to one
+kind, for a dashboard that only wants to line releases up against the curve.
+Left empty it shows all of them. Under the chart, a key names the categories
+actually drawn rather than every category that exists.
 
 ## Data age
 

@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Controller\Ajax;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsTilesController;
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository};
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Backend\Routing\Route;
@@ -220,7 +220,7 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
     public function testRendersAnnotationsAsADataAttributeOnTheTilesContainer(): void
     {
         $this->writeSiteConfiguration('main', 1, 'https://example.com/');
-        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', '1', new DateTimeImmutable('today'), 'Release 2.0');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('1', new DateTimeImmutable('today'), 'Release 2.0'));
 
         $response = $this->dispatch(['id' => '2']);
         $body = (string) $response->getBody();

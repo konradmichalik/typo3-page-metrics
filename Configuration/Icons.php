@@ -43,6 +43,30 @@ return [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-info-circle.svg',
     ],
+    'tabler-rocket' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-rocket.svg',
+    ],
+    'tabler-speakerphone' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-speakerphone.svg',
+    ],
+    'tabler-pencil' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-pencil.svg',
+    ],
+    'tabler-layout-dashboard' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-layout-dashboard.svg',
+    ],
+    'tabler-alert-triangle' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-alert-triangle.svg',
+    ],
+    'tabler-external-link' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-external-link.svg',
+    ],
     'tabler-clock' => [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-clock.svg',

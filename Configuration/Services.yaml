@@ -100,6 +100,12 @@ services:
     KonradMichalik\Typo3PageMetrics\UserFunction\AnnotationSiteItemsProcFunc:
         public: true
 
+    # Public for the same reason as AnnotationSiteItemsProcFunc above: TCA
+    # itemsProcFunc classes are resolved by class name through
+    # GeneralUtility::makeInstance(), not through the container's own wiring.
+    KonradMichalik\Typo3PageMetrics\UserFunction\AnnotationCategoryItemsProcFunc:
+        public: true
+
     # Public so functional tests can fetch it directly via $this->get() instead
     # of dispatching a full ModifyPageLayoutContentEvent.
     KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder:

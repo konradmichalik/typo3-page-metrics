@@ -15,7 +15,18 @@
                                     <tbody>
                                         <f:for each="{overview.annotations}" as="annotation">
                                             <tr>
-                                                <td class="nowrap"><f:format.date date="{annotation.date}" format="Y-m-d" /></td>
+                                                <td class="nowrap">
+                                                    <f:format.date date="{annotation.date}" format="Y-m-d" />
+                                                    <f:if condition="{annotation.isRange}">
+                                                        <br /><span class="pagemetrics-annotation-until"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:annotation.until" default="until" /> <f:format.date date="{annotation.dateUntil}" format="Y-m-d" /></span>
+                                                    </f:if>
+                                                </td>
+                                                <td class="nowrap pagemetrics-annotation-{annotation.category.value}">
+                                                    <span class="pagemetrics-annotation-legend-item">
+                                                        <core:icon identifier="{annotation.categoryIcon}" size="small" alternativeMarkupIdentifier="inline" />
+                                                        <f:translate key="{annotation.categoryLabel}" default="{annotation.category.value}" />
+                                                    </span>
+                                                </td>
                                                 <td>{annotation.text}</td>
                                             </tr>
                                         </f:for>

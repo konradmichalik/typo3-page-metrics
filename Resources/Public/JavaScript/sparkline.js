@@ -43,6 +43,13 @@ const FALLBACK_LABELS = {
   sliderPage: 'Page %1$s',
   chartSummary: 'Chart from %1$s to %2$s, values from %3$s to %4$s',
   chartSummaryDates: 'Chart from %1$s to %2$s',
+  'annotationCategory.release': 'Release',
+  'annotationCategory.campaign': 'Campaign',
+  'annotationCategory.content': 'Content change',
+  'annotationCategory.redesign': 'Redesign',
+  'annotationCategory.incident': 'Incident',
+  'annotationCategory.seo': 'SEO change',
+  'annotationCategory.external': 'External event',
 };
 
 function getLabels(element) {
@@ -357,6 +364,74 @@ function bindHintTooltip(element) {
   });
 }
 
+// A marker is a tick on its day, or a band across the days it covers. The
+// band is the whole point of date_until: a campaign that ran for three weeks
+// drawn as a line on the Monday it started says it was over by the evening.
+//
+// Both carry their category as a class, so the colour comes from the
+// stylesheet where it can be a light-dark() pair, rather than from a hex
+// string travelling through JSON.
+function appendAnnotationMarker(svg, annotation, dates, step) {
+  const index = dates.indexOf(annotation.date);
+  if (index === -1 && !annotation.dateUntil) {
+    return;
+  }
+
+  // A band can start before the period does. Clamped to the first day rather
+  // than dropped: it is still running, and that is why it is being drawn.
+  const fromIndex = index === -1 ? 0 : index;
+  const untilIndex = annotation.dateUntil ? dates.indexOf(annotation.dateUntil) : -1;
+  const category = annotation.category || 'release';
+
+  if (annotation.dateUntil && untilIndex !== fromIndex) {
+    const lastIndex = untilIndex === -1 ? dates.length - 1 : untilIndex;
+    const band = document.createElementNS(SVG_NS, 'rect');
+    band.setAttribute('x', fromIndex * step);
+    band.setAttribute('y', '0');
+    band.setAttribute('width', Math.max((lastIndex - fromIndex) * step, 1));
+    band.setAttribute('height', String(SPARKLINE_HEIGHT));
+    band.setAttribute('class', `pagemetrics-sparkline-annotation-band pagemetrics-annotation-${category}`);
+    svg.appendChild(band);
+
+    return;
+  }
+
+  const x = fromIndex * step;
+  const marker = document.createElementNS(SVG_NS, 'line');
+  marker.setAttribute('x1', x);
+  marker.setAttribute('x2', x);
+  marker.setAttribute('y1', '0');
+  marker.setAttribute('y2', String(SPARKLINE_HEIGHT));
+  marker.setAttribute('class', `pagemetrics-sparkline-annotation pagemetrics-annotation-${category}`);
+  marker.setAttribute('vector-effect', 'non-scaling-stroke');
+  svg.appendChild(marker);
+}
+
+// The tooltip line for whichever annotation explains a given day, naming
+// the kind of event before what happened. A band answers for every day it
+// spans, not just the one it began on.
+//
+// The kind is spelled out rather than left to the marker's colour: a
+// page-header tile carries no legend, so the colour would otherwise be the
+// only thing saying it.
+function annotationLineFor(annotations, date, labels) {
+  const match = annotations.find((annotation) => {
+    if (annotation.dateUntil) {
+      return date >= annotation.date && date <= annotation.dateUntil;
+    }
+
+    return annotation.date === date;
+  });
+
+  if (!match) {
+    return undefined;
+  }
+
+  const kind = labels[`annotationCategory.${match.category || 'release'}`];
+
+  return kind ? `${kind}: ${match.text}` : match.text;
+}
+
 class PageMetricsTile {
   constructor(element) {
     this.element = element;
@@ -483,33 +558,19 @@ class PageMetricsTile {
 
     appendSeriesPath(svg, points, { stroke: 'currentColor', withArea: true });
 
-    // Minimal, dashed vertical ticks for annotations (e.g. Matomo releases)
-    // that fall on one of this sparkline's own dates - same list on every
-    // tile/metric, since annotations are site-wide, not per-metric. Text is
-    // surfaced through the existing mousemove-tracked value tooltip below
-    // (see annotationTextByDate) rather than a native SVG <title>: a 1px
-    // line is a poor, hard-to-hit hover target, and a second, independent
-    // tooltip mechanism would fight the one already there.
-    const annotationTextByDate = new Map(getAnnotations(this.element).map((annotation) => [annotation.date, annotation.text]));
+    // Marks for the annotations covering this sparkline's own dates. The
+    // same list on every tile of a page, since a marker explains the day
+    // rather than the metric. Text is surfaced through the existing
+    // mousemove-tracked value tooltip below (see annotationLineFor) rather
+    // than a native SVG <title>: a 1px line is a poor, hard-to-hit hover
+    // target, and a second, independent tooltip mechanism would fight the
+    // one already there.
+    const annotations = getAnnotations(this.element);
+    const dates = entries.map(([date]) => date);
 
-    annotationTextByDate.forEach((text, date) => {
-      const index = entries.findIndex(([entryDate]) => entryDate === date);
-      if (index === -1) {
-        return;
-      }
-
-      // The x position only depends on the index, so an annotation still
-      // gets its tick on a day the metric itself has no value for.
-      const x = index * step;
-      const marker = document.createElementNS(SVG_NS, 'line');
-      marker.setAttribute('x1', x);
-      marker.setAttribute('x2', x);
-      marker.setAttribute('y1', '0');
-      marker.setAttribute('y2', String(SPARKLINE_HEIGHT));
-      marker.setAttribute('class', 'pagemetrics-sparkline-annotation');
-      marker.setAttribute('vector-effect', 'non-scaling-stroke');
-      svg.appendChild(marker);
-    });
+    // The x position only depends on the index, so an annotation still gets
+    // its mark on a day the metric itself has no value for.
+    annotations.forEach((annotation) => appendAnnotationMarker(svg, annotation, dates, step));
 
     // An HTML element rather than an SVG <circle>: the SVG uses
     // preserveAspectRatio="none" so the line fills the full width/height,
@@ -553,7 +614,7 @@ class PageMetricsTile {
       marker.style.top = `${centerY}px`;
       marker.hidden = point === null;
 
-      const annotationText = annotationTextByDate.get(date);
+      const annotationText = annotationLineFor(annotations, date, this.labels);
       tooltipValue.textContent = `${date}: ${value === null ? this.labels.noData : formatValueForUnit(value, this.element.dataset.unit)}`;
       tooltipAnnotation.textContent = annotationText ?? '';
       tooltipAnnotation.hidden = !annotationText;
@@ -1262,33 +1323,18 @@ function renderSeriesLines(svg, plotted) {
   });
 }
 
-// Same dashed annotation markers as the tile sparkline (see
-// buildSparklineSvg() above) - the list is embedded on this same element
-// rather than looked up via getAnnotations()/closest(), since this chart
-// has no surrounding .pagemetrics-tiles container. Returns the parsed
-// date => text map so the tooltip (built later, see attachChartInteractivity())
-// can look up the hovered date's annotation without re-parsing it.
+// Same annotation marks as the tile sparkline (see buildSparklineSvg()
+// above) - the list is embedded on this same element rather than looked up
+// via getAnnotations()/closest(), since this chart has no surrounding
+// .pagemetrics-tiles container. Returns the parsed list so the tooltip
+// (built later, see attachChartInteractivity()) can find the hovered day's
+// annotation without re-parsing it.
 function renderAnnotationMarkers(svg, container, dates, step) {
-  const annotationTextByDate = new Map(JSON.parse(container.dataset.annotations || '[]').map((annotation) => [annotation.date, annotation.text]));
+  const annotations = JSON.parse(container.dataset.annotations || '[]');
 
-  annotationTextByDate.forEach((text, date) => {
-    const index = dates.indexOf(date);
-    if (index === -1) {
-      return;
-    }
+  annotations.forEach((annotation) => appendAnnotationMarker(svg, annotation, dates, step));
 
-    const x = index * step;
-    const marker = document.createElementNS(SVG_NS, 'line');
-    marker.setAttribute('x1', x);
-    marker.setAttribute('x2', x);
-    marker.setAttribute('y1', '0');
-    marker.setAttribute('y2', String(SPARKLINE_HEIGHT));
-    marker.setAttribute('class', 'pagemetrics-sparkline-annotation');
-    marker.setAttribute('vector-effect', 'non-scaling-stroke');
-    svg.appendChild(marker);
-  });
-
-  return annotationTextByDate;
+  return annotations;
 }
 
 // One position marker per series - with a single series this is exactly
@@ -1341,7 +1387,7 @@ function buildTooltip(plotted) {
 // Wires up hover interactivity: on mousemove, positions every series'
 // marker and fills in the shared tooltip for whichever date the cursor is
 // nearest to; on mouseleave, hides all of it again.
-function attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotationTextByDate, dates, step, width, labels }) {
+function attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotations, dates, step, width, labels }) {
   const { tooltip, heading, values: tooltipValues, annotation: tooltipAnnotation } = tooltipParts;
   const isMultiSeries = plotted.length > 1;
 
@@ -1373,7 +1419,7 @@ function attachChartInteractivity({ svg, container, plotted, markers, tooltipPar
 
     heading.textContent = date;
 
-    const annotationText = annotationTextByDate.get(date);
+    const annotationText = annotationLineFor(annotations, date, labels);
     tooltipAnnotation.textContent = annotationText ?? '';
     tooltipAnnotation.hidden = !annotationText;
     tooltip.hidden = false;
@@ -1461,12 +1507,12 @@ function initializeStaticCharts(root) {
     svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('class', 'pagemetrics-sparkline');
     renderSeriesLines(svg, plotted);
-    const annotationTextByDate = renderAnnotationMarkers(svg, container, dates, step);
+    const annotations = renderAnnotationMarkers(svg, container, dates, step);
 
     const markers = buildSeriesMarkers(plotted);
     const tooltipParts = buildTooltip(plotted);
     const labels = getLabels(container);
-    attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotationTextByDate, dates, step, width, labels });
+    attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotations, dates, step, width, labels });
 
     // Overlaid series each get their own scale (see computePlottedSeries),
     // so there is no one axis to label - two numbers in the corners would

@@ -130,7 +130,7 @@ final readonly class PageMetricsViewDataBuilder
         if (null !== $site) {
             $tiles = $this->buildTiles($site, $pageId, $languageId, $tileRange, $previousRange, $includeSubpages);
             $unresolvedCount = $this->unresolvedUrlRepository->countForSite($site->getBase()->getHost(), (new DateTimeImmutable('today'))->modify('-30 days'));
-            $annotations = $this->buildAnnotations($site->getIdentifier(), $tileRange);
+            $annotations = $this->buildAnnotations($site->getIdentifier(), $tileRange, $pageId);
             $hasSubpages = $this->pageUidRepository->hasChildren($pageId);
             $dataFreshness = $this->resolveDataFreshness($site, $tileRange->until);
         }
@@ -195,11 +195,17 @@ final readonly class PageMetricsViewDataBuilder
      *
      * @return list<Annotation>
      */
-    private function buildAnnotations(string $siteIdentifier, DateRange $range): array
+    private function buildAnnotations(string $siteIdentifier, DateRange $range, int $pageUid): array
     {
+        // Scoped to this page: the site-wide markers, this page's own, and
+        // an ancestor's where it said it covers its subtree. Before markers
+        // could name a page every one of them appeared on every tile, which
+        // is why the site-wide ones keep doing exactly that.
+        $ancestors = $this->pageUidRepository->ancestorsOf($pageUid);
+
         $annotations = [
-            ...$this->annotationRepository->forSiteAndRange($siteIdentifier, $range),
-            ...$this->manualAnnotationRepository->forSiteAndRange($siteIdentifier, $range),
+            ...$this->annotationRepository->forSiteAndRange($siteIdentifier, $range, $pageUid, $ancestors),
+            ...$this->manualAnnotationRepository->forSiteAndRange($siteIdentifier, $range, $pageUid, $ancestors),
         ];
 
         usort($annotations, static fn (Annotation $a, Annotation $b): int => $a->date <=> $b->date);

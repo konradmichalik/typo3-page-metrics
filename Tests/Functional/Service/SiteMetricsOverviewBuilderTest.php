@@ -15,6 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Service;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\Annotation;
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -151,7 +152,7 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
     public function testAnnotationsAreReturnedForTheSiteAndRange(): void
     {
         $this->writeSiteConfiguration();
-        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', 'a1', new DateTimeImmutable('today'), 'Release 2.0');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('a1', new DateTimeImmutable('today'), 'Release 2.0'));
         $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
 
         $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7);
@@ -164,7 +165,7 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
     {
         $this->writeSiteConfiguration();
         $today = new DateTimeImmutable('today');
-        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', 'a1', $today, 'Imported release');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('a1', $today, 'Imported release'));
         $this->get(ConnectionPool::class)->getConnectionForTable('tx_typo3pagemetrics_manual_annotation')->insert(
             'tx_typo3pagemetrics_manual_annotation',
             ['pid' => 0, 'site_identifier' => 'main', 'date' => $today->getTimestamp(), 'text' => 'Manual note'],

@@ -18,6 +18,7 @@ use TYPO3\CMS\Core\Database\{Connection, ConnectionPool};
 
 use function array_map;
 use function array_push;
+use function in_array;
 
 /**
  * SitePageUidRepository.
@@ -34,6 +35,11 @@ use function array_push;
 final readonly class SitePageUidRepository
 {
     private const TABLE = 'pages';
+
+    /**
+     * A page tree deeper than this is a broken pid chain, not a site.
+     */
+    private const MAX_ROOTLINE_DEPTH = 50;
 
     public function __construct(
         private ConnectionPool $connectionPool,
@@ -59,6 +65,50 @@ final readonly class SitePageUidRepository
             ->setMaxResults(1)
             ->executeQuery()
             ->fetchOne();
+    }
+
+    /**
+     * Every page above this one, nearest first, stopping at the tree root.
+     *
+     * Used to decide which page-scoped annotations reach a page: a marker on
+     * an ancestor explains this page only if it said it covers its subtree,
+     * so the caller needs the chain rather than just the page.
+     *
+     * Walks pid by pid rather than using a rootline helper, because the
+     * question here is only "which uids are above this one" - no permissions,
+     * no overlays, no mount points, and nothing that needs a full page record.
+     *
+     * @return list<int>
+     */
+    public function ancestorsOf(int $pageUid): array
+    {
+        $ancestors = [];
+        $current = $pageUid;
+
+        // Bounded rather than trusting the tree to be acyclic: a broken pid
+        // chain would otherwise spin here forever, and no real page tree is
+        // anywhere near this deep.
+        for ($depth = 0; $depth < self::MAX_ROOTLINE_DEPTH; ++$depth) {
+            $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+            $parent = $queryBuilder
+                ->select('pid')
+                ->from(self::TABLE)
+                ->where(
+                    $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($current, ParameterType::INTEGER)),
+                    $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
+                )
+                ->executeQuery()
+                ->fetchOne();
+
+            if (false === $parent || 0 === (int) $parent || in_array((int) $parent, $ancestors, true)) {
+                break;
+            }
+
+            $ancestors[] = (int) $parent;
+            $current = (int) $parent;
+        }
+
+        return $ancestors;
     }
 
     /**

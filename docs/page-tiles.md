@@ -29,8 +29,10 @@ trigger button gets a small badge while the filter is active.
 Clicking (or focusing, via keyboard) a tile opens a popover with a
 day-by-day sparkline for that metric over the selected period. Dashed
 vertical markers on the sparkline mark any [annotation](#annotations) that
-falls in the shown range; hovering or focusing a marker's date shows its
-text in the tooltip alongside that day's value.
+falls in the shown range, and an annotation covering several days is drawn
+as a faint band across them rather than as a tick on the day it started.
+Hovering or focusing a marked date shows the kind of event and its text in
+the tooltip alongside that day's value.
 
 ![Sparkline popover for the Visits tile, showing last day/previous day/peak/average and a dated tooltip](img/page-tiles-sparkline-popover.png)
 
@@ -92,8 +94,8 @@ gap.
 
 ## Annotations
 
-Annotations are site-wide, point-in-time events, from two independent
-providers that are always merged together:
+Annotations are events worth explaining a change in the numbers by, from two
+independent providers that are always merged together:
 
 - **Imported**, via the same `page-metrics:import` command, from any
   registered `AnnotationProviderInterface` (mirroring
@@ -103,8 +105,8 @@ providers that are always merged together:
   already-configured `providers.matomo` is needed. GA4 has no equivalent API
   to import from.
 - **Manual**, created directly in the TYPO3 backend as a "Page metrics
-  annotation" record — pick the site, a date and a text. An annotation is
-  scoped by that "Site" field alone, not by its position in a page tree,
+  annotation" record — pick the site, a category, a date and a text. An
+  annotation is scoped by its "Site" field, not by its position in a page tree,
   so the record lives at the absolute root (`rootLevel = 1`, the same
   convention as `be_users`/`be_groups`) rather than under any one page:
   open the root page in the page tree (the extension/site name at the
@@ -114,7 +116,38 @@ providers that are always merged together:
   GA4-only sites, or anything not tied to an external API at all, and
   appear immediately, without waiting for the next import run.
 
-Annotations show up in two places: the marker ticks on every sparkline
+Annotations show up in two places: the markers on every sparkline
 (page-tile popovers and the [dashboard chart widget](dashboard-widgets.md)
 alike), and the dedicated
 [annotations dashboard widget](dashboard-widgets.md).
+
+### Category
+
+Every annotation has a category, which decides the colour and the icon it is
+drawn with: release, campaign, content change, redesign, incident, SEO change
+or external event. A marker's category is always spelled out in its tooltip
+as well, so the colour is never the only thing carrying it, and the chart
+widget can filter its markers down to a single category.
+
+Annotations that predate this field, and anything imported from a provider
+that has no notion of a kind (Matomo's own annotations, for instance), read
+as "release" — which is what every annotation in this extension meant before
+categories existed.
+
+### Duration
+
+Leave **Last day** empty for an event that happened on one day and it is
+drawn as a tick. Set it for one that ran for a while, a campaign or a
+freeze, and the chart draws a band across those days instead. A band that
+started before the shown period, or has not ended within it, is still drawn:
+it is clamped to the edge of the chart rather than dropped, because it is
+still explaining the days on screen.
+
+### Page scope
+
+Leave **Page** empty and the marker explains the whole site, which is what
+every annotation did before this field existed. Pick a page and it only
+appears on that page's tiles, plus, if **Also applies to subpages** is set,
+on everything below it. Dashboard widgets are site-wide and show every
+marker regardless of its page, since a marker on one page still explains a
+bump in the site's totals.

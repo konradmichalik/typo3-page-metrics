@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\AnnotationCategory;
 use TYPO3\CMS\Core\Localization\LanguageService;
 
 /**
@@ -61,6 +62,14 @@ final readonly class SparklineLabelProvider
             'chart.summary' => 'chartSummary',
             'chart.summaryDates' => 'chartSummaryDates',
         ];
+
+        // The marker tooltip names the kind of event, so the category
+        // colour is not the only thing carrying it on a page-header tile,
+        // which has no legend. Built from the enum rather than listed, so a
+        // new category cannot be missing here.
+        foreach (AnnotationCategory::cases() as $category) {
+            $keys['annotation.category.'.$category->value] = 'annotationCategory.'.$category->value;
+        }
 
         $labels = [];
         foreach ($keys as $id => $key) {

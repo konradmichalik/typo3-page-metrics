@@ -161,7 +161,7 @@ final class ImportCommand extends Command
 
         $count = 0;
         foreach ($annotationProvider->fetch($site, $range) as $annotation) {
-            $this->annotationRepository->upsert($site->getIdentifier(), $annotationProvider->getIdentifier(), $annotation->id, $annotation->date, $annotation->text);
+            $this->annotationRepository->upsert($site->getIdentifier(), $annotationProvider->getIdentifier(), $annotation);
             ++$count;
         }
 

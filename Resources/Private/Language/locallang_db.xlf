@@ -15,6 +15,30 @@
             <trans-unit id="tx_typo3pagemetrics_manual_annotation.text" resname="tx_typo3pagemetrics_manual_annotation.text">
                 <source>Text</source>
             </trans-unit>
-        </body>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.category" resname="tx_typo3pagemetrics_manual_annotation.category">
+                <source>Category</source>
+            </trans-unit>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.date_until" resname="tx_typo3pagemetrics_manual_annotation.date_until">
+                <source>Last day</source>
+            </trans-unit>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.date_until.description" resname="tx_typo3pagemetrics_manual_annotation.date_until.description">
+                <source>Leave empty for an event that happened on a single day. Set it for one that ran for a while, such as a campaign, and the chart draws it as a band.</source>
+            </trans-unit>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.page_uid" resname="tx_typo3pagemetrics_manual_annotation.page_uid">
+                <source>Page</source>
+            </trans-unit>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.page_uid.description" resname="tx_typo3pagemetrics_manual_annotation.page_uid.description">
+                <source>Leave empty for a marker that explains the whole site. Pick a page and it only appears where it explains something.</source>
+            </trans-unit>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.include_subpages" resname="tx_typo3pagemetrics_manual_annotation.include_subpages">
+                <source>Also applies to subpages</source>
+            </trans-unit>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.include_subpages.description" resname="tx_typo3pagemetrics_manual_annotation.include_subpages.description">
+                <source>For an event that covered a whole section rather than the one page, such as a relaunch.</source>
+            </trans-unit>
+            <trans-unit id="tx_typo3pagemetrics_manual_annotation.tab.scope" resname="tx_typo3pagemetrics_manual_annotation.tab.scope">
+                <source>Scope</source>
+            </trans-unit>
+</body>
     </file>
 </xliff>

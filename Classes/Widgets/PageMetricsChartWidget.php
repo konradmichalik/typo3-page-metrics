@@ -13,8 +13,9 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\AnnotationCategory;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, SiteMetricsOverview};
-use KonradMichalik\Typo3PageMetrics\Service\{SiteMetricsOverviewBuilder, SparklineLabelProvider};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, SiteMetricsOverviewBuilder, SparklineLabelProvider};
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
@@ -54,6 +55,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
         private SiteFinder $siteFinder,
         private BackendViewFactory $backendViewFactory,
         private SparklineLabelProvider $labelProvider,
+        private AnnotationPayloadBuilder $annotationPayloadBuilder,
     ) {}
 
     /**
@@ -101,6 +103,18 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
                     90 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.90',
                 ],
             ),
+            new SettingDefinition(
+                'annotationCategory',
+                'string',
+                '',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.annotationCategory.label',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.annotationCategory.description',
+                false,
+                [
+                    '' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.annotationCategory.all',
+                    ...$this->annotationCategoryOptions(),
+                ],
+            ),
         ];
     }
 
@@ -111,7 +125,10 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
         $additionalMetrics = '' !== $metric2 ? [$metric2] : [];
         $period = (int) $context->settings->get('period');
         $period = in_array($period, self::PERIOD_OPTIONS, true) ? $period : 30;
-        $overviews = $this->collectOverviews($metric, $additionalMetrics, $period);
+        // An empty setting means every kind, which is what a chart showed
+        // before markers had kinds at all.
+        $annotationCategory = AnnotationCategory::tryFrom((string) $context->settings->get('annotationCategory'));
+        $overviews = $this->collectOverviews($metric, $additionalMetrics, $period, $annotationCategory);
 
         $view = $this->backendViewFactory->create($context->request, ['konradmichalik/typo3-page-metrics', 'typo3/cms-dashboard']);
         $view->assignMultiple([
@@ -138,6 +155,50 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
     public function getCssFiles(): array
     {
         return ['EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css'];
+    }
+
+    /**
+     * The categories actually present, in the enum's own order so two charts
+     * never disagree about where a kind belongs in the key.
+     *
+     * Prepared as arrays rather than handed over as enum cases: Fluid
+     * resolves properties and getters, and icon() and label() are neither.
+     *
+     * @param list<Annotation> $annotations
+     *
+     * @return list<array{value: string, icon: string, label: string}>
+     */
+    private static function legendFor(array $annotations): array
+    {
+        $present = [];
+
+        foreach ($annotations as $annotation) {
+            $present[$annotation->category->value] = true;
+        }
+
+        $legend = [];
+
+        foreach (AnnotationCategory::cases() as $category) {
+            if (isset($present[$category->value])) {
+                $legend[] = ['value' => $category->value, 'icon' => $category->icon(), 'label' => $category->label()];
+            }
+        }
+
+        return $legend;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function annotationCategoryOptions(): array
+    {
+        $options = [];
+
+        foreach (AnnotationCategory::cases() as $category) {
+            $options[$category->value] = $category->label();
+        }
+
+        return $options;
     }
 
     /**
@@ -182,12 +243,12 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
      *
      * @return list<SiteMetricsOverview>
      */
-    private function collectOverviews(string $preferredMetricIdentifier, array $additionalMetricIdentifiers, int $periodDays): array
+    private function collectOverviews(string $preferredMetricIdentifier, array $additionalMetricIdentifiers, int $periodDays, ?AnnotationCategory $annotationCategory): array
     {
         $result = [];
 
         foreach ($this->siteFinder->getAllSites() as $site) {
-            $overview = $this->overviewBuilder->build($site, 0, $periodDays, $preferredMetricIdentifier, $additionalMetricIdentifiers);
+            $overview = $this->overviewBuilder->build($site, 0, $periodDays, $preferredMetricIdentifier, $additionalMetricIdentifiers, $annotationCategory);
 
             if (!$overview->hasProvider) {
                 continue;
@@ -201,10 +262,10 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
 
     /**
      * The chart's annotation markers are drawn by JS from a JSON data
-     * attribute (see sparkline.js's initializeStaticCharts()), which needs
-     * plain date strings rather than Annotation's DateTimeImmutable - the
-     * same transform PageMetricsTilesController already does for the
-     * PageHeader tiles' own data-annotations attribute.
+     * attribute (see sparkline.js's initializeStaticCharts()), which is why
+     * the annotations go through AnnotationPayloadBuilder rather than
+     * straight into the view - the same shape the PageHeader tiles and the
+     * tiles widget put in their own data-annotations attribute.
      *
      * @param list<SiteMetricsOverview> $overviews
      *
@@ -212,6 +273,10 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
      */
     private function buildViewVariables(array $overviews): array
     {
+        // Captured rather than reached through $this: the closure below is
+        // static, like every other mapping closure in this class.
+        $payloadBuilder = $this->annotationPayloadBuilder;
+
         return ['sites' => array_map(
             static fn (SiteMetricsOverview $overview): array => [
                 'site' => $overview->site,
@@ -221,10 +286,8 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
                 'chartColor' => $overview->chartColor,
                 'chartUnit' => $overview->chartUnit,
                 'chartSeries' => $overview->chartSeries,
-                'annotations' => array_map(
-                    static fn (Annotation $annotation): array => ['date' => $annotation->date->format('Y-m-d'), 'text' => $annotation->text],
-                    $overview->annotations,
-                ),
+                'annotationCategories' => self::legendFor($overview->annotations),
+                'annotations' => $payloadBuilder->build($overview->annotations),
                 // The primary series first, so the JS always draws it as
                 // index 0 (relevant for e.g. picking which series still
                 // gets an area fill in the single-series case) - see

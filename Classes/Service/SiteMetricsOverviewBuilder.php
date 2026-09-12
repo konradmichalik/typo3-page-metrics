@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendSentiment, UnresolvedReason};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, MetricUnit, TrendSentiment, UnresolvedReason};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, DataFreshness, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
@@ -63,7 +63,7 @@ final readonly class SiteMetricsOverviewBuilder
     /**
      * @param list<string> $additionalMetricIdentifiers overlaid on the chart alongside $preferredMetricIdentifier (see PageMetricsChartWidget's metric2 setting) - an identifier not belonging to this site's own provider is silently dropped, the same fallback buildAdditionalChartSeries() already applies to $preferredMetricIdentifier
      */
-    public function build(Site $site, int $languageId, int $periodDays, ?string $preferredMetricIdentifier = null, array $additionalMetricIdentifiers = []): SiteMetricsOverview
+    public function build(Site $site, int $languageId, int $periodDays, ?string $preferredMetricIdentifier = null, array $additionalMetricIdentifiers = [], ?AnnotationCategory $annotationCategory = null): SiteMetricsOverview
     {
         $provider = $this->resolveProvider($site);
 
@@ -88,7 +88,7 @@ final readonly class SiteMetricsOverviewBuilder
             $this->buildChartSeries($chartMetric, $pageUids, $languageId, $currentRange, $coverage),
             $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT),
             $this->buildUnresolvedUrls($site),
-            $this->buildAnnotations($site->getIdentifier(), $currentRange),
+            $this->buildAnnotations($site->getIdentifier(), $currentRange, $annotationCategory),
             $this->buildAdditionalChartSeries($provider, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange, $coverage),
             $this->dataFreshnessFor($site),
         );
@@ -375,14 +375,28 @@ final readonly class SiteMetricsOverviewBuilder
      * one date-ordered list - callers never need to know an annotation can
      * come from two different places.
      *
+     * Site-wide, so no page filter: a dashboard covers the whole site and a
+     * marker scoped to one page still explains a bump in the site's totals.
+     *
+     * The category filter is applied here rather than in SQL. The set is
+     * bounded by the retention window and is small enough that a second
+     * query shape would cost more to maintain than it saves.
+     *
      * @return list<Annotation>
      */
-    private function buildAnnotations(string $siteIdentifier, DateRange $range): array
+    private function buildAnnotations(string $siteIdentifier, DateRange $range, ?AnnotationCategory $category = null): array
     {
         $annotations = [
             ...$this->annotationRepository->forSiteAndRange($siteIdentifier, $range),
             ...$this->manualAnnotationRepository->forSiteAndRange($siteIdentifier, $range),
         ];
+
+        if (null !== $category) {
+            $annotations = array_values(array_filter(
+                $annotations,
+                static fn (Annotation $annotation): bool => $annotation->category === $category,
+            ));
+        }
 
         usort($annotations, static fn (Annotation $a, Annotation $b): int => $a->date <=> $b->date);
 

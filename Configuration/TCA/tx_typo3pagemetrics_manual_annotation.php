@@ -11,7 +11,8 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-use KonradMichalik\Typo3PageMetrics\UserFunction\AnnotationSiteItemsProcFunc;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\AnnotationCategory;
+use KonradMichalik\Typo3PageMetrics\UserFunction\{AnnotationCategoryItemsProcFunc, AnnotationSiteItemsProcFunc};
 
 return [
     'ctrl' => [
@@ -69,6 +70,49 @@ return [
                 'required' => true,
             ],
         ],
+        'date_until' => [
+            'exclude' => true,
+            'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.date_until',
+            'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.date_until.description',
+            'config' => [
+                'type' => 'datetime',
+                'format' => 'date',
+            ],
+        ],
+        'category' => [
+            'exclude' => true,
+            'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.category',
+            'config' => [
+                'type' => 'select',
+                'renderType' => 'selectSingle',
+                // Built from the enum rather than repeated here, so a new
+                // category cannot exist in one place and not the other.
+                'itemsProcFunc' => AnnotationCategoryItemsProcFunc::class.'->populateCategories',
+                'default' => AnnotationCategory::Release->value,
+                'required' => true,
+            ],
+        ],
+        'page_uid' => [
+            'exclude' => true,
+            'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.page_uid',
+            'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.page_uid.description',
+            'config' => [
+                'type' => 'group',
+                'allowed' => 'pages',
+                'size' => 1,
+                'maxitems' => 1,
+            ],
+        ],
+        'include_subpages' => [
+            'exclude' => true,
+            'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.include_subpages',
+            'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.include_subpages.description',
+            'displayCond' => 'FIELD:page_uid:REQ:true',
+            'config' => [
+                'type' => 'check',
+                'renderType' => 'checkboxToggle',
+            ],
+        ],
         'text' => [
             'exclude' => true,
             'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.text',
@@ -83,7 +127,8 @@ return [
     'types' => [
         '1' => [
             'showitem' => '
-                site_identifier, date, text,
+                site_identifier, category, date, date_until, text,
+                --div--;LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.tab.scope, page_uid, include_subpages,
                 --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:access, hidden,
             ',
         ],

@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{TrendDirection, UnresolvedReason};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricTile, PageMetricsViewData};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, TrendDirection, UnresolvedReason};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricTile, PageMetricsViewData};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -374,7 +374,7 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
     public function testAnnotationsWithinTheSelectedPeriodAreExposed(): void
     {
         $this->writeSiteConfiguration(1, 'https://example.com/');
-        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', '1', new DateTimeImmutable('today'), 'Release 2.0');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('1', new DateTimeImmutable('today'), 'Release 2.0'));
 
         $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
 
@@ -386,7 +386,7 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
     {
         $this->writeSiteConfiguration(1, 'https://example.com/');
         $today = new DateTimeImmutable('today');
-        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', '1', $today, 'Imported release');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('1', $today, 'Imported release'));
         $this->get(ConnectionPool::class)->getConnectionForTable('tx_typo3pagemetrics_manual_annotation')->insert(
             'tx_typo3pagemetrics_manual_annotation',
             ['pid' => 0, 'site_identifier' => 'main', 'date' => $today->modify('-1 day')->getTimestamp(), 'text' => 'Manual note'],
@@ -397,6 +397,31 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         self::assertCount(2, $viewData->annotations);
         self::assertSame('Manual note', $viewData->annotations[0]->text);
         self::assertSame('Imported release', $viewData->annotations[1]->text);
+    }
+
+    public function testAPageScopedAnnotationDoesNotShowOnOtherPages(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('about', $today, 'About page rewrite', AnnotationCategory::Content, null, 2));
+
+        self::assertCount(1, $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30)->annotations);
+        self::assertSame([], $this->get(PageMetricsViewDataBuilder::class)->build(4, 0, 30)->annotations);
+    }
+
+    public function testAnAncestorsAnnotationReachesDownOnlyWhenItCoversItsSubtree(): void
+    {
+        // Page 5 sits under 3, which sits under the root page 1 - so this
+        // also covers that the builder walks the whole chain rather than
+        // just the immediate parent.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('relaunch', $today, 'Relaunch', AnnotationCategory::Redesign, null, 1, true));
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('rootonly', $today, 'Home only', AnnotationCategory::Content, null, 1));
+
+        $annotations = $this->get(PageMetricsViewDataBuilder::class)->build(5, 0, 30)->annotations;
+
+        self::assertSame(['Relaunch'], array_map(static fn (Annotation $a): string => $a->text, $annotations));
     }
 
     public function testIncludeSubpagesSumsMetricsAcrossTheWholeSubtree(): void

@@ -56,12 +56,23 @@ CREATE TABLE tx_typo3pagemetrics_import (
 	UNIQUE KEY provider_site (provider,site_identifier)
 );
 
+# category, date_until, page_uid and include_subpages are what turn a marker
+# from "something happened" into an explanation. category carries the icon and
+# the colour a chart draws it with, date_until makes a campaign a band rather
+# than a tick on the day it started, and page_uid scopes a marker to the page
+# it actually explains - 0 keeps the site-wide meaning every annotation had
+# before these columns existed, which is why it is the default rather than
+# NULL.
 CREATE TABLE tx_typo3pagemetrics_annotation (
 	uid int(11) unsigned NOT NULL auto_increment,
 	date date NOT NULL,
+	date_until date DEFAULT NULL,
 	site_identifier varchar(255) DEFAULT '' NOT NULL,
 	provider varchar(32) DEFAULT '' NOT NULL,
 	annotation_id varchar(32) DEFAULT '' NOT NULL,
+	category varchar(16) DEFAULT 'release' NOT NULL,
+	page_uid int(11) unsigned DEFAULT '0' NOT NULL,
+	include_subpages tinyint(1) unsigned DEFAULT '0' NOT NULL,
 	text varchar(1024) DEFAULT '' NOT NULL,
 
 	PRIMARY KEY (uid),
@@ -97,9 +108,17 @@ CREATE TABLE tx_typo3pagemetrics_bot_agent_daily (
 # timestamp by convention - unlike tx_typo3pagemetrics_annotation.date,
 # which is only ever written by this extension's own code as a plain
 # 'Y-m-d' string, never through a form.
+# date_until is int here for the same reason date is: this table is edited
+# through TCA, which stores a datetime as a Unix timestamp. Not nullable,
+# because TCA writes 0 for an empty datetime rather than NULL, which is why
+# the repository reads 0 as "no range" instead of as a date in 1970.
 CREATE TABLE tx_typo3pagemetrics_manual_annotation (
 	site_identifier varchar(255) DEFAULT '' NOT NULL,
 	date int(11) unsigned DEFAULT '0' NOT NULL,
+	date_until int(11) unsigned DEFAULT '0' NOT NULL,
+	category varchar(16) DEFAULT 'release' NOT NULL,
+	page_uid int(11) unsigned DEFAULT '0' NOT NULL,
+	include_subpages tinyint(1) unsigned DEFAULT '0' NOT NULL,
 	text varchar(1024) DEFAULT '' NOT NULL,
 
 	KEY site_date (site_identifier,date)

@@ -15,6 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Widgets;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\Annotation;
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Widgets\{AbstractSiteMetricsWidget, AnnotationsWidget, NotFoundPagesWidget};
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -64,7 +65,7 @@ final class SiteMetricsWidgetsTest extends FunctionalTestCase
     public function testAnnotationsWidgetListsSiteWideAnnotations(): void
     {
         $this->writeSiteConfiguration();
-        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', 'a1', new DateTimeImmutable('today'), 'Release 2.0');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('a1', new DateTimeImmutable('today'), 'Release 2.0'));
 
         $content = $this->renderWidget('dashboard.widget.pageMetricsAnnotations', AnnotationsWidget::class);
 
@@ -100,7 +101,7 @@ final class SiteMetricsWidgetsTest extends FunctionalTestCase
             'errorHandling' => [],
             'routes' => [],
         ]);
-        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', 'a1', new DateTimeImmutable('today'), 'Release 2.0');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('a1', new DateTimeImmutable('today'), 'Release 2.0'));
 
         $content = $this->renderWidget('dashboard.widget.pageMetricsAnnotations', AnnotationsWidget::class);
 

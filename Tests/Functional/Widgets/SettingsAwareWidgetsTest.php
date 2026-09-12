@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Widgets;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository};
 use KonradMichalik\Typo3PageMetrics\Widgets\{PageMetricsChartWidget, TopPagesWidget, TrendWidget};
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -89,7 +89,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertInstanceOf(PageMetricsChartWidget::class, $widget);
 
         $definitions = $widget->getSettingsDefinitions();
-        self::assertCount(3, $definitions);
+        self::assertCount(4, $definitions);
         self::assertSame('metric', $definitions[0]->key);
         self::assertArrayHasKey('matomo.pageviews', $definitions[0]->enum);
         self::assertArrayHasKey('matomo.bounce_rate', $definitions[0]->enum);
@@ -97,6 +97,11 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertArrayHasKey('matomo.pageviews', $definitions[1]->enum);
         self::assertSame('period', $definitions[2]->key);
         self::assertArrayHasKey(30, $definitions[2]->enum);
+        self::assertSame('annotationCategory', $definitions[3]->key);
+        // The empty choice is every kind, so a chart configured before this
+        // setting existed keeps showing what it showed.
+        self::assertArrayHasKey('', $definitions[3]->enum);
+        self::assertArrayHasKey('campaign', $definitions[3]->enum);
     }
 
     public function testChartWidgetMetricSettingOnlyOffersMetricsFromConfiguredProviders(): void
@@ -116,7 +121,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         $this->writeSiteConfiguration();
         $today = new DateTimeImmutable('today');
         $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 42);
-        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', 'a1', $today, 'Release 2.0');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('a1', $today, 'Release 2.0'));
 
         $result = $this->renderChartWidgetResult([]);
 

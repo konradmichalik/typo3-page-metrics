@@ -543,11 +543,86 @@
     cursor: crosshair;
 }
 
+/* One colour per annotation category, written here rather than carried in
+   PHP so each can be a light-dark() pair and follow a custom backend theme.
+   Deliberately muted in both schemes: a marker is context for the curve, not
+   a second data series competing with it.
+
+   The category is also on the icon beside the text in the annotations
+   widget, so colour is never the only thing saying which kind an event was. */
+.pagemetrics-annotation-release {
+    --pm-annotation-color: light-dark(#0969da, #6cb6ff);
+}
+
+.pagemetrics-annotation-campaign {
+    --pm-annotation-color: light-dark(#8250df, #c297ff);
+}
+
+.pagemetrics-annotation-content {
+    --pm-annotation-color: light-dark(#1a7f37, #6fdd8b);
+}
+
+.pagemetrics-annotation-redesign {
+    --pm-annotation-color: light-dark(#9a6700, #e0b341);
+}
+
+.pagemetrics-annotation-incident {
+    --pm-annotation-color: light-dark(#cf222e, #ff8182);
+}
+
+.pagemetrics-annotation-seo {
+    --pm-annotation-color: light-dark(#0f766e, #5fe0b5);
+}
+
+.pagemetrics-annotation-external {
+    --pm-annotation-color: light-dark(#6a7085, #a8adbd);
+}
+
 .pagemetrics-sparkline-annotation {
-    opacity: 0.6;
-    stroke: var(--typo3-text-color-variant, #6a7085);
+    opacity: 0.7;
+    stroke: var(--pm-annotation-color, var(--typo3-text-color-variant, #6a7085));
     stroke-dasharray: 2 2;
     stroke-width: 1;
+}
+
+/* A band rather than a tick, for an event that lasted. Faint enough to read
+   the curve through: it is the backdrop to the days it covers, not a shape
+   of its own. */
+.pagemetrics-sparkline-annotation-band {
+    fill: var(--pm-annotation-color, var(--typo3-text-color-variant, #6a7085));
+    fill-opacity: 0.12;
+}
+
+/* The legend under a chart, naming the kinds actually present rather than
+   every kind that exists: a key to seven colours when two are drawn is
+   noise. */
+.pagemetrics-annotation-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 4px;
+    font-size: 0.6875rem;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-annotation-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Only the icon takes the category colour. The words beside it keep the
+   body colour, so the text stays at its own contrast whatever hue the
+   category is. */
+.pagemetrics-annotation-legend-item svg {
+    width: 12px;
+    height: 12px;
+    color: var(--pm-annotation-color, currentColor);
+}
+
+/* The second date of a range, under the first in the annotations table. */
+.pagemetrics-annotation-until {
+    color: var(--typo3-text-color-variant, #6a7085);
 }
 
 .pagemetrics-sparkline-marker {

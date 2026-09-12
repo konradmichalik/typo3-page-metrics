@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Service;
 
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\AnnotationCategory;
 use KonradMichalik\Typo3PageMetrics\Service\SparklineLabelProvider;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -66,7 +67,26 @@ final class SparklineLabelProviderTest extends FunctionalTestCase
             'sliderPage',
             'chartSummary',
             'chartSummaryDates',
+            'annotationCategory.release',
+            'annotationCategory.campaign',
+            'annotationCategory.content',
+            'annotationCategory.redesign',
+            'annotationCategory.incident',
+            'annotationCategory.seo',
+            'annotationCategory.external',
         ], array_keys($labels));
+    }
+
+    public function testEveryAnnotationCategoryReachesTheClient(): void
+    {
+        // The marker tooltip names the kind of event because the colour
+        // alone does not, and it can only do that for a category the server
+        // actually sent a label for.
+        $labels = $this->subject->all();
+
+        foreach (AnnotationCategory::cases() as $category) {
+            self::assertArrayHasKey('annotationCategory.'.$category->value, $labels);
+        }
     }
 
     public function testTheChartSummaryKeepsItsPlaceholders(): void

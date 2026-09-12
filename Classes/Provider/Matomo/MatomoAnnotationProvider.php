@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Provider\Matomo;
 
 use DateTimeImmutable;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\AnnotationCategory;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange};
 use KonradMichalik\Typo3PageMetrics\Provider\AnnotationProviderInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
@@ -82,7 +83,11 @@ final readonly class MatomoAnnotationProvider implements AnnotationProviderInter
                 continue;
             }
 
-            yield new Annotation((string) $id, new DateTimeImmutable($row['date']), $row['note']);
+            // Matomo's annotations carry no kind of their own, and the ones
+            // teams actually keep there are release markers. Stated rather
+            // than left to the default, so the day Matomo does offer a kind
+            // this is the line that has to change.
+            yield new Annotation((string) $id, new DateTimeImmutable($row['date']), $row['note'], AnnotationCategory::Release);
         }
     }
 }

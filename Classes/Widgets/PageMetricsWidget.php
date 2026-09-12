@@ -13,8 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\Annotation;
-use KonradMichalik\Typo3PageMetrics\Service\{PageMetricsViewDataBuilder, SparklineLabelProvider};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsViewDataBuilder, SparklineLabelProvider};
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
@@ -45,6 +44,7 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
         private readonly SiteFinder $siteFinder,
         private readonly BackendViewFactory $backendViewFactory,
         private readonly SparklineLabelProvider $labelProvider,
+        private readonly AnnotationPayloadBuilder $annotationPayloadBuilder,
     ) {}
 
     public function setRequest(ServerRequestInterface $request): void
@@ -92,7 +92,7 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
     }
 
     /**
-     * @return list<array{site: Site, tiles: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricTile>, annotations: list<array{date: string, text: string}>, dataFreshness: ?\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DataFreshness}>
+     * @return list<array{site: Site, tiles: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricTile>, annotations: list<array{date: string, dateUntil: ?string, category: string, text: string}>, dataFreshness: ?\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DataFreshness}>
      */
     private function collectSiteTiles(): array
     {
@@ -108,10 +108,7 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
             $result[] = [
                 'site' => $site,
                 'tiles' => $viewData->tiles,
-                'annotations' => array_map(
-                    static fn (Annotation $annotation): array => ['date' => $annotation->date->format('Y-m-d'), 'text' => $annotation->text],
-                    $viewData->annotations,
-                ),
+                'annotations' => $this->annotationPayloadBuilder->build($viewData->annotations),
                 'dataFreshness' => $viewData->dataFreshness,
             ];
         }

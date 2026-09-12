@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Controller\Ajax;
 
-use KonradMichalik\Typo3PageMetrics\Service\{PageMetricsAccessChecker, PageMetricsViewDataBuilder, SparklineLabelProvider};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsAccessChecker, PageMetricsViewDataBuilder, SparklineLabelProvider};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Http\HtmlResponse;
@@ -36,6 +36,7 @@ final readonly class PageMetricsTilesController
         private BackendViewFactory $backendViewFactory,
         private PageMetricsAccessChecker $accessChecker,
         private SparklineLabelProvider $labelProvider,
+        private AnnotationPayloadBuilder $annotationPayloadBuilder,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
@@ -71,10 +72,7 @@ final readonly class PageMetricsTilesController
             'includeSubpages' => $viewData->includeSubpages,
             'hasSubpages' => $viewData->hasSubpages,
             'dataFreshness' => $viewData->dataFreshness,
-            'annotations' => array_map(
-                static fn ($annotation) => ['date' => $annotation->date->format('Y-m-d'), 'text' => $annotation->text],
-                $viewData->annotations,
-            ),
+            'annotations' => $this->annotationPayloadBuilder->build($viewData->annotations),
         ]);
 
         return new HtmlResponse($view->render('PageHeader/Metrics'));

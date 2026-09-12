@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Widgets;
 
 use DateTimeImmutable;
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\Annotation;
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository};
 use KonradMichalik\Typo3PageMetrics\Widgets\PageMetricsWidget;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -72,7 +73,7 @@ final class PageMetricsWidgetTest extends FunctionalTestCase
         $this->writeSiteConfiguration('main', 1, 'https://example.com/');
         $today = new DateTimeImmutable('today');
         $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 42);
-        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', 'a1', $today, 'Release 2.0');
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('a1', $today, 'Release 2.0'));
 
         $content = $this->renderWidget();
 

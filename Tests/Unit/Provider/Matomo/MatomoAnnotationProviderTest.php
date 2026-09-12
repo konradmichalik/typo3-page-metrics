@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Provider\Matomo;
 
 use DateTimeImmutable;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\AnnotationCategory;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
 use KonradMichalik\Typo3PageMetrics\Provider\Matomo\{MatomoAnnotationProvider, MatomoApiClient, MatomoConfiguration, MatomoConfigurationResolver};
 use PHPUnit\Framework\TestCase;
@@ -90,6 +91,24 @@ final class MatomoAnnotationProviderTest extends TestCase
         self::assertSame('2', $annotations[1]->id);
         self::assertSame('2026-08-05', $annotations[1]->date->format('Y-m-d'));
         self::assertSame('Campaign start', $annotations[1]->text);
+    }
+
+    public function testEveryImportedAnnotationIsAReleaseOnASingleDay(): void
+    {
+        // Matomo's API carries no kind and no end date, so the extension's
+        // own default is what these become. Pinned here because a change to
+        // it would silently recolour every imported marker.
+        $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
+        $this->apiClient->method('request')->willReturn([
+            '3' => [['id' => 1, 'date' => '2026-08-02', 'note' => 'Release 2.0']],
+        ]);
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+        $annotations = iterator_to_array($this->subject->fetch($this->site, $range), false);
+
+        self::assertSame(AnnotationCategory::Release, $annotations[0]->category);
+        self::assertNull($annotations[0]->dateUntil);
+        self::assertSame(0, $annotations[0]->pageUid);
     }
 
     public function testFetchReturnsNothingWhenTheSiteHasNoAnnotations(): void

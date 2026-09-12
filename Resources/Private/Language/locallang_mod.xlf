@@ -132,6 +132,42 @@
             <trans-unit id="trend.explanation.new" resname="trend.explanation.new">
                 <source>No data in the previous period (%1$s) to compare against</source>
             </trans-unit>
+            <trans-unit id="annotation.category.release" resname="annotation.category.release">
+                <source>Release</source>
+            </trans-unit>
+            <trans-unit id="annotation.category.campaign" resname="annotation.category.campaign">
+                <source>Campaign</source>
+            </trans-unit>
+            <trans-unit id="annotation.category.content" resname="annotation.category.content">
+                <source>Content change</source>
+            </trans-unit>
+            <trans-unit id="annotation.category.redesign" resname="annotation.category.redesign">
+                <source>Redesign</source>
+            </trans-unit>
+            <trans-unit id="annotation.category.incident" resname="annotation.category.incident">
+                <source>Incident</source>
+            </trans-unit>
+            <trans-unit id="annotation.category.seo" resname="annotation.category.seo">
+                <source>SEO change</source>
+            </trans-unit>
+            <trans-unit id="annotation.category.external" resname="annotation.category.external">
+                <source>External event</source>
+            </trans-unit>
+            <trans-unit id="annotation.legend.label" resname="annotation.legend.label">
+                <source>Markers</source>
+            </trans-unit>
+            <trans-unit id="annotation.until" resname="annotation.until">
+                <source>until</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.setting.annotationCategory.label" resname="widget.chart.setting.annotationCategory.label">
+                <source>Marker category</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.setting.annotationCategory.description" resname="widget.chart.setting.annotationCategory.description">
+                <source>Show only markers of one kind, or all of them.</source>
+            </trans-unit>
+            <trans-unit id="widget.chart.setting.annotationCategory.all" resname="widget.chart.setting.annotationCategory.all">
+                <source>All categories</source>
+            </trans-unit>
             <trans-unit id="widget.title" resname="widget.title">
                 <source>Page metrics</source>
             </trans-unit>
