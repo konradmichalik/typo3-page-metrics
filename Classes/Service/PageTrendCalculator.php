@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, TrendDirection, TrendSentiment};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricTrend, RateMetricDefinition, TopPage};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricSignificance, MetricTrend, PageTrend, RateMetricDefinition, TopPage};
 use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, SitePageUidRepository};
 
 use function array_slice;
@@ -51,7 +51,7 @@ final readonly class PageTrendCalculator
     public function rankedByValue(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit): array
     {
         $trends = $this->computeTrends($pageUids, $languageId, $metric, $currentRange, $previousRange);
-        usort($trends, static fn (array $a, array $b): int => $b['value'] <=> $a['value']);
+        usort($trends, static fn (PageTrend $a, PageTrend $b): int => $b->value <=> $a->value);
 
         return $this->toTopPages(array_slice($trends, 0, $limit), $metric);
     }
@@ -64,22 +64,30 @@ final readonly class PageTrendCalculator
     public function rankedByTrend(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, TrendSentiment $sentiment, int $limit): array
     {
         $polarity = $metric->polarity;
+        $significance = $metric->significance ?? MetricSignificance::default();
         $trends = $this->computeTrends($pageUids, $languageId, $metric, $currentRange, $previousRange);
-        $trends = array_filter(
-            $trends,
-            static fn (array $trend): bool => null !== $trend['deltaPercent']
-                && $sentiment === self::rankingSentimentOf($trend['trend'], $polarity),
-        );
 
-        // Ranked by how far the change went in the asked-for direction, not
-        // by the raw percentage: for a metric where lower is better, the
-        // worst drops are the biggest *rises*, so the sign has to be
-        // normalised before sorting.
+        // Both thresholds, not just the direction. Filtering on direction
+        // alone puts a page that went from two views to four at the top of
+        // "what rose", above one that lost a thousand, which is the opposite
+        // of what a widget called "what moved" is for.
+        $trends = array_values(array_filter(
+            $trends,
+            static fn (PageTrend $trend): bool => $sentiment === self::rankingSentimentOf($trend->direction, $polarity)
+                && $significance->clears($trend->value, $trend->previousValue),
+        ));
+
+        // Ranked by how much the movement is worth attending to, which is
+        // its size weighted by the volume behind it. Sorting by percentage
+        // is what the threshold above already had to correct for, and would
+        // reintroduce the same inversion inside the list that survived it.
+        //
+        // The sentiment does not enter the order. Everything left is already
+        // on the asked-for side of flat, so the largest movement leads
+        // whether "largest" means the steepest fall or the steepest rise.
         usort(
             $trends,
-            TrendSentiment::Negative === $sentiment
-                ? static fn (array $a, array $b): int => self::signedDelta($a['deltaPercent'], $polarity) <=> self::signedDelta($b['deltaPercent'], $polarity)
-                : static fn (array $a, array $b): int => self::signedDelta($b['deltaPercent'], $polarity) <=> self::signedDelta($a['deltaPercent'], $polarity),
+            static fn (PageTrend $a, PageTrend $b): int => $b->weight() <=> $a->weight(),
         );
 
         return $this->toTopPages(array_slice($trends, 0, $limit), $metric);
@@ -106,7 +114,7 @@ final readonly class PageTrendCalculator
     public function rankedByValueGrouped(array $pageUidsByAnchor, int $languageId, MetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit): array
     {
         $trends = $this->computeGroupedTrends($pageUidsByAnchor, $languageId, $metric->identifier, $currentRange, $previousRange);
-        usort($trends, static fn (array $a, array $b): int => $b['value'] <=> $a['value']);
+        usort($trends, static fn (PageTrend $a, PageTrend $b): int => $b->value <=> $a->value);
 
         return $this->toTopPages(array_slice($trends, 0, $limit), $metric);
     }
@@ -132,19 +140,9 @@ final readonly class PageTrendCalculator
     }
 
     /**
-     * $deltaPercent is never actually null here: rankedByTrend() filters
-     * those out before sorting, since a page with no comparable previous
-     * period has no percentage to rank by in the first place.
-     */
-    private static function signedDelta(?int $deltaPercent, MetricPolarity $polarity): int
-    {
-        return MetricPolarity::LowerIsBetter === $polarity ? -(int) $deltaPercent : (int) $deltaPercent;
-    }
-
-    /**
      * @param list<int> $pageUids
      *
-     * @return list<array{pageUid: int, value: int, deltaPercent: ?int, trend: TrendDirection}>
+     * @return list<PageTrend>
      */
     private function computeTrends(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange): array
     {
@@ -162,7 +160,7 @@ final readonly class PageTrendCalculator
      *
      * @param list<int> $pageUids
      *
-     * @return list<array{pageUid: int, value: int, deltaPercent: ?int, trend: TrendDirection}>
+     * @return list<PageTrend>
      */
     private function computePageTrends(array $pageUids, int $languageId, string $metric, DateRange $currentRange, DateRange $previousRange): array
     {
@@ -179,9 +177,9 @@ final readonly class PageTrendCalculator
             }
 
             $metricTrend = MetricTrend::between($value, $previousValue);
-            $deltaPercent = $metricTrend->deltaPercent;
-            $trend = $metricTrend->direction;
-            $trends[] = ['pageUid' => $pageUid, 'value' => $value, 'deltaPercent' => $deltaPercent, 'trend' => $trend];
+            // The count itself is the volume: a page's traffic is both what
+            // moved and the scale it moved at.
+            $trends[] = new PageTrend($pageUid, $value, $previousValue, max($value, $previousValue), $metricTrend->deltaPercent, $metricTrend->direction);
         }
 
         return $trends;
@@ -190,7 +188,7 @@ final readonly class PageTrendCalculator
     /**
      * @param array<int, list<int>> $pageUidsByAnchor
      *
-     * @return list<array{pageUid: int, value: int, deltaPercent: ?int, trend: TrendDirection}>
+     * @return list<PageTrend>
      */
     private function computeGroupedTrends(array $pageUidsByAnchor, int $languageId, string $metric, DateRange $currentRange, DateRange $previousRange): array
     {
@@ -208,9 +206,7 @@ final readonly class PageTrendCalculator
             }
 
             $metricTrend = MetricTrend::between($value, $previousValue);
-            $deltaPercent = $metricTrend->deltaPercent;
-            $trend = $metricTrend->direction;
-            $trends[] = ['pageUid' => $anchorUid, 'value' => $value, 'deltaPercent' => $deltaPercent, 'trend' => $trend];
+            $trends[] = new PageTrend($anchorUid, $value, $previousValue, max($value, $previousValue), $metricTrend->deltaPercent, $metricTrend->direction);
         }
 
         return $trends;
@@ -248,7 +244,7 @@ final readonly class PageTrendCalculator
      *
      * @param list<int> $pageUids
      *
-     * @return list<array{pageUid: int, value: int, deltaPercent: ?int, trend: TrendDirection}>
+     * @return list<PageTrend>
      */
     private function computePageTrendsForRate(array $pageUids, int $languageId, RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange): array
     {
@@ -270,30 +266,31 @@ final readonly class PageTrendCalculator
             $previousValue = $this->rateSeriesCalculator->ratio($previousNumerator[$pageUid] ?? 0, $previousDenominatorValue, $metric->unit);
 
             $metricTrend = MetricTrend::between($value, $previousValue);
-            $deltaPercent = $metricTrend->deltaPercent;
-            $trend = $metricTrend->direction;
-            $trends[] = ['pageUid' => $pageUid, 'value' => $value, 'deltaPercent' => $deltaPercent, 'trend' => $trend];
+            // The denominator, not the rate: a bounce rate is a share, and a
+            // share of four visits is not a movement of the same size as the
+            // same share of four thousand.
+            $trends[] = new PageTrend($pageUid, $value, $previousValue, max($denominator, $previousDenominatorValue), $metricTrend->deltaPercent, $metricTrend->direction);
         }
 
         return $trends;
     }
 
     /**
-     * @param list<array{pageUid: int, value: int, deltaPercent: ?int, trend: TrendDirection}> $trends
+     * @param list<PageTrend> $trends
      *
      * @return list<TopPage>
      */
     private function toTopPages(array $trends, MetricDefinition|RateMetricDefinition $metric): array
     {
-        $titlesByUid = $this->pageUidRepository->titlesFor(array_map(static fn (array $trend): int => $trend['pageUid'], $trends));
+        $titlesByUid = $this->pageUidRepository->titlesFor(array_map(static fn (PageTrend $trend): int => $trend->pageUid, $trends));
 
         return array_map(
-            fn (array $trend): TopPage => new TopPage(
-                $trend['pageUid'],
-                $titlesByUid[$trend['pageUid']] ?? sprintf('#%d', $trend['pageUid']),
-                $this->valueFormatter->format($trend['value'], $metric->unit),
-                $trend['deltaPercent'],
-                $trend['trend'],
+            fn (PageTrend $trend): TopPage => new TopPage(
+                $trend->pageUid,
+                $titlesByUid[$trend->pageUid] ?? sprintf('#%d', $trend->pageUid),
+                $this->valueFormatter->format($trend->value, $metric->unit),
+                $trend->deltaPercent,
+                $trend->direction,
                 $metric->polarity,
             ),
             $trends,

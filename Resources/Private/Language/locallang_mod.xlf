@@ -283,7 +283,7 @@
                 <source>Which metric ranks the pages. Defaults to the site's primary metric.</source>
             </trans-unit>
             <trans-unit id="widget.trend.empty" resname="widget.trend.empty">
-                <source>No trending pages in this period.</source>
+                <source>No page moved far enough in this period to be worth reporting.</source>
             </trans-unit>
             <trans-unit id="widget.trend.setting.sentiment.label" resname="widget.trend.setting.sentiment.label">
                 <source>Movement</source>

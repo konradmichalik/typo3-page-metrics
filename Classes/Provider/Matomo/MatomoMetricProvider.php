@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Provider\Matomo;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, RateMetricDefinition, UrlMetric};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricSignificance, RateMetricDefinition, UrlMetric};
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -40,6 +40,16 @@ final readonly class MatomoMetricProvider implements MetricProviderInterface
 {
     private const IDENTIFIER = 'matomo';
 
+    /**
+     * Below this many views a movement is arithmetic, not news: a page going
+     * from two views to four has doubled and means nothing. Paired with the
+     * relative threshold, so a small page that genuinely doubled still has to
+     * clear both. Deliberately half of what Matomo's Generated Insights uses,
+     * because a TYPO3 site is usually smaller than the Matomo Cloud volumes
+     * that figure was calibrated on.
+     */
+    private const MOVEMENT_FLOOR_VIEWS = 10;
+
     public function __construct(
         private MatomoConfigurationResolver $configurationResolver,
         private MatomoApiClient $apiClient,
@@ -58,8 +68,8 @@ final readonly class MatomoMetricProvider implements MetricProviderInterface
     public function getMetricDefinitions(): array
     {
         return [
-            new MetricDefinition('matomo.pageviews', 'Page views', 'The number of times this page was viewed in the selected period.', 'tabler-eye-search', MetricUnit::Count, 10, '#0969da'),
-            new MetricDefinition('matomo.visits', 'Visits', 'The number of visits that included this page in the selected period.', 'tabler-chart-dots', MetricUnit::Count, 20, '#8250df'),
+            new MetricDefinition('matomo.pageviews', 'Page views', 'The number of times this page was viewed in the selected period.', 'tabler-eye-search', MetricUnit::Count, 10, '#0969da', MetricPolarity::HigherIsBetter, MetricGroup::Audience, new MetricSignificance(0.1, self::MOVEMENT_FLOOR_VIEWS)),
+            new MetricDefinition('matomo.visits', 'Visits', 'The number of visits that included this page in the selected period.', 'tabler-chart-dots', MetricUnit::Count, 20, '#8250df', MetricPolarity::HigherIsBetter, MetricGroup::Audience, new MetricSignificance(0.1, self::MOVEMENT_FLOOR_VIEWS)),
         ];
     }
 
@@ -92,6 +102,11 @@ final readonly class MatomoMetricProvider implements MetricProviderInterface
                 'matomo.entry_bounces',
                 'matomo.entries',
                 MetricPolarity::LowerIsBetter,
+                // Percentage points, not percent: a bounce rate moving from
+                // 30% to 33% moved by 3, and under that it is the sort of
+                // wobble a handful of visits produces on its own. The figure
+                // Matomo's Generated Insights uses for the same metric.
+                new MetricSignificance(0.1, 3),
             ),
         ];
     }

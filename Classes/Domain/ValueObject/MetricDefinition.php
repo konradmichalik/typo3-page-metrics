@@ -28,6 +28,12 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, Me
  * call passing the arguments this constructor already had keeps meaning what
  * it meant, and one passing a ninth did not compile before.
  *
+ * $significance is null for a provider that has not thought about it, which
+ * is every provider until it has volumes to calibrate against. The trend
+ * ranking resolves that to MetricSignificance::default() rather than storing
+ * a default here, so the day the default changes it changes for every metric
+ * that never named one instead of for none of them.
+ *
  * @api
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
@@ -44,5 +50,6 @@ final readonly class MetricDefinition
         public string $color,
         public MetricPolarity $polarity = MetricPolarity::HigherIsBetter,
         public MetricGroup $group = MetricGroup::Audience,
+        public ?MetricSignificance $significance = null,
     ) {}
 }

@@ -79,6 +79,31 @@ Nothing about storage or import changes. Each machine metric keeps its own ident
 
 Only `MetricDefinition` takes it, appended after `polarity`. Unlike `polarity`, which took a slot `maxDimensions` had freed, this one is genuinely new, so a positional call written against the older constructor keeps meaning exactly what it meant. `RateMetricDefinition` has no such parameter: a rate cannot be summed, so there is nothing for a machine-side rate to fold into.
 
+## Significance
+
+`significance` says how far your metric has to move before the trend widget calls it a movement. It is optional, and a metric that omits it gets a tenth of the previous period's value with no floor.
+
+```php
+new MetricDefinition(
+    'acme.downloads',
+    'Downloads',
+    'Completed downloads of this page\'s attachment.',
+    'tabler-download',
+    MetricUnit::Count,
+    50,
+    '#0969da',
+    MetricPolarity::HigherIsBetter,
+    MetricGroup::Audience,
+    new MetricSignificance(0.1, 10),
+);
+```
+
+Both figures have to be cleared, which is the point of having two. `relative` is a share of the previous period's value, so `0.1` means "at least a tenth". `absolute` is a floor in your metric's own unit: views for a count, percentage points for a rate, seconds for a duration. Pass `0` to switch the floor off.
+
+Pick the floor from the volumes your metric actually sees. It exists to stop a page going from two to four leading a list of what rose, so it wants to sit just above the range where a handful of events is indistinguishable from noise. The bundled providers use ten views and three percentage points, deliberately half of what Matomo's Generated Insights plugin uses, because a TYPO3 site is usually smaller than the volumes that figure was calibrated on.
+
+Both `MetricDefinition` and `RateMetricDefinition` take it, appended last in each. Ordering within what survives the thresholds is not yours to set: it is the size of the movement weighted by the traffic behind it, which for a rate is the denominator.
+
 For a provider that needs its own daily-import step, its own configurable
 retention and to participate in the dashboard widgets, implement
 `MetricProviderInterface` instead, see the `Matomo`, `Ga4` and `AccessLog`

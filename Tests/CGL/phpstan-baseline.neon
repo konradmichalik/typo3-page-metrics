@@ -44,11 +44,11 @@ parameters:
 			# API shape rather than a defect. TopPage, which is not `@api` and has
 			# exactly one call site, deliberately does not get a default.
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
-			count: 2
+			count: 3
 			path: ../../Classes/Domain/ValueObject/MetricDefinition.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
-			count: 1
+			count: 2
 			path: ../../Classes/Domain/ValueObject/RateMetricDefinition.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue

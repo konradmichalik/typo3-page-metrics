@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit, TrendDirection, TrendSentiment};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, RateMetricDefinition};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit, TrendDirection, TrendSentiment};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricSignificance, RateMetricDefinition};
 use KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository;
 use KonradMichalik\Typo3PageMetrics\Service\PageTrendCalculator;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -152,6 +152,99 @@ final class PageTrendCalculatorTest extends FunctionalTestCase
 
         self::assertSame([2], array_map(static fn ($page): int => $page->pageUid, $risen));
         self::assertSame(TrendSentiment::Neutral, $risen[0]->sentiment);
+    }
+
+    public function testAMovementTooSmallToMeanAnythingIsLeftOut(): void
+    {
+        // The issue this exists for: two views becoming four is +100% and
+        // used to lead the list of what rose.
+        $this->upsert(2, 'matomo.pageviews', '2026-08-03', 2);
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 4);
+
+        $risen = $this->subject->rankedByTrend([2], 0, $this->flooredCountMetric(), $this->current, $this->previous, TrendSentiment::Positive, 10);
+
+        self::assertSame([], $risen);
+    }
+
+    public function testALargeMovementOutranksALargePercentage(): void
+    {
+        // Page 2 loses a quarter of four thousand views, page 3 loses eleven
+        // of twenty. Page 3 fell by far the larger share, and page 2 is the
+        // one somebody has to look at.
+        $this->upsert(2, 'matomo.pageviews', '2026-08-03', 4000);
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 3000);
+        $this->upsert(3, 'matomo.pageviews', '2026-08-03', 20);
+        $this->upsert(3, 'matomo.pageviews', '2026-08-10', 9);
+
+        $fallen = $this->subject->rankedByTrend([2, 3], 0, $this->flooredCountMetric(), $this->current, $this->previous, TrendSentiment::Negative, 10);
+
+        self::assertSame([2, 3], array_map(static fn ($page): int => $page->pageUid, $fallen));
+    }
+
+    public function testAMetricWithoutItsOwnThresholdStillHasAFloor(): void
+    {
+        // Nothing obliges a provider to name one, and "no threshold at all"
+        // is what put the noise at the top in the first place.
+        $this->upsert(2, 'matomo.pageviews', '2026-08-03', 100);
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 104);
+
+        $risen = $this->subject->rankedByTrend([2], 0, $this->countMetric(), $this->current, $this->previous, TrendSentiment::Positive, 10);
+
+        self::assertSame([], $risen);
+    }
+
+    public function testAnAbsoluteFloorDoesNotSwallowARealMovementOnASmallPage(): void
+    {
+        // Both thresholds have to be cleared, but clearing both is enough:
+        // a page that went from twenty to sixty is small and still news.
+        $this->upsert(2, 'matomo.pageviews', '2026-08-03', 20);
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 60);
+
+        $risen = $this->subject->rankedByTrend([2], 0, $this->flooredCountMetric(), $this->current, $this->previous, TrendSentiment::Positive, 10);
+
+        self::assertSame([2], array_map(static fn ($page): int => $page->pageUid, $risen));
+    }
+
+    public function testARateNeedsPercentagePointsRatherThanPercent(): void
+    {
+        // 30% to 33% is a tenth in relative terms and three points in the
+        // metric's own unit, which is what the floor is expressed in.
+        $this->upsert(2, 'matomo.entries', '2026-08-03', 1000);
+        $this->upsert(2, 'matomo.entry_bounces', '2026-08-03', 300);
+        $this->upsert(2, 'matomo.entries', '2026-08-10', 1000);
+        $this->upsert(2, 'matomo.entry_bounces', '2026-08-10', 320);
+
+        $declined = $this->subject->rankedByTrend([2], 0, $this->flooredRateMetric(), $this->current, $this->previous, TrendSentiment::Negative, 10);
+
+        self::assertSame([], $declined);
+    }
+
+    public function testARateSwingOnAHandfulOfVisitsRanksBelowASmallerOneOnMany(): void
+    {
+        // Page 2 swings forty points on five entries, page 3 swings ten on
+        // two thousand. The second is the one that happened to anybody.
+        $this->upsert(2, 'matomo.entries', '2026-08-03', 5);
+        $this->upsert(2, 'matomo.entry_bounces', '2026-08-03', 1);
+        $this->upsert(2, 'matomo.entries', '2026-08-10', 5);
+        $this->upsert(2, 'matomo.entry_bounces', '2026-08-10', 3);
+        $this->upsert(3, 'matomo.entries', '2026-08-03', 2000);
+        $this->upsert(3, 'matomo.entry_bounces', '2026-08-03', 400);
+        $this->upsert(3, 'matomo.entries', '2026-08-10', 2000);
+        $this->upsert(3, 'matomo.entry_bounces', '2026-08-10', 600);
+
+        $declined = $this->subject->rankedByTrend([2, 3], 0, $this->flooredRateMetric(), $this->current, $this->previous, TrendSentiment::Negative, 10);
+
+        self::assertSame([3, 2], array_map(static fn ($page): int => $page->pageUid, $declined));
+    }
+
+    private function flooredCountMetric(): MetricDefinition
+    {
+        return new MetricDefinition('matomo.pageviews', 'Page views', 'Views', 'actions-view', MetricUnit::Count, 10, '#0969da', MetricPolarity::HigherIsBetter, MetricGroup::Audience, new MetricSignificance(0.1, 10));
+    }
+
+    private function flooredRateMetric(): RateMetricDefinition
+    {
+        return new RateMetricDefinition('matomo.bounce_rate', 'Bounce rate', 'Bounces', 'actions-door-exit', MetricUnit::Percent, 40, '#cf222e', 'matomo.entry_bounces', 'matomo.entries', MetricPolarity::LowerIsBetter, new MetricSignificance(0.1, 5));
     }
 
     private function neutralRateMetric(): RateMetricDefinition

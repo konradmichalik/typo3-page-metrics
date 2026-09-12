@@ -42,5 +42,6 @@ final readonly class RateMetricDefinition
         public string $numerator,
         public string $denominator,
         public MetricPolarity $polarity = MetricPolarity::HigherIsBetter,
+        public ?MetricSignificance $significance = null,
     ) {}
 }

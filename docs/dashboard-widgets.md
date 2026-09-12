@@ -44,6 +44,20 @@ The trend widget ranks by whether a page improved or declined, not by whether it
 
 A metric with no polarity of its own, such as an average time on page, has no improvement to rank by, so for those the setting falls back to its literal direction meaning.
 
+## What counts as a movement
+
+A page going from 2 views to 4 has risen by 100%, and ranking on the percentage alone puts it above a page that lost a thousand. On any site with a long tail, which is every site, that inverts the answer a widget called "what moved" exists to give.
+
+So a movement has to clear two thresholds rather than one, the pairing Matomo's Generated Insights plugin uses: a share of the previous period's value **and** a floor in the metric's own unit. Two views becoming four clears the share and not the floor; four thousand views becoming three thousand nine hundred and sixty clears the floor and not the share. Neither is reported. A page that went from twenty views to sixty clears both, and is reported, because a small page that genuinely tripled is news.
+
+The floor is in the metric's own unit, so it is views for a count and percentage points for a rate. A bounce rate moving from 30% to 33% moved by 3, not by 10.
+
+What survives is ordered by how far it moved, weighted by the traffic behind it, never by the percentage. For a rate the traffic behind it is the denominator: a bounce rate that swung forty points on five entries is not the same event as one that swung ten on two thousand, and the widget says so by putting the second one first.
+
+Each provider sets these for its own metrics (see [Significance](extending.md#significance)); a metric that names none gets a tenth with no floor. The built-in figures are deliberately half of Matomo's, since a TYPO3 site is usually smaller than the Matomo Cloud volumes those were calibrated on. They may still be wrong for a particular installation.
+
+An empty widget is therefore a real answer, not a fault: it says nothing moved far enough this period.
+
 ## Reading the chart
 
 Each chart scales to its own data, so the shape of the curve says nothing about how big the numbers behind it are. The preset makes that concrete by putting two compact charts side by side: without a scale, a few dozen visits and a few thousand draw the same picture.
