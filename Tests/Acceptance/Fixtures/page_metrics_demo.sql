@@ -119,6 +119,16 @@ SELECT * FROM (
 ) sub
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
+-- The import state a real run over the rows above would have produced: the
+-- window starts where the data starts. Without it the backend cannot tell
+-- "no traffic that day" from "never imported", and a 90-day period over this
+-- 60-day history would draw its first 30 days as a flat zero instead of
+-- leaving them blank (see ImportCoverage).
+INSERT INTO tx_typo3pagemetrics_import (provider, site_identifier, covered_from_date, covered_until_date, last_imported_date, tstamp)
+VALUES
+    ('matomo', 'main', DATE_SUB(CURDATE(), INTERVAL 59 DAY), CURDATE(), DATE_SUB(CURDATE(), INTERVAL 1 DAY), UNIX_TIMESTAMP())
+ON DUPLICATE KEY UPDATE covered_from_date = VALUES(covered_from_date), covered_until_date = VALUES(covered_until_date), last_imported_date = VALUES(last_imported_date), tstamp = VALUES(tstamp);
+
 -- Two sample annotations (release/campaign markers) within the 30-day
 -- window above, so the sparkline markers have something to render.
 INSERT INTO tx_typo3pagemetrics_annotation (date, site_identifier, provider, annotation_id, text)

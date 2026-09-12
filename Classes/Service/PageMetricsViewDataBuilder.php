@@ -71,6 +71,8 @@ final readonly class PageMetricsViewDataBuilder
         private AnnotationRepository $annotationRepository,
         private ManualAnnotationRepository $manualAnnotationRepository,
         private SitePageUidRepository $pageUidRepository,
+        private RateSeriesCalculator $rateSeriesCalculator,
+        private ImportCoverage $importCoverage,
         private EventDispatcherInterface $eventDispatcher,
         private iterable $providers,
     ) {}
@@ -167,7 +169,7 @@ final readonly class PageMetricsViewDataBuilder
         // page URL at all is what makes collectDefinitions() skip it.
         $pageUrl = $includeSubpages ? null : $this->resolvePageUrl($site, $pageId);
         $pageUids = $includeSubpages ? $this->pageUidRepository->descendantsOf($pageId) : [$pageId];
-        [$definitions, $rateDefinitions, $externalLinkByIdentifier] = $this->collectDefinitions($site, $pageUrl, $tileRange);
+        [$definitions, $rateDefinitions, $externalLinkByIdentifier, $coverageByIdentifier] = $this->collectDefinitions($site, $pageUrl, $tileRange);
 
         /** @var list<array{sortOrder: int, tile: MetricTile}> $ordered */
         $ordered = [];
@@ -175,14 +177,14 @@ final readonly class PageMetricsViewDataBuilder
         foreach ($definitions as $definition) {
             $ordered[] = [
                 'sortOrder' => $definition->sortOrder,
-                'tile' => $this->buildCountTile($definition, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null),
+                'tile' => $this->buildCountTile($definition, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null, $coverageByIdentifier[$definition->identifier] ?? null),
             ];
         }
 
         foreach ($rateDefinitions as $rateDefinition) {
             $ordered[] = [
                 'sortOrder' => $rateDefinition->sortOrder,
-                'tile' => $this->buildRateTile($rateDefinition, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$rateDefinition->identifier] ?? null),
+                'tile' => $this->buildRateTile($rateDefinition, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$rateDefinition->identifier] ?? null, $coverageByIdentifier[$rateDefinition->identifier] ?? null),
             ];
         }
 
@@ -204,7 +206,7 @@ final readonly class PageMetricsViewDataBuilder
     }
 
     /**
-     * @return array{0: list<MetricDefinition>, 1: list<RateMetricDefinition>, 2: array<string, ?string>}
+     * @return array{0: list<MetricDefinition>, 1: list<RateMetricDefinition>, 2: array<string, ?string>, 3: array<string, ?DateRange>}
      */
     private function collectDefinitions(Site $site, ?string $pageUrl, DateRange $tileRange): array
     {
@@ -214,6 +216,11 @@ final readonly class PageMetricsViewDataBuilder
         $rateDefinitionsByIdentifier = [];
         /** @var array<string, ?string> $externalLinkByIdentifier */
         $externalLinkByIdentifier = [];
+        // Coverage is a property of the provider that fetched the metric,
+        // never of the site: an access log added to a site Matomo has been
+        // feeding for a year has its own, much shorter history.
+        /** @var array<string, ?DateRange> $coverageByIdentifier */
+        $coverageByIdentifier = [];
 
         foreach ($this->providers as $provider) {
             if (!$provider->supports($site)) {
@@ -221,19 +228,22 @@ final readonly class PageMetricsViewDataBuilder
             }
 
             $externalLink = null !== $pageUrl ? $provider->getExternalLink($site, $pageUrl, $tileRange) : null;
+            $coverage = $this->importCoverage->forProvider($provider->getIdentifier(), $site->getIdentifier());
 
             foreach ($provider->getMetricDefinitions() as $definition) {
                 $definitionsByIdentifier[$definition->identifier] = $definition;
                 $externalLinkByIdentifier[$definition->identifier] = $externalLink;
+                $coverageByIdentifier[$definition->identifier] = $coverage;
             }
 
             foreach ($provider->getRateMetricDefinitions() as $rateDefinition) {
                 $rateDefinitionsByIdentifier[$rateDefinition->identifier] = $rateDefinition;
                 $externalLinkByIdentifier[$rateDefinition->identifier] = $externalLink;
+                $coverageByIdentifier[$rateDefinition->identifier] = $coverage;
             }
         }
 
-        return [array_values($definitionsByIdentifier), array_values($rateDefinitionsByIdentifier), $externalLinkByIdentifier];
+        return [array_values($definitionsByIdentifier), array_values($rateDefinitionsByIdentifier), $externalLinkByIdentifier, $coverageByIdentifier];
     }
 
     private function resolvePageUrl(Site $site, int $pageId): ?string
@@ -257,10 +267,11 @@ final readonly class PageMetricsViewDataBuilder
     /**
      * @param list<int> $pageUids
      */
-    private function buildCountTile(MetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink): MetricTile
+    private function buildCountTile(MetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage): MetricTile
     {
-        $sparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
-        $value = array_sum($sparkline);
+        $series = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
+        $sparkline = $this->importCoverage->mask($series, $coverage);
+        $value = array_sum($series);
         $previousValue = array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $previousRange));
         $redirectValue = array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange, 'via_redirect'));
 
@@ -295,18 +306,18 @@ final readonly class PageMetricsViewDataBuilder
     /**
      * @param list<int> $pageUids
      */
-    private function buildRateTile(RateMetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink): MetricTile
+    private function buildRateTile(RateMetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage): MetricTile
     {
         $numeratorSparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->numerator, $tileRange);
         $denominatorSparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->denominator, $tileRange);
-        $sparkline = $this->buildRatioSeries($numeratorSparkline, $denominatorSparkline, $definition->unit);
+        $sparkline = $this->importCoverage->mask($this->rateSeriesCalculator->series($numeratorSparkline, $denominatorSparkline, $definition->unit), $coverage);
 
-        $value = $this->computeRatio(
+        $value = $this->rateSeriesCalculator->ratio(
             array_sum($numeratorSparkline),
             array_sum($denominatorSparkline),
             $definition->unit,
         );
-        $previousValue = $this->computeRatio(
+        $previousValue = $this->rateSeriesCalculator->ratio(
             array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->numerator, $previousRange)),
             array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->denominator, $previousRange)),
             $definition->unit,
@@ -330,34 +341,6 @@ final readonly class PageMetricsViewDataBuilder
             $externalLink,
             null !== $deltaPercent ? $this->formatValue($previousValue, $definition->unit) : '',
         );
-    }
-
-    /**
-     * @param array<string, int> $numeratorSeries
-     * @param array<string, int> $denominatorSeries
-     *
-     * @return array<string, int>
-     */
-    private function buildRatioSeries(array $numeratorSeries, array $denominatorSeries, MetricUnit $unit): array
-    {
-        $series = [];
-
-        foreach ($numeratorSeries as $date => $numeratorValue) {
-            $series[$date] = $this->computeRatio($numeratorValue, $denominatorSeries[$date] ?? 0, $unit);
-        }
-
-        return $series;
-    }
-
-    private function computeRatio(int $numerator, int $denominator, MetricUnit $unit): int
-    {
-        if (0 === $denominator) {
-            return 0;
-        }
-
-        $ratio = $numerator / $denominator;
-
-        return MetricUnit::Percent === $unit ? (int) round($ratio * 100) : (int) round($ratio);
     }
 
     private function formatValue(int $value, MetricUnit $unit): string

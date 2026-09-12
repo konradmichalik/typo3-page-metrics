@@ -39,6 +39,7 @@ final readonly class PageTrendCalculator
     public function __construct(
         private DailyMetricsRepository $dailyMetricsRepository,
         private SitePageUidRepository $pageUidRepository,
+        private RateSeriesCalculator $rateSeriesCalculator,
     ) {}
 
     /**
@@ -221,8 +222,8 @@ final readonly class PageTrendCalculator
                 continue;
             }
 
-            $value = $this->computeRatio($currentNumerator[$pageUid] ?? 0, $denominator, $metric->unit);
-            $previousValue = $this->computeRatio($previousNumerator[$pageUid] ?? 0, $previousDenominatorValue, $metric->unit);
+            $value = $this->rateSeriesCalculator->ratio($currentNumerator[$pageUid] ?? 0, $denominator, $metric->unit);
+            $previousValue = $this->rateSeriesCalculator->ratio($previousNumerator[$pageUid] ?? 0, $previousDenominatorValue, $metric->unit);
 
             [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
             $trends[] = ['pageUid' => $pageUid, 'value' => $value, 'deltaPercent' => $deltaPercent, 'trend' => $trend];
@@ -248,17 +249,6 @@ final readonly class PageTrendCalculator
         };
 
         return [$deltaPercent, $trend];
-    }
-
-    private function computeRatio(int $numerator, int $denominator, MetricUnit $unit): int
-    {
-        if (0 === $denominator) {
-            return 0;
-        }
-
-        $ratio = $numerator / $denominator;
-
-        return MetricUnit::Percent === $unit ? (int) round($ratio * 100) : (int) round($ratio);
     }
 
     /**

@@ -15,8 +15,8 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Service;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{TrendDirection, UnresolvedReason};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{MetricTile, PageMetricsViewData};
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricTile, PageMetricsViewData};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -76,6 +76,53 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
 
         $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 90), 'matomo.pageviews');
         self::assertCount(90, $tile->sparkline);
+    }
+
+    public function testDaysOutsideTheImportedWindowAreNullRatherThanZero(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        // The import has only ever covered the last two days, so the rest of
+        // a seven-day period is not "no traffic", it is "no answer".
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today->modify('-1 day'), new DateRange($today->modify('-1 day'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 4);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7), 'matomo.pageviews');
+
+        self::assertSame(4, $tile->sparkline[$today->format('Y-m-d')]);
+        // Inside the window and with no row: a genuine quiet day.
+        self::assertSame(0, $tile->sparkline[$today->modify('-1 day')->format('Y-m-d')]);
+        // Before the window: unknown.
+        self::assertNull($tile->sparkline[$today->modify('-2 days')->format('Y-m-d')]);
+        self::assertSame(4, $tile->value);
+    }
+
+    public function testARateTileMarksUncoveredDaysTheSameWay(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today->modify('-1 day'), new DateRange($today->modify('-1 day'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entries', 4);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entry_bounces', 1);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7), 'matomo.bounce_rate');
+
+        self::assertSame(25, $tile->sparkline[$today->format('Y-m-d')]);
+        self::assertSame(0, $tile->sparkline[$today->modify('-1 day')->format('Y-m-d')]);
+        self::assertNull($tile->sparkline[$today->modify('-2 days')->format('Y-m-d')]);
+    }
+
+    public function testSparklineIsLeftUntouchedWhenNothingHasEverBeenImported(): void
+    {
+        // Without import state the extension does not know what it covers,
+        // so it must not claim a day is missing.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 4);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7), 'matomo.pageviews');
+
+        self::assertNotContains(null, $tile->sparkline);
     }
 
     public function testExposesTheCurrentAndPreviousPeriodAsDateRangeLabels(): void

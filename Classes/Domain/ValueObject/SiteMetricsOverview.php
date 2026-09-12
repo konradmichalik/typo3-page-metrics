@@ -29,7 +29,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 final readonly class SiteMetricsOverview
 {
     /**
-     * @param array<string, int>         $chartSeries           Y-m-d => summed value, covers the same period as topPages/unresolvedUrls
+     * @param array<string, int|null>    $chartSeries           Y-m-d => summed value, covers the same period as topPages/unresolvedUrls; null for a day with no data
      * @param list<TopPage>              $topPages
      * @param list<UnresolvedUrlSummary> $unresolvedUrls
      * @param list<Annotation>           $annotations

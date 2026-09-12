@@ -54,6 +54,8 @@ final readonly class SiteMetricsOverviewBuilder
         private AnnotationRepository $annotationRepository,
         private ManualAnnotationRepository $manualAnnotationRepository,
         private PageTrendCalculator $trendCalculator,
+        private RateSeriesCalculator $rateSeriesCalculator,
+        private ImportCoverage $importCoverage,
         private iterable $providers,
     ) {}
 
@@ -73,6 +75,7 @@ final readonly class SiteMetricsOverviewBuilder
 
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
+        $coverage = $this->importCoverage->forProvider($provider->getIdentifier(), $site->getIdentifier());
 
         return new SiteMetricsOverview(
             $site,
@@ -81,11 +84,11 @@ final readonly class SiteMetricsOverviewBuilder
             $chartMetric->icon,
             $chartMetric->color,
             $chartMetric->unit,
-            $this->buildChartSeries($chartMetric, $pageUids, $languageId, $currentRange),
+            $this->buildChartSeries($chartMetric, $pageUids, $languageId, $currentRange, $coverage),
             $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT),
             $this->buildUnresolvedUrls($site),
             $this->buildAnnotations($site->getIdentifier(), $currentRange),
-            $this->buildAdditionalChartSeries($provider, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange),
+            $this->buildAdditionalChartSeries($provider, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange, $coverage),
         );
     }
 
@@ -288,23 +291,19 @@ final readonly class SiteMetricsOverviewBuilder
     /**
      * @param list<int> $pageUids
      *
-     * @return array<string, int> Y-m-d => value
+     * @return array<string, int|null> Y-m-d => value, null for days with no data
      */
-    private function buildChartSeries(MetricDefinition|RateMetricDefinition $metric, array $pageUids, int $languageId, DateRange $range): array
+    private function buildChartSeries(MetricDefinition|RateMetricDefinition $metric, array $pageUids, int $languageId, DateRange $range, ?DateRange $coverage): array
     {
-        if ($metric instanceof MetricDefinition) {
-            return $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $metric->identifier, $range);
-        }
+        $series = $metric instanceof MetricDefinition
+            ? $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $metric->identifier, $range)
+            : $this->rateSeriesCalculator->series(
+                $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $metric->numerator, $range),
+                $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $metric->denominator, $range),
+                $metric->unit,
+            );
 
-        $numerator = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $metric->numerator, $range);
-        $denominator = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $metric->denominator, $range);
-
-        $series = [];
-        foreach ($numerator as $date => $numeratorValue) {
-            $series[$date] = $this->computeRatio($numeratorValue, $denominator[$date] ?? 0, $metric->unit);
-        }
-
-        return $series;
+        return $this->importCoverage->mask($series, $coverage);
     }
 
     /**
@@ -319,7 +318,7 @@ final readonly class SiteMetricsOverviewBuilder
      *
      * @return list<ChartSeries>
      */
-    private function buildAdditionalChartSeries(MetricProviderInterface $provider, array $metricIdentifiers, array $pageUids, int $languageId, DateRange $range): array
+    private function buildAdditionalChartSeries(MetricProviderInterface $provider, array $metricIdentifiers, array $pageUids, int $languageId, DateRange $range, ?DateRange $coverage): array
     {
         $series = [];
         $seenIdentifiers = [];
@@ -336,7 +335,7 @@ final readonly class SiteMetricsOverviewBuilder
             }
 
             $seenIdentifiers[] = $identifier;
-            $series[] = new ChartSeries($metric->label, $metric->color, $metric->unit, $this->buildChartSeries($metric, $pageUids, $languageId, $range));
+            $series[] = new ChartSeries($metric->label, $metric->color, $metric->unit, $this->buildChartSeries($metric, $pageUids, $languageId, $range, $coverage));
         }
 
         return $series;
@@ -373,17 +372,6 @@ final readonly class SiteMetricsOverviewBuilder
         $previousRange = new DateRange($previousUntil->modify(sprintf('-%d days', $periodDays - 1)), $previousUntil);
 
         return [$currentRange, $previousRange];
-    }
-
-    private function computeRatio(int $numerator, int $denominator, MetricUnit $unit): int
-    {
-        if (0 === $denominator) {
-            return 0;
-        }
-
-        $ratio = $numerator / $denominator;
-
-        return MetricUnit::Percent === $unit ? (int) round($ratio * 100) : (int) round($ratio);
     }
 
     /**

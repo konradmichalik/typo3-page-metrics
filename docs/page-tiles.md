@@ -34,6 +34,32 @@ text in the tooltip alongside that day's value.
 
 ![Sparkline popover for the Visits tile, showing today/yesterday/peak/average and a dated tooltip](img/page-tiles-sparkline-popover.png)
 
+## Days without data
+
+A sparkline distinguishes a day with no traffic from a day the extension has
+no number for. The import records the window it has answers for, and days
+outside that window are drawn as a gap in the line rather than a value of
+zero: a 90-day period on a site with 60 days of history starts where the data
+starts instead of climbing out of the floor. Hovering such a day says "No
+data", and those days are left out of the popover's peak and average.
+
+That window starts where the provider's data starts, not where the import
+asked. `retentionDays` defaults to 400, so a first run requests well over a
+year of history even from a site that is three weeks old, and treating the
+request as the answer would put the cliff back.
+
+Inside the imported window a missing day really is zero. A provider only
+reports a URL that had activity, so an ordinary quiet day has no row of its
+own and is shown as the zero it was.
+
+Today is usually outside the window until the day's import has run, so the
+most recent point commonly reads as no data rather than as a drop to zero.
+
+Installations that have never run `page-metrics:import`, or whose data was
+seeded straight into the database, have no window recorded. Nothing is marked
+as missing then, since not knowing what is covered is no basis for claiming a
+gap.
+
 ## Annotations
 
 Annotations are site-wide, point-in-time events, from two independent

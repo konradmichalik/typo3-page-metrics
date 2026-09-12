@@ -103,8 +103,11 @@ final class DailyMetricsRepositoryTest extends FunctionalTestCase
         self::assertSame(['2026-08-01' => 35], $series);
     }
 
-    public function testSiteSeriesReturnsZeroForDaysWithoutARow(): void
+    public function testSiteSeriesZeroFillsDaysWithoutARow(): void
     {
+        // A provider only emits a metric for a URL that had activity, so a
+        // day with no row is an ordinary quiet day. Whether the day was
+        // imported at all is ImportCoverage's question, not this one.
         $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 5);
 
         $series = $this->subject->siteSeries([2, 3], 0, 'matomo.pageviews', new DateRange(

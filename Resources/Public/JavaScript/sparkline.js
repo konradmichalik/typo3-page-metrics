@@ -7,6 +7,10 @@ const SPARKLINE_HEIGHT = 52;
 const SPARKLINE_WIDTH = 29 * 4;
 const openTiles = new Set();
 
+// Hard-coded like every other string in this file; they move to the XLF
+// together, see the popover-strings issue.
+const NO_DATA_LABEL = 'No data';
+
 const CHEVRON_LEFT_PATH = 'M15 6l-6 6l6 6';
 const CHEVRON_RIGHT_PATH = 'M9 6l6 6l-6 6';
 
@@ -24,6 +28,75 @@ function getAnnotations(tileElement) {
   } catch {
     return [];
   }
+}
+
+// A day with no data at all arrives as null, not 0 (see
+// DailyMetricsRepository::siteSeries()). The line has to break there rather
+// than dive to the baseline, which is what made the first day of an import
+// history, or any day the analytics source was unreachable, read as a
+// traffic collapse.
+function segmentsOf(points) {
+  const segments = [];
+  let current = [];
+
+  points.forEach((point) => {
+    if (point === null) {
+      if (current.length > 0) {
+        segments.push(current);
+        current = [];
+      }
+      return;
+    }
+    current.push(point);
+  });
+
+  if (current.length > 0) {
+    segments.push(current);
+  }
+
+  return segments;
+}
+
+function appendSeriesPath(svg, points, { stroke, withArea }) {
+  segmentsOf(points).forEach((segment) => {
+    // A single day surrounded by gaps has no line to draw, so it becomes a
+    // dot: a zero-length stroke with a round cap, which non-scaling-stroke
+    // keeps circular despite the SVG's preserveAspectRatio="none".
+    if (segment.length === 1) {
+      const [[x, y]] = segment;
+      const dot = document.createElementNS(SVG_NS, 'line');
+      dot.setAttribute('x1', x);
+      dot.setAttribute('x2', x);
+      dot.setAttribute('y1', y);
+      dot.setAttribute('y2', y);
+      dot.setAttribute('stroke', stroke);
+      dot.setAttribute('stroke-width', '2.5');
+      dot.setAttribute('stroke-linecap', 'round');
+      dot.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(dot);
+      return;
+    }
+
+    if (withArea) {
+      const [firstX] = segment[0];
+      const [lastX] = segment[segment.length - 1];
+      const area = document.createElementNS(SVG_NS, 'polygon');
+      const areaPoints = [...segment, [lastX, SPARKLINE_HEIGHT], [firstX, SPARKLINE_HEIGHT]];
+      area.setAttribute('points', areaPoints.map((point) => point.join(',')).join(' '));
+      area.setAttribute('fill', 'currentColor');
+      area.setAttribute('fill-opacity', '0.2');
+      area.setAttribute('stroke', 'none');
+      svg.appendChild(area);
+    }
+
+    const polyline = document.createElementNS(SVG_NS, 'polyline');
+    polyline.setAttribute('points', segment.map((point) => point.join(',')).join(' '));
+    polyline.setAttribute('fill', 'none');
+    polyline.setAttribute('stroke', stroke);
+    polyline.setAttribute('stroke-width', '1');
+    polyline.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.appendChild(polyline);
+  });
 }
 
 function formatValueForUnit(value, unit) {
@@ -85,35 +158,20 @@ class PageMetricsTile {
     }
 
     const values = entries.map(([, value]) => value);
-    const max = Math.max(...values, 1);
+    const max = Math.max(...values.filter((value) => value !== null), 1);
     const width = SPARKLINE_WIDTH;
     const step = entries.length > 1 ? width / (entries.length - 1) : 0;
 
-    const points = entries.map(([, value], index) => [
-      index * step,
-      SPARKLINE_HEIGHT - (value / max) * SPARKLINE_HEIGHT,
-    ]);
+    const points = entries.map(([, value], index) =>
+      value === null ? null : [index * step, SPARKLINE_HEIGHT - (value / max) * SPARKLINE_HEIGHT],
+    );
 
     const svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${width} ${SPARKLINE_HEIGHT}`);
     svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('class', 'pagemetrics-sparkline');
 
-    const area = document.createElementNS(SVG_NS, 'polygon');
-    const areaPoints = [...points, [width, SPARKLINE_HEIGHT], [0, SPARKLINE_HEIGHT]];
-    area.setAttribute('points', areaPoints.map((point) => point.join(',')).join(' '));
-    area.setAttribute('fill', 'currentColor');
-    area.setAttribute('fill-opacity', '0.2');
-    area.setAttribute('stroke', 'none');
-    svg.appendChild(area);
-
-    const polyline = document.createElementNS(SVG_NS, 'polyline');
-    polyline.setAttribute('points', points.map((point) => point.join(',')).join(' '));
-    polyline.setAttribute('fill', 'none');
-    polyline.setAttribute('stroke', 'currentColor');
-    polyline.setAttribute('stroke-width', '1');
-    polyline.setAttribute('vector-effect', 'non-scaling-stroke');
-    svg.appendChild(polyline);
+    appendSeriesPath(svg, points, { stroke: 'currentColor', withArea: true });
 
     // Minimal, dashed vertical ticks for annotations (e.g. Matomo releases)
     // that fall on one of this sparkline's own dates - same list on every
@@ -130,7 +188,9 @@ class PageMetricsTile {
         return;
       }
 
-      const [x] = points[index];
+      // The x position only depends on the index, so an annotation still
+      // gets its tick on a day the metric itself has no value for.
+      const x = index * step;
       const marker = document.createElementNS(SVG_NS, 'line');
       marker.setAttribute('x1', x);
       marker.setAttribute('x2', x);
@@ -172,17 +232,19 @@ class PageMetricsTile {
       const relativeX = ((event.clientX - rect.left) / rect.width) * width;
       const index = Math.max(0, Math.min(entries.length - 1, step > 0 ? Math.round(relativeX / step) : 0));
       const [date, value] = entries[index];
-      const [x, y] = points[index];
+      const point = points[index];
 
-      const centerX = (x / width) * rect.width;
-      const centerY = (y / SPARKLINE_HEIGHT) * rect.height;
+      const centerX = (index * step / width) * rect.width;
+      // A day with no data has no point to put the marker on, so the marker
+      // is hidden and the tooltip is anchored mid-height instead.
+      const centerY = point === null ? rect.height / 2 : (point[1] / SPARKLINE_HEIGHT) * rect.height;
 
       marker.style.left = `${centerX}px`;
       marker.style.top = `${centerY}px`;
-      marker.hidden = false;
+      marker.hidden = point === null;
 
       const annotationText = annotationTextByDate.get(date);
-      tooltipValue.textContent = `${date}: ${formatValueForUnit(value, this.element.dataset.unit)}`;
+      tooltipValue.textContent = `${date}: ${value === null ? NO_DATA_LABEL : formatValueForUnit(value, this.element.dataset.unit)}`;
       tooltipAnnotation.textContent = annotationText ?? '';
       tooltipAnnotation.hidden = !annotationText;
       tooltip.hidden = false;
@@ -233,11 +295,19 @@ class PageMetricsTile {
 
     openTiles.forEach((tile) => tile.closePopover());
 
-    const values = Object.values(this.data);
-    const today = values.at(-1) ?? 0;
-    const yesterday = values.at(-2) ?? 0;
-    const peak = Math.max(...values, 0);
-    const average = values.length > 0 ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
+    // Today and yesterday are positions in the period, so they read the
+    // series as it is - filtering first would silently relabel the last two
+    // days that happen to have data as "today" and "yesterday".
+    const allValues = Object.values(this.data);
+    const today = allValues.at(-1) ?? null;
+    const yesterday = allValues.at(-2) ?? null;
+
+    // Peak and average, by contrast, are statements about the data that
+    // exists: counting an uncovered day as zero would drag the average down
+    // and report a peak of 0 for a period with no numbers in it at all.
+    const values = allValues.filter((value) => value !== null);
+    const peak = values.length > 0 ? Math.max(...values) : null;
+    const average = values.length > 0 ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
     const redirectShare = parseInt(this.element.dataset.redirectShare || '0', 10);
     const unit = this.element.dataset.unit;
 
@@ -281,20 +351,22 @@ class PageMetricsTile {
     }
 
     const stat = (label, value) =>
-      `<div class="pagemetrics-popover-stat"><span class="pagemetrics-popover-stat-label">${label}</span><span class="pagemetrics-popover-stat-value">${value}</span></div>`;
+      `<div class="pagemetrics-popover-stat"><span class="pagemetrics-popover-stat-label">${label}</span><span class="pagemetrics-popover-stat-value">${value === null ? NO_DATA_LABEL : value}</span></div>`;
+
+    const formatted = (value) => (value === null ? null : formatValueForUnit(value, unit));
 
     const stats = document.createElement('div');
     stats.className = 'pagemetrics-popover-stats';
     stats.innerHTML =
-      stat('Today', formatValueForUnit(today, unit)) +
-      stat('Yesterday', formatValueForUnit(yesterday, unit)) +
-      stat('Peak', formatValueForUnit(peak, unit)) +
+      stat('Today', formatted(today)) +
+      stat('Yesterday', formatted(yesterday)) +
+      stat('Peak', formatted(peak)) +
       // For a rate tile this is the simple mean of the daily rates, which
       // can differ from the tile's own headline value (a weighted average:
       // sum of numerator / sum of denominator over the period) on a page
       // with uneven day-to-day traffic - that divergence is itself useful
       // information, not redundant with the headline number.
-      stat('Average', formatValueForUnit(average, unit)) +
+      stat('Average', formatted(average)) +
       (redirectShare > 0 ? stat('Via redirects', `${redirectShare}%`) : '');
     this.popover.appendChild(stats);
 
@@ -678,13 +750,17 @@ function percentile(sortedValues, p) {
 // The 5th/95th percentile rather than the plain min/max: a single extreme
 // day (most often "today", still an incomplete/partial import - a rate
 // metric like "Avg. time on page" falls back to 0 when its denominator is
-// still 0, see computeRatio() in SiteMetricsOverviewBuilder.php) would
+// still 0, see RateSeriesCalculator::ratio()) would
 // otherwise stretch that one outlier across the whole chart height and
 // squash every other, actually-typical day into a barely-visible sliver at
 // the opposite end. Values outside the percentile band still get plotted -
 // see the y-coordinate clamp below - just clipped to the top/bottom edge
 // instead of driving the whole scale.
 function scaleBounds(values) {
+  if (values.length === 0) {
+    return [0, 1];
+  }
+
   const sorted = [...values].sort((a, b) => a - b);
   const low = percentile(sorted, 0.05);
   const high = percentile(sorted, 0.95);
@@ -703,10 +779,13 @@ function scaleBounds(values) {
 // outlier-tolerant now (see scaleBounds()).
 function computePlottedSeries(seriesList, dates, step) {
   return seriesList.map((series) => {
-    const values = dates.map((date) => series.values[date] ?? 0);
-    const [low, high] = scaleBounds(values);
+    const values = dates.map((date) => series.values[date] ?? null);
+    const [low, high] = scaleBounds(values.filter((value) => value !== null));
     const range = high - low || 1;
     const points = values.map((value, index) => {
+      if (value === null) {
+        return null;
+      }
       const fraction = Math.min(1, Math.max(0, (value - low) / range));
       return [index * step, SPARKLINE_HEIGHT - fraction * SPARKLINE_HEIGHT];
     });
@@ -714,36 +793,22 @@ function computePlottedSeries(seriesList, dates, step) {
   });
 }
 
-function renderSeriesLines(svg, plotted, width) {
+function renderSeriesLines(svg, plotted) {
   const isMultiSeries = plotted.length > 1;
 
-  // The area fill only makes sense for a single line - overlaid, it would
-  // just muddy the overlap between series - so it's kept for the (still
-  // most common) single-metric case only.
-  if (!isMultiSeries) {
-    const [series] = plotted;
-    const area = document.createElementNS(SVG_NS, 'polygon');
-    const areaPoints = [...series.points, [width, SPARKLINE_HEIGHT], [0, SPARKLINE_HEIGHT]];
-    area.setAttribute('points', areaPoints.map((point) => point.join(',')).join(' '));
-    area.setAttribute('fill', 'currentColor');
-    area.setAttribute('fill-opacity', '0.2');
-    area.setAttribute('stroke', 'none');
-    svg.appendChild(area);
-  }
-
   plotted.forEach((series) => {
-    const polyline = document.createElementNS(SVG_NS, 'polyline');
-    polyline.setAttribute('points', series.points.map((point) => point.join(',')).join(' '));
-    polyline.setAttribute('fill', 'none');
-    // A single series still relies on the surrounding --pm-accent CSS
-    // custom property (currentColor) rather than its own color, so it
-    // keeps picking up the compact/trend-direction color overrides other
-    // rules apply to that property (see page-metrics.css) instead of only
-    // ever drawing in the metric's own fixed color.
-    polyline.setAttribute('stroke', isMultiSeries ? series.color : 'currentColor');
-    polyline.setAttribute('stroke-width', '1');
-    polyline.setAttribute('vector-effect', 'non-scaling-stroke');
-    svg.appendChild(polyline);
+    appendSeriesPath(svg, series.points, {
+      // A single series still relies on the surrounding --pm-accent CSS
+      // custom property (currentColor) rather than its own color, so it
+      // keeps picking up the compact/trend-sentiment color overrides other
+      // rules apply to that property (see page-metrics.css) instead of only
+      // ever drawing in the metric's own fixed color.
+      stroke: isMultiSeries ? series.color : 'currentColor',
+      // The area fill only makes sense for a single line - overlaid, it
+      // would just muddy the overlap between series - so it's kept for the
+      // (still most common) single-metric case only.
+      withArea: !isMultiSeries,
+    });
   });
 }
 
@@ -839,16 +904,19 @@ function attachChartInteractivity({ svg, container, plotted, markers, tooltipPar
     let centerY = rect.height / 2;
 
     plotted.forEach((series, seriesIndex) => {
-      const [, y] = series.points[index];
-      const markerCenterY = (y / SPARKLINE_HEIGHT) * rect.height;
+      const point = series.points[index];
+      // A day with no data has no point to put the marker on, so it is
+      // hidden and the tooltip says so instead of showing a made-up zero.
+      const markerCenterY = point === null ? rect.height / 2 : (point[1] / SPARKLINE_HEIGHT) * rect.height;
       markers[seriesIndex].style.left = `${centerX}px`;
       markers[seriesIndex].style.top = `${markerCenterY}px`;
-      markers[seriesIndex].hidden = false;
+      markers[seriesIndex].hidden = point === null;
 
+      const value = series.values[index];
       const tooltipPrefix = isMultiSeries ? series.label : date;
-      tooltipValues[seriesIndex].textContent = `${tooltipPrefix}: ${formatValueForUnit(series.values[index], series.unit)}`;
+      tooltipValues[seriesIndex].textContent = `${tooltipPrefix}: ${value === null ? NO_DATA_LABEL : formatValueForUnit(value, series.unit)}`;
 
-      if (0 === seriesIndex) {
+      if (0 === seriesIndex && point !== null) {
         centerY = markerCenterY;
       }
     });
@@ -942,7 +1010,7 @@ function initializeStaticCharts(root) {
     svg.setAttribute('viewBox', `0 0 ${width} ${SPARKLINE_HEIGHT}`);
     svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('class', 'pagemetrics-sparkline');
-    renderSeriesLines(svg, plotted, width);
+    renderSeriesLines(svg, plotted);
     const annotationTextByDate = renderAnnotationMarkers(svg, container, dates, step);
 
     const markers = buildSeriesMarkers(plotted);

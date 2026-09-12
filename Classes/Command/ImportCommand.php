@@ -188,9 +188,64 @@ final class ImportCommand extends Command
         // total rather than the second upsert() silently overwriting the
         // first - upsert() is a set operation by design (see its own
         // docblock), so summing has to happen before it, not in it.
+        [$aggregated, $earliestWithData] = $this->collectMetrics($site, $provider, $configuration, $range);
+
+        // Null when the provider returned nothing at all for the range, in
+        // which case this run establishes no window: it cannot tell an empty
+        // history apart from an empty answer, and an unknown window masks
+        // nothing rather than blanking a whole chart.
+        $covered = null !== $earliestWithData ? new DateRange($earliestWithData, $today) : null;
+
+        $connection = $this->connectionPool->getConnectionForTable('tx_typo3pagemetrics_daily');
+        $connection->transactional(function () use ($aggregated, $identifier, $site, $configuration, $today, $covered, $lastImported): void {
+            foreach ($aggregated as $row) {
+                $this->dailyMetricsRepository->upsert($row['pageUid'], $row['languageUid'], $identifier, $row['date'], $row['metric'], $row['value'], $row['dimension']);
+            }
+
+            $this->botAgentDetailCollector->flush($site->getIdentifier(), $configuration->dropQueryString, $configuration->keepQueryParams);
+
+            // Mark yesterday, not today, as the last complete imported day: a
+            // scheduled run may only capture part of today's traffic, so today
+            // must always be revisited (and safely re-upserted) by the next run
+            // until it is genuinely a fully elapsed prior day.
+            //
+            // $covered, by contrast, is which days this site has an answer
+            // for at all (see ImportCoverage). The two are different
+            // questions: one is "where does the next run resume", the other
+            // is "which days may be drawn as a number".
+            $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $today->modify('-1 day'), $covered, null === $lastImported);
+        });
+
+        $output->writeln(sprintf('Imported "%s" for site "%s" from %s to %s.', $identifier, $site->getIdentifier(), $from->format('Y-m-d'), $today->format('Y-m-d')));
+    }
+
+    /**
+     * Fetches one provider's range and folds it into the per-fact aggregate,
+     * recording unresolved URLs as it goes.
+     *
+     * The second return value is the earliest day the provider actually
+     * returned something for, which is not the same as the earliest day
+     * asked about: retentionDays defaults to 400, so a first run requests
+     * well over a year of history on a site that may be three weeks old.
+     * Recording the asked-for range as the covered window would claim an
+     * answer for every day before the site existed and draw them as a flat
+     * zero, the exact false collapse ImportCoverage exists to prevent. A
+     * contiguous run of empty days before a provider's first data point is
+     * far more often "there was nothing to track yet" than "nobody visited".
+     *
+     * @return array{0: array<string, array{pageUid: int, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}>, 1: ?DateTimeImmutable}
+     */
+    private function collectMetrics(Site $site, MetricProviderInterface $provider, PageMetricsSiteConfiguration $configuration, DateRange $range): array
+    {
+        $identifier = $provider->getIdentifier();
         $aggregated = [];
+        $earliestWithData = null;
 
         foreach ($provider->fetch($site, $range) as $urlMetric) {
+            if (null === $earliestWithData || $urlMetric->date < $earliestWithData) {
+                $earliestWithData = $urlMetric->date;
+            }
+
             $result = $this->resolver->resolve($urlMetric->url, $configuration->dropQueryString, $configuration->keepQueryParams);
 
             if (!$result instanceof ResolvedUrl) {
@@ -206,22 +261,7 @@ final class ImportCommand extends Command
             }
         }
 
-        $connection = $this->connectionPool->getConnectionForTable('tx_typo3pagemetrics_daily');
-        $connection->transactional(function () use ($aggregated, $identifier, $site, $configuration, $today): void {
-            foreach ($aggregated as $row) {
-                $this->dailyMetricsRepository->upsert($row['pageUid'], $row['languageUid'], $identifier, $row['date'], $row['metric'], $row['value'], $row['dimension']);
-            }
-
-            $this->botAgentDetailCollector->flush($site->getIdentifier(), $configuration->dropQueryString, $configuration->keepQueryParams);
-
-            // Mark yesterday, not today, as the last complete imported day: a
-            // scheduled run may only capture part of today's traffic, so today
-            // must always be revisited (and safely re-upserted) by the next run
-            // until it is genuinely a fully elapsed prior day.
-            $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $today->modify('-1 day'));
-        });
-
-        $output->writeln(sprintf('Imported "%s" for site "%s" from %s to %s.', $identifier, $site->getIdentifier(), $from->format('Y-m-d'), $today->format('Y-m-d')));
+        return [$aggregated, $earliestWithData];
     }
 
     /**

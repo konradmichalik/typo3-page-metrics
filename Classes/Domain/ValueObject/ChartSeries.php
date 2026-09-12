@@ -28,7 +28,8 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
 final readonly class ChartSeries
 {
     /**
-     * @param array<string, int> $series Y-m-d => value, covers the same period as the primary series
+     * @param array<string, int|null> $series Y-m-d => value, covers the same period as the primary series;
+     *                                        null for a day with no data
      */
     public function __construct(
         public string $label,

@@ -98,6 +98,12 @@ class DailyMetricsRepository
      * $pageUids instead of a single page - the site-wide chart widget's
      * data source.
      *
+     * A day with no row is zero, not unknown: a provider only emits a
+     * metric for a URL that had activity, so an ordinary quiet day simply
+     * has no row. Whether a day was imported at all is a property of the
+     * site's import state, not of this table, and is applied one level up
+     * by ImportCoverage.
+     *
      * @param list<int> $pageUids
      *
      * @return array<string, int> Y-m-d => value, zero-filled for days without a row

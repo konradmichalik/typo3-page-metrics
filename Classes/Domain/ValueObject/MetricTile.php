@@ -23,14 +23,16 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
 final readonly class MetricTile
 {
     /**
-     * @param array<string, int> $sparkline              Y-m-d => value, covers the same period as the tile itself
-     * @param int|null           $deltaPercent           null when the previous period's total was zero and the
-     *                                                   current period's is not - there is no meaningful percentage
-     *                                                   base, rendered as "new" rather than a false infinite/undefined
-     *                                                   percentage
-     * @param string             $previousFormattedValue the previous period's own value, formatted the same way as
-     *                                                   $formattedValue - empty when $deltaPercent is null, since
-     *                                                   there is nothing meaningful to show
+     * @param array<string, int|null> $sparkline              Y-m-d => value, covers the same period as the tile
+     *                                                        itself; null for a day with no data at all, which is
+     *                                                        not the same as a day with no traffic
+     * @param int|null                $deltaPercent           null when the previous period's total was zero and the
+     *                                                        current period's is not - there is no meaningful percentage
+     *                                                        base, rendered as "new" rather than a false infinite/undefined
+     *                                                        percentage
+     * @param string                  $previousFormattedValue the previous period's own value, formatted the same way as
+     *                                                        $formattedValue - empty when $deltaPercent is null, since
+     *                                                        there is nothing meaningful to show
      */
     public function __construct(
         public string $identifier,

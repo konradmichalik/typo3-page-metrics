@@ -28,10 +28,27 @@ CREATE TABLE tx_typo3pagemetrics_unresolved (
 	UNIQUE KEY fact (date,provider,url_hash,metric)
 );
 
+# covered_from_date/covered_until_date are what make "we have no number for
+# this day" answerable at all. The fact table cannot answer it: a provider
+# only ever emits a metric for a URL that had activity, so a missing row
+# means a quiet day far more often than it means a gap in the data. Only the
+# import knows which window it actually fetched, so it records both ends here.
+#
+# They are deliberately NOT the same as last_imported_date, which is a resume
+# cursor: that one is always set one day behind, because a run may only catch
+# part of today and today must be re-fetched next time. The covered window,
+# by contrast, does include today - the data for it was fetched, it is just
+# not final yet. Reusing the cursor as the window's end masked every tile's
+# most recent day as missing.
+#
+# Both are nullable, and either being NULL means "window unknown", which
+# makes callers fall back to claiming nothing rather than claiming a gap.
 CREATE TABLE tx_typo3pagemetrics_import (
 	uid int(11) unsigned NOT NULL auto_increment,
 	provider varchar(32) DEFAULT '' NOT NULL,
 	site_identifier varchar(255) DEFAULT '' NOT NULL,
+	covered_from_date date DEFAULT NULL,
+	covered_until_date date DEFAULT NULL,
 	last_imported_date date NOT NULL,
 	tstamp int(11) unsigned DEFAULT '0' NOT NULL,
 

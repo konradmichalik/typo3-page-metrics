@@ -135,6 +135,51 @@ final class ImportCommandTest extends FunctionalTestCase
         self::assertSame($today->modify('-1 day')->format('Y-m-d'), $lastImported?->format('Y-m-d'));
     }
 
+    public function testTheCoveredWindowStartsWhereTheDataDoesNotWhereTheRequestDid(): void
+    {
+        // retentionDays defaults to 400, so the run asks for well over a
+        // year. The provider only has the last few days, and claiming an
+        // answer for the 390-odd days before that would draw them as a flat
+        // zero on any 90-day chart.
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricProvider([
+            new UrlMetric('https://example.com/about', $today->modify('-3 days'), 'stub.hits', 4),
+            new UrlMetric('https://example.com/about', $today, 'stub.hits', 7),
+        ]);
+
+        $this->runImport([$stub]);
+
+        $coverage = $this->importStateRepository->getCoverage('stub', 'main');
+
+        self::assertNotNull($coverage);
+        self::assertSame($today->modify('-3 days')->format('Y-m-d'), $coverage->from->format('Y-m-d'));
+        self::assertSame($today->format('Y-m-d'), $coverage->until->format('Y-m-d'));
+    }
+
+    public function testAProviderThatReturnsNothingEstablishesNoCoveredWindow(): void
+    {
+        // An empty answer and an empty history are indistinguishable here,
+        // and an unknown window masks nothing rather than blanking a chart.
+        $this->runImport([new StubMetricProvider([])]);
+
+        self::assertNull($this->importStateRepository->getCoverage('stub', 'main'));
+        // The resume cursor still advances, so the import is unaffected.
+        self::assertNotNull($this->importStateRepository->getLastImportedDate('stub', 'main'));
+    }
+
+    public function testAnEmptyRunLeavesAnAlreadyKnownWindowIntact(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $this->runImport([new StubMetricProvider([new UrlMetric('https://example.com/about', $today->modify('-5 days'), 'stub.hits', 3)])]);
+
+        $this->runImport([new StubMetricProvider([])], true);
+
+        self::assertSame(
+            $today->modify('-5 days')->format('Y-m-d'),
+            $this->importStateRepository->getCoverage('stub', 'main')?->from->format('Y-m-d'),
+        );
+    }
+
     public function testForceReimportsEvenWhenAlreadyImportedToday(): void
     {
         $today = new DateTimeImmutable('today');
@@ -286,7 +331,7 @@ final class ImportCommandTest extends FunctionalTestCase
     public function testImportsNothingWhenEveryDayUpToTodayIsAlreadyImported(): void
     {
         $today = new DateTimeImmutable('today');
-        $this->importStateRepository->markImported('stub', 'main', $today);
+        $this->importStateRepository->markImported('stub', 'main', $today, new DateRange($today->modify('-30 days'), $today), true);
         $stub = new StubMetricProvider([new UrlMetric('https://example.com/about', $today, 'stub.hits', 42)]);
 
         $exitCode = $this->runImport([$stub]);
