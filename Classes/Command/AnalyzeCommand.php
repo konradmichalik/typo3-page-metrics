@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Command;
 
+use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Analysis\Aggregate\Aggregator;
 use KonradMichalik\Typo3PageMetrics\Analysis\Guard\SpoofingGuardInterface;
 use KonradMichalik\Typo3PageMetrics\Analysis\Parser\LogParserInterface;
@@ -67,10 +68,13 @@ final class AnalyzeCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         $since = $input->getOption('since');
-        if (null !== $since && 1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $since)) {
-            $io->error('--since expects YYYY-MM-DD.');
+        if (null !== $since) {
+            $sinceDate = DateTimeImmutable::createFromFormat('!Y-m-d', $since);
+            if (false === $sinceDate || $sinceDate->format('Y-m-d') !== $since) {
+                $io->error('--since expects YYYY-MM-DD.');
 
-            return Command::FAILURE;
+                return Command::FAILURE;
+            }
         }
 
         $top = max(1, (int) $input->getOption('top'));
