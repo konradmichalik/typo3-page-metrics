@@ -46,6 +46,10 @@ The sparkline carries no scale of its own. It is a filled silhouette of the peri
 
 Above the chart the popover shows the period's figures as an icon and a number each: the most recent day, the day before it, the peak, the average, and the share that arrived through a redirect. Hovering one shows its name and what it counts, in a tooltip of the extension's own rather than the browser's title attribute, which waits about a second and runs both together into one line. Keyboard focus shows the same tooltip, and a tap toggles it, since a touch device has no hover at all. The written name and explanation are in the markup either way, so a screen reader reads "Peak. The highest value a single day reached. 162" rather than a bare number. They are simply not drawn: five two-word labels wrapped the row onto three uneven lines and pushed one value out of alignment with the rest.
 
+That tooltip is the house style for every explanation in this extension, not just the popover's figures: the trend badge on a tile names both periods and their values, the date mark names the day the numbers are from, and the fold-away control says which way it will fold. All of them are written the same way in the markup, which is what keeps them behaving the same way.
+
+The browser's own `title` attribute is not used for any of them. It waits about a second before appearing, cannot be styled to match the backend, and runs a heading and its explanation together into a single line.
+
 The axis does not start at zero. It uses the same percentile band as the [dashboard chart](dashboard-widgets.md#reading-the-chart), for the same reason: a page holding steady between 446 and 457 views a day puts its whole variation into the top two percent of a zero-based chart and draws as a flat line. The magnitude is already spelled out as numbers on the row above; what the chart is there for is the shape.
 
 The lowest value of the period is drawn clear of the bottom edge rather than on it, so a page whose quietest day still had traffic does not read as having dropped to nothing.

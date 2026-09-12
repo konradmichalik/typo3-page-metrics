@@ -6,16 +6,21 @@
     same thing every day, and what it is there for is the day it stops doing
     that.
 
-    So the date lives in the title, and only the stale state earns words: at
+    So the date lives in the hover, and only the stale state earns words: at
     that point it is no longer a footnote, it is the one piece of information
     on the page.
+
+    The hover is the extension's own tooltip, written as the two data
+    attributes sparkline.js binds everywhere, rather than the title attribute
+    it replaced: that one waits about a second and cannot be styled to match
+    the backend.
 </f:comment>
 <f:if condition="{freshness}">
     <f:variable name="freshnessDate"><f:format.date date="{freshness.date}" format="Y-m-d" /></f:variable>
     <f:variable name="freshnessLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.asOf" arguments="{0: freshnessDate}">As of {freshnessDate}</f:translate></f:variable>
     <f:variable name="staleLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.stale" default="import may have stopped" /></f:variable>
     <f:variable name="freshnessTitle"><f:if condition="{freshness.isStale}"><f:then>{freshnessLabel}, {staleLabel}</f:then><f:else>{freshnessLabel}</f:else></f:if></f:variable>
-    <span class="pagemetrics-freshness{f:if(condition: freshness.isStale, then: ' pagemetrics-freshness-stale')}" title="{freshnessTitle}">
+    <span class="pagemetrics-freshness{f:if(condition: freshness.isStale, then: ' pagemetrics-freshness-stale')}" data-hint-title="{freshnessLabel}"<f:if condition="{freshness.isStale}"> data-hint-text="{staleLabel}"</f:if>>
         <span class="pagemetrics-freshness-icon" aria-hidden="true">
             <f:if condition="{freshness.isStale}">
                 <f:then><core:icon identifier="tabler-clock" size="small" alternativeMarkupIdentifier="inline" /></f:then>
@@ -23,7 +28,7 @@
             </f:if>
         </span>
         <f:comment>
-            The icon carries it visually and a title is not an accessible
+            The icon carries it visually and a tooltip is not an accessible
             name, so the same sentence is present in text that is not drawn.
         </f:comment>
         <span class="pagemetrics-visually-hidden">{freshnessTitle}</span>

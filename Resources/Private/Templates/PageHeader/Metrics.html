@@ -62,17 +62,16 @@
                             <f:then>
                                 <f:if condition="{tile.deltaPercent} !== null">
                                     <f:then>
-                                        <f:variable name="trendCurrentLine"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.current" arguments="{0: currentRangeLabel, 1: tile.formattedValue}" default="This period (%1$s): %2$s" /></f:variable>
-                                        <f:variable name="trendPreviousLine"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.previous" arguments="{0: previousRangeLabel, 1: tile.previousFormattedValue}" default="Previous period (%1$s): %2$s" /></f:variable>
-                                        <f:variable name="trendTitle">{trendCurrentLine}
-{trendPreviousLine}</f:variable>
+                                        <f:variable name="trendHintTitle"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.current" arguments="{0: currentRangeLabel, 1: tile.formattedValue}" default="This period (%1$s): %2$s" /></f:variable>
+                                        <f:variable name="trendHintText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.previous" arguments="{0: previousRangeLabel, 1: tile.previousFormattedValue}" default="Previous period (%1$s): %2$s" /></f:variable>
                                     </f:then>
                                     <f:else>
-                                        <f:variable name="trendTitle"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.new" arguments="{0: previousRangeLabel}" default="No data in the previous period (%1$s) to compare against" /></f:variable>
+                                        <f:variable name="trendHintTitle"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable>
+                                        <f:variable name="trendHintText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.new" arguments="{0: previousRangeLabel}" default="No data in the previous period (%1$s) to compare against" /></f:variable>
                                     </f:else>
                                 </f:if>
                                 <f:variable name="trendDeltaText"><f:if condition="{tile.deltaPercent} !== null"><f:then>{tile.deltaPercent}%</f:then><f:else><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:else></f:if></f:variable>
-                                <f:render partial="TrendBadge" arguments="{trend: tile.trend, sentiment: tile.sentiment, deltaText: trendDeltaText, isNew: tile.isNew, title: trendTitle, modifier: 'pagemetrics-trend-pill'}" />
+                                <f:render partial="TrendBadge" arguments="{trend: tile.trend, sentiment: tile.sentiment, deltaText: trendDeltaText, isNew: tile.isNew, hintTitle: trendHintTitle, hintText: trendHintText, modifier: 'pagemetrics-trend-pill'}" />
                             </f:then>
                         </f:if>
                     </span>

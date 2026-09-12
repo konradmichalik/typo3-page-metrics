@@ -69,6 +69,10 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         self::assertStringContainsString('pagemetrics-freshness', $body);
         self::assertStringContainsString($today->modify('-1 day')->format('Y-m-d'), $body);
         self::assertStringNotContainsString('pagemetrics-freshness-stale', $body);
+        // The extension's own tooltip, not the browser's: a title attribute
+        // waits about a second and cannot be styled to match the backend.
+        self::assertStringContainsString('data-hint-title="As of', $body);
+        self::assertStringNotContainsString('<span class="pagemetrics-freshness" title=', $body);
     }
 
     public function testMarksTheDateStaleOnceTheImportIsMoreThanTwoDaysBehind(): void
@@ -136,6 +140,10 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         self::assertStringContainsString('pagemetrics-trend-pill', (string) $response->getBody());
         self::assertStringContainsString('50%', (string) $response->getBody());
         self::assertStringContainsString('data-redirect-share="20"', (string) $response->getBody());
+        // Both periods behind the badge, in the same tooltip every other
+        // explained control in this extension uses.
+        self::assertStringContainsString('data-hint-title="This period', (string) $response->getBody());
+        self::assertStringContainsString('data-hint-text="Previous period', (string) $response->getBody());
     }
 
     public function testTheTrendBadgeSpellsOutTheMovementForAssistiveTechnology(): void

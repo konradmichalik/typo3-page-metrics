@@ -369,8 +369,19 @@ function bindHintTooltip(element) {
   const open = () => showHintTooltip(element, element.dataset.hintTitle || '', element.dataset.hintText || '');
 
   element.addEventListener('mouseenter', open);
-  element.addEventListener('focus', open);
   element.addEventListener('mouseleave', () => hideHintTooltip());
+
+  // Focus and tap only where the element can actually take focus and a tap
+  // means something. The trend badge is neither: it sits inside a tile that
+  // is itself the button, so giving it its own focus stop would break the
+  // tile's semantics, and a tap on it opens that tile. There the tooltip is
+  // the hover convenience the title attribute used to be, and what it says
+  // is in the tile's own popover for everyone else.
+  if (!element.matches('button, a[href], [tabindex]')) {
+    return;
+  }
+
+  element.addEventListener('focus', open);
   element.addEventListener('blur', () => hideHintTooltip());
   element.addEventListener('click', () => {
     if (hintTooltipFor === element && hintTooltip && !hintTooltip.hidden) {
@@ -380,6 +391,20 @@ function bindHintTooltip(element) {
     }
 
     open();
+  });
+}
+
+// Every element that carries an explanation in the markup, wherever it is.
+// One pass rather than one per kind of control: the tooltip is the house
+// style for "there is more to say about this", and a new control should get
+// it by writing the two data attributes and nothing else.
+//
+// Guarded by data-hint-bound because the header is replaced wholesale on
+// every period switch and this runs again over what came back.
+function bindHintTooltips(root) {
+  root.querySelectorAll('[data-hint-title]:not([data-hint-bound])').forEach((element) => {
+    element.dataset.hintBound = '1';
+    bindHintTooltip(element);
   });
 }
 
@@ -1188,6 +1213,7 @@ async function loadTiles(container, period, includeSubpages) {
   initializeTiles(container);
   bindPeriodLinks(container);
   bindOptionsMenu(container);
+  bindHintTooltips(container);
   initializeSlider(container);
 }
 
@@ -1226,17 +1252,10 @@ window.addEventListener(
 //
 // Delegated from the document rather than bound to the button: the header is
 // re-rendered on every period switch, and a bound handler would go with it.
-// The same explaining tooltip the popover's figures use, so the control that
-// hides the whole block says what it does before it is pressed rather than
-// after. Re-bound after every render, since the header is replaced wholesale.
-function bindCollapseTooltip(root) {
-  root.querySelectorAll('[data-collapse-toggle]:not([data-hint-bound])').forEach((toggle) => {
-    toggle.dataset.hintBound = '1';
-    bindHintTooltip(toggle);
-  });
-}
-
-bindCollapseTooltip(document);
+// The toggle's own explanation comes from the same pass as every other one,
+// so the control that hides the whole block says what it does before it is
+// pressed rather than after.
+bindHintTooltips(document);
 
 document.addEventListener('click', (event) => {
   const toggle = event.target.closest('[data-collapse-toggle]');
@@ -1596,4 +1615,7 @@ document.addEventListener('typo3:dashboard:widget:content:rendered', (event) => 
   // dashboard widget, since initializeTiles() only ever finds something to
   // do where .pagemetrics-tile elements actually exist.
   initializeTiles(target);
+  // The freshness mark and the trend badges come back with the widget, and
+  // an explanation bound to the nodes that were replaced is not one.
+  bindHintTooltips(target);
 });
