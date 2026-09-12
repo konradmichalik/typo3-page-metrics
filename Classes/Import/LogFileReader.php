@@ -74,13 +74,13 @@ final class LogFileReader
     private function open(string $path, bool $isGzip): mixed
     {
         if (!is_readable($path)) {
-            throw new RuntimeException(sprintf('Unable to open log file: %s', $path));
+            throw new RuntimeException(sprintf('Unable to open log file: %s', $path), 2881245831);
         }
 
         $handle = $isGzip ? gzopen($path, 'rb') : fopen($path, 'r');
 
         if (false === $handle) {
-            throw new RuntimeException(sprintf('Unable to open log file: %s', $path));
+            throw new RuntimeException(sprintf('Unable to open log file: %s', $path), 4805609342);
         }
 
         return $handle;

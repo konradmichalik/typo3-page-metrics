@@ -26,7 +26,7 @@ use KonradMichalik\Typo3PageMetrics\Analysis\Parser\LogLine;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class BotTaxonomy
+final readonly class BotTaxonomy
 {
     /**
      * Accepted by Matomo's AI-chatbot tracking allowlist.
@@ -199,7 +199,7 @@ final class BotTaxonomy
     ];
 
     public function __construct(
-        private readonly AgentMatcher $agentMatcher,
+        private AgentMatcher $agentMatcher,
     ) {}
 
     /**
