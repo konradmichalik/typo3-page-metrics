@@ -12,6 +12,18 @@
             <trans-unit id="subpages.include" resname="subpages.include">
                 <source>Include subpages</source>
             </trans-unit>
+            <trans-unit id="collapse.hide" resname="collapse.hide">
+                <source>Hide</source>
+            </trans-unit>
+            <trans-unit id="collapse.hide.hint" resname="collapse.hide.hint">
+                <source>Folds the metrics away on every page until you show them again</source>
+            </trans-unit>
+            <trans-unit id="collapse.show.hint" resname="collapse.show.hint">
+                <source>Shows the metrics again on every page</source>
+            </trans-unit>
+            <trans-unit id="collapse.show" resname="collapse.show">
+                <source>Metrics</source>
+            </trans-unit>
             <trans-unit id="options.label" resname="options.label">
                 <source>More options</source>
             </trans-unit>

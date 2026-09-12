@@ -75,4 +75,12 @@ return [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-note.svg',
     ],
+    'tabler-sitemap' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-sitemap.svg',
+    ],
+    'tabler-chevron-up' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-chevron-up.svg',
+    ],
 ];

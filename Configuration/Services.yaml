@@ -119,6 +119,16 @@ services:
     KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsTilesController:
         public: true
 
+    # Public for the same reason as the tiles controller above.
+    KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsPreferencesController:
+        public: true
+
+    # Public so functional tests can assert the stored preference without
+    # going through a request, and so the renderer's two states can be set up
+    # directly.
+    KonradMichalik\Typo3PageMetrics\Service\PageMetricsUserPreferences:
+        public: true
+
     # Public so a functional test can assert the key list against the XLF
     # directly. That seam fails silently otherwise: an unresolvable key is
     # dropped on purpose and the client falls back to English, so a typo would

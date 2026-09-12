@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-use KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsTilesController;
+use KonradMichalik\Typo3PageMetrics\Controller\Ajax\{PageMetricsPreferencesController, PageMetricsTilesController};
 
 // Registered so PageHeaderMetricsRenderer can inject a lightweight placeholder
 // into the page module's own synchronous render and defer all data-fetching
@@ -24,6 +24,16 @@ return [
         'path' => '/page-metrics/tiles',
         'methods' => ['GET'],
         'target' => PageMetricsTilesController::class.'::handleRequest',
+        'inheritAccessFromModule' => 'web_layout',
+    ],
+    // Separate from the route above rather than a mode on it: that one is a
+    // repeatable GET returning markup, this one changes stored user state,
+    // and a read endpoint with a side effect is what lets a prefetch rewrite
+    // someone's settings. POST-only for the same reason.
+    'page_metrics_preferences' => [
+        'path' => '/page-metrics/preferences',
+        'methods' => ['POST'],
+        'target' => PageMetricsPreferencesController::class.'::handleRequest',
         'inheritAccessFromModule' => 'web_layout',
     ],
 ];

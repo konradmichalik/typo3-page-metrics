@@ -14,6 +14,11 @@ parameters:
 			count: 1
 			path: ../../Classes/Controller/Ajax/PageMetricsTilesController.php
 		-
+			# Same reasoning, same route dispatcher, for the preferences write.
+			identifier: typePerfect.narrowPublicClassMethodParamType
+			count: 1
+			path: ../../Classes/Controller/Ajax/PageMetricsPreferencesController.php
+		-
 			# itemsProcFunc has a fixed, framework-mandated signature -
 			# array &$parameters passed by reference - the same contract TYPO3
 			# core's own TcaSystemLanguageCollector::populateAvailableSiteLanguages()

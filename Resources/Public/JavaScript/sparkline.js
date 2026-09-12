@@ -278,14 +278,90 @@ function buildChartSummary(labels, dates, bounds, unit) {
     .replace('%4$s', formatValueForUnit(bounds[1], unit));
 }
 
+// One explaining tooltip for the whole file, shared by the popover's figures
+// and by the header's fold-away control. Its own element on <body>, because
+// the popover clips its overflow and the control that opens it can sit
+// anywhere.
+//
+// The browser's own title attribute would be the obvious answer and is not
+// one: it waits about a second, cannot be styled to match the backend, and
+// runs the name and the explanation together into a single line.
+let hintTooltip = null;
+let hintTooltipFor = null;
+
+function showHintTooltip(element, name, hint) {
+  if (!hintTooltip) {
+    hintTooltip = document.createElement('div');
+    hintTooltip.className = 'pagemetrics-stat-tooltip';
+    hintTooltip.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(hintTooltip);
+  }
+
+  hintTooltip.replaceChildren();
+
+  const title = document.createElement('span');
+  title.className = 'pagemetrics-stat-tooltip-title';
+  title.textContent = name;
+  hintTooltip.appendChild(title);
+
+  if ('' !== hint) {
+    const description = document.createElement('span');
+    description.textContent = hint;
+    hintTooltip.appendChild(description);
+  }
+
+  hintTooltip.hidden = false;
+  hintTooltipFor = element;
+
+  const rect = element.getBoundingClientRect();
+  const margin = 8;
+  const width = hintTooltip.offsetWidth;
+  // Above by default, below when there is no room, and always inside the
+  // viewport horizontally - the same clamping positionPopover() applies to
+  // the popover as a whole.
+  const above = rect.top - hintTooltip.offsetHeight - 4;
+  hintTooltip.style.top = `${above > margin ? above : rect.bottom + 4}px`;
+  hintTooltip.style.left = `${Math.min(Math.max(margin, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - margin)}px`;
+}
+
+function hideHintTooltip() {
+  if (hintTooltip) {
+    hintTooltip.hidden = true;
+    hintTooltipFor = null;
+  }
+}
+
+// Hover and keyboard focus both open it, and a tap toggles it, which is the
+// only one of the three a touch device has.
+//
+// The text is read from the element when the tooltip opens, not captured
+// when the handler is bound: the fold-away control means the opposite thing
+// after it has been used, and rebinding to swap the words would leave the
+// previous pair of listeners attached.
+function bindHintTooltip(element) {
+  const open = () => showHintTooltip(element, element.dataset.hintTitle || '', element.dataset.hintText || '');
+
+  element.addEventListener('mouseenter', open);
+  element.addEventListener('focus', open);
+  element.addEventListener('mouseleave', () => hideHintTooltip());
+  element.addEventListener('blur', () => hideHintTooltip());
+  element.addEventListener('click', () => {
+    if (hintTooltipFor === element && hintTooltip && !hintTooltip.hidden) {
+      hideHintTooltip();
+
+      return;
+    }
+
+    open();
+  });
+}
+
 class PageMetricsTile {
   constructor(element) {
     this.element = element;
     this.data = JSON.parse(element.dataset.sparkline || '{}');
     this.labels = getLabels(element);
     this.popover = null;
-    this.statTooltip = null;
-    this.statTooltipFor = null;
     element.addEventListener('click', (event) => {
       if (this.popover && this.popover.contains(event.target)) {
         return;
@@ -308,58 +384,6 @@ class PageMetricsTile {
   //
   // Appended to <body> like the popover itself: the popover clips its own
   // overflow, so a tooltip inside it would be cut off at the card's edge.
-  showStatTooltip(button, name, hint) {
-    if (!this.statTooltip) {
-      this.statTooltip = document.createElement('div');
-      this.statTooltip.className = 'pagemetrics-stat-tooltip';
-      this.statTooltip.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(this.statTooltip);
-    }
-
-    this.statTooltip.replaceChildren();
-
-    const title = document.createElement('span');
-    title.className = 'pagemetrics-stat-tooltip-title';
-    title.textContent = name;
-    this.statTooltip.appendChild(title);
-
-    if ('' !== hint) {
-      const description = document.createElement('span');
-      description.textContent = hint;
-      this.statTooltip.appendChild(description);
-    }
-
-    this.statTooltip.hidden = false;
-    this.statTooltipFor = button;
-
-    const rect = button.getBoundingClientRect();
-    const margin = 8;
-    const width = this.statTooltip.offsetWidth;
-    // Above the chip by default, below it when there is no room, and always
-    // inside the viewport horizontally - the same clamping positionPopover()
-    // applies to the popover as a whole.
-    const above = rect.top - this.statTooltip.offsetHeight - 4;
-    this.statTooltip.style.top = `${above > margin ? above : rect.bottom + 4}px`;
-    this.statTooltip.style.left = `${Math.min(Math.max(margin, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - margin)}px`;
-  }
-
-  hideStatTooltip() {
-    if (this.statTooltip) {
-      this.statTooltip.hidden = true;
-      this.statTooltipFor = null;
-    }
-  }
-
-  toggleStatTooltip(button, name, hint) {
-    if (this.statTooltipFor === button && this.statTooltip && !this.statTooltip.hidden) {
-      this.hideStatTooltip();
-
-      return;
-    }
-
-    this.showStatTooltip(button, name, hint);
-  }
-
   closePopover() {
     if (!this.popover) {
       return;
@@ -367,9 +391,7 @@ class PageMetricsTile {
     this.popover.remove();
     this.popover = null;
     // Lives on <body>, so closing the popover does not take it with it.
-    this.statTooltip?.remove();
-    this.statTooltip = null;
-    this.statTooltipFor = null;
+    hideHintTooltip();
     this.element.setAttribute('aria-expanded', 'false');
     openTiles.delete(this);
   }
@@ -634,14 +656,9 @@ class PageMetricsTile {
       button.appendChild(labelElement);
       button.appendChild(valueElement);
 
-      button.addEventListener('mouseenter', () => this.showStatTooltip(button, name, hint));
-      button.addEventListener('focus', () => this.showStatTooltip(button, name, hint));
-      button.addEventListener('mouseleave', () => this.hideStatTooltip());
-      button.addEventListener('blur', () => this.hideStatTooltip());
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        this.toggleStatTooltip(button, name, hint);
-      });
+      button.dataset.hintTitle = name;
+      button.dataset.hintText = hint;
+      bindHintTooltip(button);
 
       return button;
     };
@@ -1038,6 +1055,77 @@ window.addEventListener(
   },
   { capture: true },
 );
+
+// Folding the block away is a standing preference, so it is stored on the
+// backend user rather than in the URL, and the server has already decided
+// what to render: a collapsed header arrives with no placeholder at all and
+// never issues the request. Expanding builds the placeholder here, which is
+// the only moment the client knows more than the server did.
+//
+// Delegated from the document rather than bound to the button: the header is
+// re-rendered on every period switch, and a bound handler would go with it.
+// The same explaining tooltip the popover's figures use, so the control that
+// hides the whole block says what it does before it is pressed rather than
+// after. Re-bound after every render, since the header is replaced wholesale.
+function bindCollapseTooltip(root) {
+  root.querySelectorAll('[data-collapse-toggle]:not([data-hint-bound])').forEach((toggle) => {
+    toggle.dataset.hintBound = '1';
+    bindHintTooltip(toggle);
+  });
+}
+
+bindCollapseTooltip(document);
+
+document.addEventListener('click', (event) => {
+  const toggle = event.target.closest('[data-collapse-toggle]');
+  if (!toggle) {
+    return;
+  }
+
+  const header = toggle.closest('.pagemetrics-header');
+  if (!header) {
+    return;
+  }
+
+  const collapsed = !header.classList.contains('pagemetrics-header-collapsed');
+  header.classList.toggle('pagemetrics-header-collapsed', collapsed);
+  toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+  // The control now does the opposite of what it did a moment ago, so its
+  // name and its explanation have to swap with it.
+  const swapped = { title: toggle.dataset.hintTitleAlt, text: toggle.dataset.hintTextAlt };
+  toggle.dataset.hintTitleAlt = toggle.dataset.hintTitle;
+  toggle.dataset.hintTextAlt = toggle.dataset.hintText;
+  toggle.dataset.hintTitle = swapped.title || '';
+  toggle.dataset.hintText = swapped.text || '';
+  toggle.setAttribute('aria-label', toggle.dataset.hintTitle);
+  hideHintTooltip();
+
+  if (collapsed) {
+    // Only the body goes. The toggle is a sibling, so it stays exactly where
+    // it was and expanding is available immediately rather than after a
+    // reload.
+    header.querySelector('.pagemetrics-header-placeholder')?.remove();
+  } else {
+    const placeholder = document.createElement('div');
+    placeholder.id = header.dataset.bodyId || '';
+    placeholder.className = 'pagemetrics-header-placeholder';
+    placeholder.dataset.pageId = header.dataset.pageId;
+    placeholder.dataset.period = '30';
+    placeholder.dataset.includeSubpages = '0';
+    placeholder.dataset.ajaxUrl = header.dataset.ajaxUrl;
+    header.insertBefore(placeholder, toggle);
+    loadTiles(placeholder, '30', false);
+  }
+
+  // Fire and forget: the state is already applied, and a preference that
+  // fails to store is worth less than blocking the interaction on it. The
+  // next page load simply shows the previous choice.
+  const body = new FormData();
+  body.append('collapsed', collapsed ? '1' : '0');
+  fetch(header.dataset.preferencesUrl, { method: 'POST', body, credentials: 'same-origin' }).catch(() => {});
+});
+
 
 document.querySelectorAll('.pagemetrics-header-placeholder').forEach((container) => {
   loadTiles(container, container.dataset.period || '30', container.dataset.includeSubpages === '1');

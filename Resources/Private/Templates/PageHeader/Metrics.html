@@ -23,11 +23,18 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5l10 -10" /></svg>
                         </f:if>
                     </span>
+                    <span class="pagemetrics-options-menu-icon" aria-hidden="true"><core:icon identifier="tabler-sitemap" size="small" alternativeMarkupIdentifier="inline" /></span>
                     <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:subpages.include" default="Include subpages" />
                 </f:be.link>
             </div>
         </div>
     </f:if>
+    <f:comment>
+        Beside the options button rather than in a row of its own: it is the
+        same kind of control, and an affordance that moves when you use it is
+        one you have to find again every time. Icon only, so the words are in
+        the accessible name and the tooltip.
+    </f:comment>
 </div>
 <div class="pagemetrics-tiles" data-labels="{f:format.json(value: sparklineLabels)}" data-page-id="{pageId}" data-include-subpages="{includeSubpagesDataValue}" data-annotations="{f:format.json(value: annotations)}">
     <f:for each="{tiles}" as="tile">

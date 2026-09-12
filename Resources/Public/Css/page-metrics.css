@@ -27,6 +27,43 @@
     margin-bottom: 8px;
 }
 
+/* Pinned to the header's top right, outside the region it folds away, so it
+   is still there once the block is gone. It shares .pagemetrics-options-trigger
+   with the button beside it and only adds the placement, since two controls in
+   the same row that look different are two controls. */
+.pagemetrics-header {
+    position: relative;
+}
+
+.pagemetrics-collapse-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+}
+
+/* Room for it, so the options button does not end up underneath. */
+.pagemetrics-toolbar {
+    padding-right: 32px;
+}
+
+/* Collapsed there is nothing but the button, which is absolutely positioned
+   and so contributes no height of its own. */
+.pagemetrics-header-collapsed {
+    min-height: 28px;
+    margin-bottom: 0;
+}
+
+.pagemetrics-options-menu-icon {
+    display: inline-flex;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-options-menu-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
 .pagemetrics-toolbar {
     display: flex;
     align-items: center;
