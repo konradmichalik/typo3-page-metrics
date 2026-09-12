@@ -65,7 +65,19 @@ period the built-in tiles use.
 
 The arrow icon always follows the actual direction, so `LowerIsBetter` shows a down arrow in green rather than inverting the arrow.
 
-`MetricDefinition` and `RateMetricDefinition` take the same parameter. Note that `MetricDefinition::$maxDimensions` was removed in the same change: it was never read. A positional call that passed it now fails loudly instead of silently landing in `polarity`.
+`MetricDefinition` takes this parameter. `RateMetricDefinition` does not: a rate cannot be summed, so there is nothing for a machine-side rate to fold into, and a parameter nothing reads is a promise nothing keeps. Note that `MetricDefinition::$maxDimensions` was removed in the same change: it was never read. A positional call that passed it now fails loudly instead of silently landing in `polarity`.
+
+## Audience and machine metrics
+
+`group` says who your metric counts. `MetricGroup::Audience`, the default, means people, and those metrics get a tile each in the page module and in the dashboard's tiles widget. `MetricGroup::Machine` means everything else: crawlers, AI agents, link-preview fetchers, monitoring.
+
+Machine metrics do not get a tile each. All of a provider's machine metrics fold into one summary tile carrying their total, which lists the parts when it is opened. That is not a display preference: a row of equally weighted tiles asserts that its numbers answer the same question, and "how many people read this" and "how often did a crawler fetch it" do not.
+
+The fold is per provider, so yours summarises its own metrics and not somebody else's. It is placed where your first machine metric's `sortOrder` would have put it, so the order you declared is the order that shows.
+
+Nothing about storage or import changes. Each machine metric keeps its own identifier and its own daily rows; only the display is folded.
+
+Only `MetricDefinition` takes it, appended after `polarity`. Unlike `polarity`, which took a slot `maxDimensions` had freed, this one is genuinely new, so a positional call written against the older constructor keeps meaning exactly what it meant. `RateMetricDefinition` has no such parameter: a rate cannot be summed, so there is nothing for a machine-side rate to fold into.
 
 For a provider that needs its own daily-import step, its own configurable
 retention and to participate in the dashboard widgets, implement

@@ -11,7 +11,7 @@
                         </f:if>
                         <div class="pagemetrics-tiles pagemetrics-tiles-static" data-labels="{f:format.json(value: sparklineLabels)}" data-annotations="{f:format.json(value: siteTiles.annotations)}">
                             <f:for each="{siteTiles.tiles}" as="tile">
-                                <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-label="{tile.label}" data-description="{tile.description}" data-unit="{tile.unit.value}" data-external-link="{tile.externalLink}" data-sparkline="{f:format.json(value: tile.sparkline)}" data-redirect-share="{tile.redirectSharePercent}" style="--pm-accent: {tile.color}" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">
+                                <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-label="{tile.label}" data-description="{tile.description}" data-unit="{tile.unit.value}" data-external-link="{tile.externalLink}" data-sparkline="{f:format.json(value: tile.sparkline)}" data-redirect-share="{tile.redirectSharePercent}" data-breakdown="{f:format.json(value: tile.breakdown)}" style="--pm-accent: {tile.color}" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">
                                     <div class="pagemetrics-tile-head">
                                         <span class="pagemetrics-tile-icon"><core:icon identifier="{tile.icon}" size="medium" alternativeMarkupIdentifier="inline" /></span>
                                         <div class="pagemetrics-tile-text">

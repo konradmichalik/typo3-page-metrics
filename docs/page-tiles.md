@@ -42,6 +42,16 @@ The axis does not start at zero. It uses the same percentile band as the [dashbo
 
 The lowest value of the period is drawn clear of the bottom edge rather than on it, so a page whose quietest day still had traffic does not read as having dropped to nothing.
 
+## Bot traffic
+
+A page's tiles answer how it performs with people. Crawler traffic is a different question, and when the access-log provider is configured it used to arrive as five more tiles of the same size and weight beside the two an editor came for, pushing the answer off the end of the row.
+
+Those five now fold into one **Bot traffic** tile carrying their total, in grey rather than a colour of its own, and the popover lists what it is made of. Every bucket is listed, including the ones at zero: a bucket that is absent and a bucket reading zero answer different questions.
+
+Nothing about the import changes. Each bucket is still fetched, resolved and stored under its own identifier exactly as before, and the summary is assembled when the tiles are built. See [bot traffic metrics](providers/accesslog.md#bot-traffic-metrics) for what each bucket counts.
+
+A provider decides which side of this its metrics fall on, see [Audience and machine metrics](extending.md#audience-and-machine-metrics).
+
 ## Data age
 
 The toolbar above the tiles marks which day the numbers are from with a small ⓘ, and hovering it names the date. It is a mark rather than a line of text: on a healthy installation it says the same thing every day, across five surfaces at once, and what it is there for is the day it stops doing that. That day is the last one the import treats as complete, which is not today: a scheduled run may only catch part of today, so it always revisits it and marks the previous day instead. The tiles therefore trail the calendar by a day even when everything is working.

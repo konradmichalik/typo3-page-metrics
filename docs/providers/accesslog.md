@@ -71,6 +71,8 @@ human metrics - there is no bucket for a bot nobody has a name for.
   URLs.
 - **`bot.tool`**: SEO tools, monitoring services and generic HTTP clients.
 
+All five are declared as machine metrics, so the page module folds them into a single **Bot traffic** tile that breaks itself down when opened, rather than putting five crawler counts beside the two numbers an editor came for. See [Bot traffic](../page-tiles.md#bot-traffic). The storage is untouched: each bucket keeps its own identifier and its own rows.
+
 These are counted differently from `accesslog.pageviews` on purpose:
 pageviews only count successful (2xx) `GET` requests, but a bot hit counts
 regardless of HTTP status or method. A bot hitting a dead link, a

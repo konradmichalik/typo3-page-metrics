@@ -20,8 +20,10 @@ use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetr
 use KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
+use function array_map;
 use function sprintf;
 
 /**
@@ -38,7 +40,10 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         parent::setUp();
         $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
         $this->importCSVDataSet(__DIR__.'/Fixtures/be_users.csv');
-        $this->setUpBackendUser(1);
+        $backendUser = $this->setUpBackendUser(1);
+        // The machine-traffic summary is labelled by this class rather than
+        // by a provider, so the builder resolves one string of its own.
+        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
     }
 
     public function testReturnsNoPageWhenPageIdIsZero(): void
@@ -450,6 +455,70 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         $this->writeSiteConfiguration(1, 'https://example.com/');
 
         self::assertFalse($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30)->hasSubpages);
+    }
+
+    public function testTheFiveBotBucketsBecomeOneTileInsteadOfFive(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'accesslog.pageviews', 40);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.ai_crawler', 7);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.search', 3);
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
+        $identifiers = array_map(static fn (MetricTile $tile): string => $tile->identifier, $viewData->tiles);
+
+        self::assertContains('accesslog.pageviews', $identifiers);
+        // Scoped to the provider that declared the buckets, so two
+        // providers with machine metrics cannot produce two tiles that are
+        // indistinguishable to a reader or to a lookup by identifier.
+        self::assertContains('machine.summary.accesslog', $identifiers);
+        foreach (['bot.ai_chatbot', 'bot.ai_crawler', 'bot.search', 'bot.social', 'bot.tool'] as $bucket) {
+            self::assertNotContains($bucket, $identifiers);
+        }
+    }
+
+    public function testTheMachineSummaryAddsUpItsBucketsAndKeepsThemAsItsParts(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.ai_crawler', 7);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today->modify('-1 day'), 'bot.ai_crawler', 2);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.search', 3);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'machine.summary.accesslog');
+
+        self::assertSame(12, $tile->value);
+        // The sparkline describes the total the tile shows, not whichever
+        // bucket happened to be read first.
+        self::assertSame(10, $tile->sparkline[$today->format('Y-m-d')]);
+        self::assertSame(2, $tile->sparkline[$today->modify('-1 day')->format('Y-m-d')]);
+
+        $byLabel = array_column($tile->breakdown, 'formattedValue', 'label');
+        self::assertSame('9', $byLabel['AI crawlers']);
+        self::assertSame('3', $byLabel['Search indexers']);
+        // Every bucket is listed, including the ones at zero: an absent row
+        // and a row reading 0 answer different questions.
+        self::assertCount(5, $tile->breakdown);
+    }
+
+    public function testASiteWithoutMachineMetricsGetsNoSummaryTile(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+
+        $identifiers = array_map(
+            static fn (MetricTile $tile): string => $tile->identifier,
+            $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30)->tiles,
+        );
+
+        self::assertNotContains('machine.summary.accesslog', $identifiers);
+    }
+
+    private function writeSiteConfigurationWithAccessLog(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/', [
+            'accesslog' => ['pathPattern' => '/var/log/nginx/access.log'],
+        ]);
     }
 
     private function tileFor(PageMetricsViewData $viewData, string $identifier): MetricTile

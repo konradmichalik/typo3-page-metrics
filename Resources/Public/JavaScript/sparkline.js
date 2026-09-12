@@ -35,6 +35,7 @@ const FALLBACK_LABELS = {
   peakHint: 'The highest value a single day reached',
   averageHint: 'The mean across the days that have data',
   viaRedirectsHint: 'The share of this metric that arrived through a redirect',
+  breakdown: 'Made up of',
   noData: 'No data',
   externalLink: 'Open in analytics tool',
   sliderPrevious: 'Previous',
@@ -409,6 +410,60 @@ class PageMetricsTile {
     this.popover.style.top = `${rect.bottom + 4}px`;
   }
 
+  // What a summary tile's headline is made of, which for the machine-traffic
+  // tile is the only way back to which crawler did what. Absent on every
+  // other tile, where the headline already stands for exactly one metric and
+  // a list of one would say nothing.
+  //
+  // A description list rather than a table: these are pairs, not a grid, and
+  // a table would promise column semantics there are none of.
+  buildBreakdown() {
+    let parts;
+    try {
+      parts = JSON.parse(this.element.dataset.breakdown || '[]');
+    } catch {
+      return null;
+    }
+
+    if (!Array.isArray(parts) || parts.length === 0) {
+      return null;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'pagemetrics-popover-breakdown';
+
+    const heading = document.createElement('p');
+    heading.className = 'pagemetrics-popover-breakdown-heading';
+    heading.textContent = this.labels.breakdown;
+    wrapper.appendChild(heading);
+
+    // Each pair in its own wrapper inside the <dl>. WebKit drops list
+    // semantics from a description list whose display is not a list value,
+    // so the two-column grid has to live on the pairs rather than on the
+    // <dl> itself, or a screen reader announces loose text instead of
+    // label-and-value.
+    const list = document.createElement('dl');
+
+    parts.forEach((part) => {
+      const pair = document.createElement('div');
+      pair.className = 'pagemetrics-popover-breakdown-pair';
+
+      const label = document.createElement('dt');
+      label.textContent = part.label;
+
+      const value = document.createElement('dd');
+      value.textContent = part.formattedValue;
+
+      pair.appendChild(label);
+      pair.appendChild(value);
+      list.appendChild(pair);
+    });
+
+    wrapper.appendChild(list);
+
+    return wrapper;
+  }
+
   buildSparklineSvg() {
     const entries = Object.entries(this.data);
     if (entries.length === 0) {
@@ -685,6 +740,11 @@ class PageMetricsTile {
 
     statNodes.forEach((node) => stats.appendChild(node));
     this.popover.appendChild(stats);
+
+    const breakdown = this.buildBreakdown();
+    if (breakdown) {
+      this.popover.appendChild(breakdown);
+    }
 
     const sparkline = this.buildSparklineSvg();
     if (sparkline) {

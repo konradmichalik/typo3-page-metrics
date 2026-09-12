@@ -60,6 +60,15 @@
             <trans-unit id="chart.summaryDates" resname="chart.summaryDates">
                 <source>Chart from %1$s to %2$s</source>
             </trans-unit>
+            <trans-unit id="metric.machine.label" resname="metric.machine.label">
+                <source>Bot traffic</source>
+            </trans-unit>
+            <trans-unit id="metric.machine.description" resname="metric.machine.description">
+                <source>Requests from crawlers, AI agents, link previews and monitoring tools, added up. Open for the split by kind.</source>
+            </trans-unit>
+            <trans-unit id="popover.breakdown" resname="popover.breakdown">
+                <source>Made up of</source>
+            </trans-unit>
             <trans-unit id="popover.lastDay" resname="popover.lastDay">
                 <source>Last day</source>
             </trans-unit>

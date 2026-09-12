@@ -39,16 +39,22 @@ final readonly class MetricTile
     public bool $isNew;
 
     /**
-     * @param array<string, int|null> $sparkline              Y-m-d => value, covers the same period as the tile
-     *                                                        itself; null for a day with no data at all, which is
-     *                                                        not the same as a day with no traffic
-     * @param int|null                $deltaPercent           null when the previous period's total was zero and the
-     *                                                        current period's is not - there is no meaningful percentage
-     *                                                        base, rendered as "new" rather than a false infinite/undefined
-     *                                                        percentage
-     * @param string                  $previousFormattedValue the previous period's own value, formatted the same way as
-     *                                                        $formattedValue - empty when $deltaPercent is null, since
-     *                                                        there is nothing meaningful to show
+     * @param array<string, int|null>                            $sparkline              Y-m-d => value, covers the same period as the tile
+     *                                                                                   itself; null for a day with no data at all, which is
+     *                                                                                   not the same as a day with no traffic
+     * @param int|null                                           $deltaPercent           null when the previous period's total was zero and the
+     *                                                                                   current period's is not - there is no meaningful percentage
+     *                                                                                   base, rendered as "new" rather than a false infinite/undefined
+     *                                                                                   percentage
+     * @param string                                             $previousFormattedValue the previous period's own value, formatted the same way as
+     *                                                                                   $formattedValue - empty when $deltaPercent is null, since
+     *                                                                                   there is nothing meaningful to show
+     * @param list<array{label: string, formattedValue: string}> $breakdown              what this tile's number is made of, shown in
+     *                                                                                   its popover. Empty for a tile that stands for one metric,
+     *                                                                                   which is all of them except the machine-traffic summary:
+     *                                                                                   that one folds a provider's whole MetricGroup::Machine set
+     *                                                                                   into a single headline, and the parts are the only way back
+     *                                                                                   to which crawler did what
      */
     public function __construct(
         public string $identifier,
@@ -66,6 +72,7 @@ final readonly class MetricTile
         public ?string $externalLink,
         public string $previousFormattedValue,
         public MetricPolarity $polarity = MetricPolarity::HigherIsBetter,
+        public array $breakdown = [],
     ) {
         $this->sentiment = TrendSentiment::of($trend, $polarity);
         $this->isNew = null === $deltaPercent;

@@ -486,7 +486,12 @@
 .pagemetrics-popover {
     position: fixed;
     z-index: 2000;
-    overflow: hidden;
+    /* Bounded, because the tallest of these now carries a heading and a row
+       per bucket on top of the figures and the chart. Opened low in the
+       viewport it would otherwise run off the bottom with the chart clipped
+       and no way to reach it. */
+    max-height: calc(100vh - 32px);
+    overflow: hidden auto;
     border: 1px solid var(--typo3-component-border-color, #cbcbcb);
     border-radius: var(--typo3-component-border-radius, 4px);
     background: var(--typo3-component-bg, #fff);
@@ -651,6 +656,46 @@
     flex-wrap: wrap;
     gap: 4px;
     padding: 10px var(--typo3-spacing, 8px);
+}
+
+/* The parts behind a summary tile's headline. Only the machine-traffic tile
+   has any, so this is absent from every other popover rather than sitting
+   there empty. */
+.pagemetrics-popover-breakdown {
+    padding: 0 var(--typo3-spacing, 8px) 10px;
+    font-size: 0.6875rem;
+}
+
+.pagemetrics-popover-breakdown-heading {
+    margin: 0 0 4px;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+/* The <dl> keeps its default display, because WebKit drops description-list
+   semantics from one that does not have it, and a screen reader would then
+   announce loose text instead of label-and-value pairs. The two columns come
+   from each pair instead. */
+.pagemetrics-popover-breakdown dl {
+    margin: 0;
+}
+
+.pagemetrics-popover-breakdown-pair {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    margin-bottom: 2px;
+}
+
+.pagemetrics-popover-breakdown dt {
+    color: var(--typo3-text-color-variant, #6a7085);
+    font-weight: 400;
+}
+
+.pagemetrics-popover-breakdown dd {
+    margin: 0;
+    text-align: right;
+    font-weight: 600;
+    color: var(--typo3-text-color-base, #14213d);
 }
 
 .pagemetrics-popover-stat {

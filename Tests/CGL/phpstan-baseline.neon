@@ -28,8 +28,9 @@ parameters:
 			path: ../../Classes/UserFunction/AnnotationSiteItemsProcFunc.php
 		-
 			# MetricDefinition, RateMetricDefinition, MetricTile and UrlMetric are
-			# `@api` value objects whose trailing optional parameter (polarity /
-			# dimension) carries the overwhelmingly common case as its default:
+			# `@api` value objects whose trailing optional parameters (polarity,
+			# group, breakdown / dimension) carry the overwhelmingly common case
+			# as their defaults:
 			# almost every metric is one where a rise is an improvement, and
 			# almost every UrlMetric has no dimension. Removing the default would
 			# force every call site, including third-party providers and tile
@@ -39,7 +40,7 @@ parameters:
 			# API shape rather than a defect. TopPage, which is not `@api` and has
 			# exactly one call site, deliberately does not get a default.
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
-			count: 1
+			count: 2
 			path: ../../Classes/Domain/ValueObject/MetricDefinition.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
@@ -47,7 +48,7 @@ parameters:
 			path: ../../Classes/Domain/ValueObject/RateMetricDefinition.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
-			count: 1
+			count: 2
 			path: ../../Classes/Domain/ValueObject/MetricTile.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue

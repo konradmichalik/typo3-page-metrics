@@ -52,6 +52,7 @@ final readonly class SparklineLabelProvider
             'popover.peakHint' => 'peakHint',
             'popover.averageHint' => 'averageHint',
             'popover.viaRedirectsHint' => 'viaRedirectsHint',
+            'popover.breakdown' => 'breakdown',
             'popover.noData' => 'noData',
             'popover.externalLink' => 'externalLink',
             'slider.previous' => 'sliderPrevious',

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit, TrendDirection};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DataFreshness, DateRange, MetricDefinition, MetricTile, PageMetricsViewData, RateMetricDefinition};
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
@@ -24,6 +24,7 @@ use Throwable;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Domain\Repository\PageRepository;
+use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Routing\RouterInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -46,6 +47,24 @@ final readonly class PageMetricsViewDataBuilder
 {
     /** @var list<int> */
     private const PERIOD_OPTIONS = [7, 30, 90];
+
+    private const LL = 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:';
+
+    /**
+     * The summary is assembled by this class rather than declared by a
+     * provider, so it needs an identifier of its own. Not a real metric
+     * identifier: nothing is ever stored under it, and it exists so the
+     * client can tell this tile apart from the ones that stand for a single
+     * stored metric.
+     */
+    private const MACHINE_SUMMARY_IDENTIFIER = 'machine.summary';
+
+    /**
+     * Grey on purpose. Every audience tile carries a colour of its own, and
+     * giving machine traffic one of the same weight would put it back on the
+     * footing this tile exists to take it off.
+     */
+    private const MACHINE_SUMMARY_COLOR = '#868e96';
 
     /**
      * Page types with no frontend content of their own - a folder, an
@@ -218,7 +237,7 @@ final readonly class PageMetricsViewDataBuilder
         // page URL at all is what makes collectDefinitions() skip it.
         $pageUrl = $includeSubpages ? null : $this->resolvePageUrl($site, $pageId);
         $pageUids = $includeSubpages ? $this->pageUidRepository->descendantsOf($pageId) : [$pageId];
-        [$definitions, $rateDefinitions, $externalLinkByIdentifier, $coverageByIdentifier] = $this->collectDefinitions($site, $pageUrl, $tileRange);
+        [$definitions, $rateDefinitions, $externalLinkByIdentifier, $coverageByIdentifier, $machineDefinitionsByProvider] = $this->collectDefinitions($site, $pageUrl, $tileRange);
 
         /** @var list<array{sortOrder: int, tile: MetricTile}> $ordered */
         $ordered = [];
@@ -227,6 +246,18 @@ final readonly class PageMetricsViewDataBuilder
             $ordered[] = [
                 'sortOrder' => $definition->sortOrder,
                 'tile' => $this->buildCountTile($definition, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null, $coverageByIdentifier[$definition->identifier] ?? null),
+            ];
+        }
+
+        foreach ($machineDefinitionsByProvider as $providerIdentifier => $machineDefinitions) {
+            $ordered[] = [
+                // Where the provider's earliest machine metric would have sat,
+                // so the summary keeps the place the buckets had rather than
+                // being pushed to an end the provider never asked for. The
+                // lowest sortOrder, not the first declared: nothing obliges a
+                // provider to list them in order.
+                'sortOrder' => min(array_column($machineDefinitions, 'sortOrder')),
+                'tile' => $this->buildMachineSummaryTile($providerIdentifier, $machineDefinitions, $pageUids, $languageId, $tileRange, $previousRange, $coverageByIdentifier[$machineDefinitions[0]->identifier] ?? null),
             ];
         }
 
@@ -255,7 +286,17 @@ final readonly class PageMetricsViewDataBuilder
     }
 
     /**
-     * @return array{0: list<MetricDefinition>, 1: list<RateMetricDefinition>, 2: array<string, ?string>, 3: array<string, ?DateRange>}
+     * Machine metrics come back separately rather than mixed into the first
+     * list: they are not tiles, they are the parts of one, and keeping them
+     * apart here means the tile loop stays a plain one-definition-one-tile
+     * mapping instead of carrying a guard for the exception.
+     *
+     * Grouped by provider, because that is what a summary tile stands for.
+     * Deriving the owner from the identifier would not work - the bundled
+     * buckets are called bot.*, not accesslog.* - and guessing it is exactly
+     * the fragility the provider tagging exists to avoid.
+     *
+     * @return array{0: list<MetricDefinition>, 1: list<RateMetricDefinition>, 2: array<string, ?string>, 3: array<string, ?DateRange>, 4: array<string, non-empty-list<MetricDefinition>>}
      */
     private function collectDefinitions(Site $site, ?string $pageUrl, DateRange $tileRange): array
     {
@@ -270,6 +311,8 @@ final readonly class PageMetricsViewDataBuilder
         // feeding for a year has its own, much shorter history.
         /** @var array<string, ?DateRange> $coverageByIdentifier */
         $coverageByIdentifier = [];
+        /** @var array<string, non-empty-list<MetricDefinition>> $machineDefinitionsByProvider */
+        $machineDefinitionsByProvider = [];
 
         foreach ($this->providers as $provider) {
             if (!$provider->supports($site)) {
@@ -280,9 +323,16 @@ final readonly class PageMetricsViewDataBuilder
             $coverage = $this->importCoverage->forProvider($provider->getIdentifier(), $site->getIdentifier());
 
             foreach ($provider->getMetricDefinitions() as $definition) {
-                $definitionsByIdentifier[$definition->identifier] = $definition;
                 $externalLinkByIdentifier[$definition->identifier] = $externalLink;
                 $coverageByIdentifier[$definition->identifier] = $coverage;
+
+                if (MetricGroup::Machine === $definition->group) {
+                    $machineDefinitionsByProvider[$provider->getIdentifier()][] = $definition;
+
+                    continue;
+                }
+
+                $definitionsByIdentifier[$definition->identifier] = $definition;
             }
 
             foreach ($provider->getRateMetricDefinitions() as $rateDefinition) {
@@ -292,7 +342,7 @@ final readonly class PageMetricsViewDataBuilder
             }
         }
 
-        return [array_values($definitionsByIdentifier), array_values($rateDefinitionsByIdentifier), $externalLinkByIdentifier, $coverageByIdentifier];
+        return [array_values($definitionsByIdentifier), array_values($rateDefinitionsByIdentifier), $externalLinkByIdentifier, $coverageByIdentifier, $machineDefinitionsByProvider];
     }
 
     private function resolvePageUrl(Site $site, int $pageId): ?string
@@ -347,12 +397,118 @@ final readonly class PageMetricsViewDataBuilder
     }
 
     /**
+     * One tile standing for a provider's whole machine-traffic set, with the
+     * buckets it is made of carried along for its popover.
+     *
+     * Summed rather than picked: the buckets are disjoint counts of the same
+     * thing, so their total is the number an editor wants ("how much of this
+     * was not a person") and the split is the follow-up question, not the
+     * headline. The daily series are summed the same way, so the sparkline
+     * describes the total the tile shows rather than whichever bucket
+     * happened to be first.
+     *
+     * @param non-empty-list<MetricDefinition> $definitions
+     * @param list<int>                        $pageUids
+     */
+    private function buildMachineSummaryTile(string $providerIdentifier, array $definitions, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?DateRange $coverage): MetricTile
+    {
+        $series = [];
+        $previousValue = 0;
+        $redirectValue = 0;
+        $breakdown = [];
+
+        foreach ($definitions as $definition) {
+            [$series, $previousValue, $redirectValue, $breakdown] = $this->foldBucket(
+                $definition,
+                $pageUids,
+                $languageId,
+                $tileRange,
+                $previousRange,
+                $series,
+                $previousValue,
+                $redirectValue,
+                $breakdown,
+            );
+        }
+
+        $value = array_sum($series);
+        [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
+        $redirectSharePercent = $value > 0 ? (int) round($redirectValue / $value * 100) : 0;
+        $languageService = $this->getLanguageService();
+
+        return new MetricTile(
+            // Per provider, not one identifier for all of them: two providers
+            // declaring machine metrics would otherwise produce two tiles that
+            // are indistinguishable to a reader and ambiguous to anything that
+            // looks a tile up by identifier.
+            self::MACHINE_SUMMARY_IDENTIFIER.'.'.$providerIdentifier,
+            $languageService->sL(self::LL.'metric.machine.label'),
+            $languageService->sL(self::LL.'metric.machine.description'),
+            'tabler-robot',
+            self::MACHINE_SUMMARY_COLOR,
+            MetricUnit::Count,
+            $value,
+            $this->formatValue($value, MetricUnit::Count),
+            $this->importCoverage->mask($series, $coverage),
+            $deltaPercent,
+            $trend,
+            $redirectSharePercent,
+            // No external link: the access log has no interface of its own to
+            // deep-link into, and a summary spanning several metrics has no
+            // single thing to point at even where a provider does.
+            null,
+            null !== $deltaPercent ? $this->formatValue($previousValue, MetricUnit::Count) : '',
+            // Neutral throughout: more crawler traffic is neither an
+            // achievement nor a failure, and colouring it green or red would
+            // tell an editor to act on something they cannot influence.
+            MetricPolarity::Neutral,
+            $breakdown,
+        );
+    }
+
+    /**
      * A bounce rate or an average duration is a ratio, not a count: summing
      * daily ratios would weight a quiet day the same as a busy one. Instead
      * this divides the sum of the numerator by the sum of the denominator
      * over each range, for the sparkline's daily points as well as the
      * tile/previous period totals.
      */
+    /**
+     * One bucket's contribution to the summary: its days added into the
+     * running series, its totals added to the running previous and
+     * via-redirect sums, and its own figure appended to the breakdown.
+     *
+     * The via-redirect share is summed across the buckets like the headline
+     * is. The import writes a via_redirect row for every metric, and folding
+     * the buckets together would otherwise drop that share in silence.
+     *
+     * @param list<int>                                          $pageUids
+     * @param array<string, int>                                 $series
+     * @param list<array{label: string, formattedValue: string}> $breakdown
+     *
+     * @return array{0: array<string, int>, 1: int, 2: int, 3: list<array{label: string, formattedValue: string}>}
+     */
+    private function foldBucket(MetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, array $series, int $previousValue, int $redirectValue, array $breakdown): array
+    {
+        $bucketSeries = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
+
+        foreach ($bucketSeries as $date => $value) {
+            $series[$date] = ($series[$date] ?? 0) + $value;
+        }
+
+        $breakdown[] = [
+            'label' => $definition->label,
+            'formattedValue' => $this->formatValue(array_sum($bucketSeries), $definition->unit),
+        ];
+
+        return [
+            $series,
+            $previousValue + array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $previousRange)),
+            $redirectValue + array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange, 'via_redirect')),
+            $breakdown,
+        ];
+    }
+
     /**
      * @param list<int> $pageUids
      */
@@ -445,5 +601,10 @@ final readonly class PageMetricsViewDataBuilder
     private function getBackendUser(): BackendUserAuthentication
     {
         return $GLOBALS['BE_USER'];
+    }
+
+    private function getLanguageService(): LanguageService
+    {
+        return $GLOBALS['LANG'];
     }
 }

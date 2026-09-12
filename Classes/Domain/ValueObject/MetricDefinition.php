@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit};
 
 /**
  * MetricDefinition.
@@ -21,6 +21,12 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
  * Display and cardinality metadata for one metric identifier. The platform
  * never interprets what a metric means - only a provider's MetricDefinition
  * does, via label/icon/unit.
+ *
+ * $group is appended rather than slotted in, unlike $polarity, which took
+ * the place $maxDimensions had freed. Appending is safe here precisely
+ * because there is no existing slot to land in: a positional third-party
+ * call passing the arguments this constructor already had keeps meaning what
+ * it meant, and one passing a ninth did not compile before.
  *
  * @api
  *
@@ -37,5 +43,6 @@ final readonly class MetricDefinition
         public int $sortOrder,
         public string $color,
         public MetricPolarity $polarity = MetricPolarity::HigherIsBetter,
+        public MetricGroup $group = MetricGroup::Audience,
     ) {}
 }

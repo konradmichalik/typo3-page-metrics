@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricDefinition;
 use PHPUnit\Framework\TestCase;
 
@@ -43,5 +43,21 @@ final class MetricDefinitionTest extends TestCase
         $definition = new MetricDefinition('matomo.pageviews', 'Page views', 'The number of times this page was viewed.', 'actions-view', MetricUnit::Count, 10, '#0969da');
 
         self::assertSame(MetricPolarity::HigherIsBetter, $definition->polarity);
+    }
+
+    public function testGroupDefaultsToAudience(): void
+    {
+        // A provider that has never heard of the distinction is describing
+        // human traffic, which is what every metric was before the split.
+        $definition = new MetricDefinition('matomo.pageviews', 'Page views', 'The number of times this page was viewed.', 'actions-view', MetricUnit::Count, 10, '#0969da');
+
+        self::assertSame(MetricGroup::Audience, $definition->group);
+    }
+
+    public function testGroupIsTakenFromTheProvider(): void
+    {
+        $definition = new MetricDefinition('bot.search', 'Search indexers', 'Requests from search-engine indexers.', 'actions-view', MetricUnit::Count, 50, '#0ca678', MetricPolarity::Neutral, MetricGroup::Machine);
+
+        self::assertSame(MetricGroup::Machine, $definition->group);
     }
 }

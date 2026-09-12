@@ -58,6 +58,7 @@ final class SparklineLabelProviderTest extends FunctionalTestCase
             'peakHint',
             'averageHint',
             'viaRedirectsHint',
+            'breakdown',
             'noData',
             'externalLink',
             'sliderPrevious',
