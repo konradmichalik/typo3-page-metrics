@@ -1,0 +1,32 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:comment>
+    The one trend badge, for the page-header tiles and for the widget tables
+    alike. It used to exist twice, with two sets of sentiment colour rules
+    that said the same thing, and only one of the two carried the explanation.
+
+    Arguments:
+      trend      TrendDirection, which way the number moved: drives the arrow
+      sentiment  TrendSentiment, whether that is an improvement: drives the colour
+      deltaText  the already formatted change, e.g. "12%" or "new"
+      isNew      no comparable previous period, so deltaText reads "new"
+      title      optional, the hover explanation naming both periods
+      modifier   optional extra class, e.g. the tile's corner-pill geometry
+</f:comment>
+<f:variable name="movement"><f:switch expression="{sentiment.value}"><f:case value="positive"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.improved" default="improved" /></f:case><f:case value="negative"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.declined" default="declined" /></f:case><f:defaultCase><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.unchanged" default="unchanged" /></f:defaultCase></f:switch></f:variable>
+<span class="pagemetrics-trend pagemetrics-trend-{sentiment.value}{f:if(condition: modifier, then: ' {modifier}')}"<f:if condition="{title}"> title="{title}"</f:if>>
+    <f:if condition="{trend.value} == 'up'"><f:then><core:icon identifier="tabler-trending-up" size="small" alternativeMarkupIdentifier="inline" /></f:then></f:if>
+    <f:if condition="{trend.value} == 'down'"><f:then><core:icon identifier="tabler-trending-down" size="small" alternativeMarkupIdentifier="inline" /></f:then></f:if>
+    <f:if condition="{trend.value} == 'flat'"><f:then><core:icon identifier="tabler-minus" size="small" alternativeMarkupIdentifier="inline" /></f:then></f:if>
+    <f:comment>
+        The arrow and the colour both say this visually and neither survives
+        assistive technology or a forced-colours mode, so the movement is
+        spelled out in text that is present but not drawn.
+
+        With no comparable previous period the movement is not a movement at
+        all: deltaText reads "new", and prefixing that with "improved by"
+        re-attaches the comparison the word exists to avoid.
+    </f:comment>
+    <span class="pagemetrics-visually-hidden"><f:if condition="{isNew}"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.noComparison" default="No previous period to compare against" /></f:then><f:else><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement" arguments="{0: movement}" default="%1$s by">{movement} by</f:translate></f:else></f:if></span>
+    {deltaText}
+</span>
+</html>

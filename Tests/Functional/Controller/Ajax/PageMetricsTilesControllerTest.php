@@ -132,9 +132,25 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
 
         $response = $this->dispatch(['id' => '2', 'period' => '7']);
 
-        self::assertStringContainsString('pagemetrics-tile-delta-positive', (string) $response->getBody());
+        self::assertStringContainsString('pagemetrics-trend-positive', (string) $response->getBody());
+        self::assertStringContainsString('pagemetrics-trend-pill', (string) $response->getBody());
         self::assertStringContainsString('50%', (string) $response->getBody());
         self::assertStringContainsString('data-redirect-share="20"', (string) $response->getBody());
+    }
+
+    public function testTheTrendBadgeSpellsOutTheMovementForAssistiveTechnology(): void
+    {
+        // The arrow and the colour both say this visually, and neither
+        // survives a screen reader or a forced-colours mode.
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 30);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-10 days'), 'matomo.pageviews', 20);
+
+        $body = (string) $this->dispatch(['id' => '2', 'period' => '7'])->getBody();
+
+        self::assertStringContainsString('pagemetrics-visually-hidden', $body);
+        self::assertStringContainsString('Improved by', $body);
     }
 
     public function testRendersZeroPercentDeltaAsANumberRatherThanNew(): void
@@ -151,7 +167,7 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $response = $this->dispatch(['id' => '2', 'period' => '7']);
         $body = (string) $response->getBody();
 
-        self::assertStringContainsString('pagemetrics-tile-delta-neutral', $body);
+        self::assertStringContainsString('pagemetrics-trend-neutral', $body);
         self::assertStringContainsString('0%', $body);
     }
 

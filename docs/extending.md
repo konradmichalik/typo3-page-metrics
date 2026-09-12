@@ -55,7 +55,7 @@ period the built-in tiles use.
 
 ## Polarity
 
-`polarity` says whether a rise in your metric is an improvement, and nothing else can: the platform never interprets what a metric means. It decides the colour of the trend badge, so a metric where a rise is the bad outcome needs `MetricPolarity::LowerIsBetter` to avoid showing a worsening number in green.
+`polarity` says whether a rise in your metric is an improvement, and nothing else can: the platform never interprets what a metric means. It decides the colour of the trend badge and the word a screen reader reads out for it, so a metric where a rise is the bad outcome needs `MetricPolarity::LowerIsBetter` to avoid showing a worsening number in green and announcing it as improved.
 
 | Value | Use for |
 | --- | --- |

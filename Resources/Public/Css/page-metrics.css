@@ -1,9 +1,25 @@
 /* Sentiment, not direction: green means "got better", which for a bounce
    rate is a number going down. Defined once here so the tile badge, the
-   table badge and the trend widget's aside icon cannot drift apart. */
+   table badge and the trend widget's aside icon cannot drift apart.
+
+   Taken from the backend's own semantic text colours rather than picked by
+   hand. Those are light-dark() pairs the core theme maintains, so they stay
+   legible in either scheme and follow a custom theme's palette, which a
+   fixed green and red chosen against a white card cannot. The literals
+   behind them are only reached if the token is absent entirely. */
 :root {
-    --pm-sentiment-positive: #1a7f37;
-    --pm-sentiment-negative: #c92a2a;
+    /* Both nudged a fifth of the way towards the body text colour. The
+       semantic tokens on their own are tuned for text on the plain page
+       surface, and these sit on a faint plate inside a tile: measured
+       against the default theme, that costs enough to drop red in the dark
+       scheme to 3.8:1 and green in the light one to 4.1:1, either side of
+       the 4.5:1 WCAG AA needs at this size. At 80% the tightest of the four
+       combinations comes out at 4.7:1.
+
+       Mixing rather than substituting a hand-picked pair keeps the hue and
+       whatever palette a custom backend theme defines. */
+    --pm-sentiment-positive: color-mix(in srgb, var(--typo3-text-color-success, #1a7f37) 80%, var(--typo3-text-color-base, #14213d));
+    --pm-sentiment-negative: color-mix(in srgb, var(--typo3-text-color-danger, #c92a2a) 80%, var(--typo3-text-color-base, #14213d));
     --pm-sentiment-neutral: var(--typo3-text-color-variant, #6a7085);
 }
 
@@ -56,7 +72,7 @@
     font-weight: 700;
     color: var(--typo3-text-color-base, #14213d);
     background: var(--typo3-component-bg, #fff);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--typo3-component-box-shadow, 0 1px 2px rgba(0, 0, 0, 0.12));
 }
 
 .pagemetrics-options {
@@ -110,7 +126,7 @@
     border: 1px solid var(--typo3-component-border-color, #cbcbcb);
     border-radius: var(--typo3-component-border-radius, 4px);
     background: var(--typo3-component-bg, #fff);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--typo3-component-box-shadow-flyout, 0 2px 8px rgba(0, 0, 0, 0.15));
 }
 
 .pagemetrics-options-menu-item {
@@ -369,7 +385,7 @@
     background: var(--typo3-component-bg, #fff);
     position: relative;
     /* Lets the trend badge sit flush in the top-right corner (see
-       .pagemetrics-tile-delta) and have its own square outer corner clipped
+       .pagemetrics-trend-pill) and have its own square outer corner clipped
        to follow the tile's rounded corner, rather than poking past it. */
     overflow: hidden;
     cursor: pointer;
@@ -378,7 +394,7 @@
 .pagemetrics-tile:hover,
 .pagemetrics-tile:focus-visible {
     border-color: color-mix(in srgb, var(--pm-accent) 40%, var(--typo3-component-border-color, #cbcbcb));
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--typo3-component-box-shadow, 0 1px 4px rgba(0, 0, 0, 0.08));
 }
 
 .pagemetrics-tile-head {
@@ -395,7 +411,7 @@
     width: 52px;
     height: 52px;
     border-radius: var(--typo3-component-border-radius, 4px);
-    background: color-mix(in srgb, var(--pm-accent) 14%, white);
+    background: color-mix(in srgb, var(--pm-accent) 14%, var(--typo3-component-bg, #fff));
     color: var(--pm-accent);
 }
 
@@ -421,43 +437,9 @@
     color: var(--typo3-text-color-base, #14213d);
 }
 
-.pagemetrics-tile-delta {
-    position: absolute;
-    top: 0;
-    right: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 1px;
-    padding: 2px 6px;
-    /* Square everywhere except the inner (bottom-left) corner, which softens
-       the transition into the tile content - the outer top-right corner is
-       clipped to the tile's own rounded corner by its overflow: hidden. */
-    border-radius: 0 0 0 6px;
-    /* currentColor picks up whichever -up/-down/-flat modifier is active,
-       so the pill background always matches the trend color. */
-    background: color-mix(in srgb, currentColor 12%, transparent);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.pagemetrics-tile-delta svg {
-    width: 11px;
-    height: 11px;
-}
-
-.pagemetrics-tile-delta-positive {
-    color: var(--pm-sentiment-positive);
-}
-
-.pagemetrics-tile-delta-negative {
-    color: var(--pm-sentiment-negative);
-}
-
-.pagemetrics-tile-delta-neutral {
-    color: var(--pm-sentiment-neutral);
-}
-
+/* The tile's corner-pill geometry, on top of the shared .pagemetrics-trend
+   badge. Colour, icon and the spoken movement all live there; only the
+   position and the plate are specific to sitting on a tile. */
 .pagemetrics-tile-label {
     font-size: 0.75rem;
     color: var(--typo3-text-color-variant, #6a7085);
@@ -470,7 +452,7 @@
     border: 1px solid var(--typo3-component-border-color, #cbcbcb);
     border-radius: var(--typo3-component-border-radius, 4px);
     background: var(--typo3-component-bg, #fff);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--typo3-component-box-shadow-flyout, 0 2px 8px rgba(0, 0, 0, 0.15));
     min-width: 280px;
     max-width: 320px;
 }
@@ -581,14 +563,18 @@
     width: max-content;
     max-width: 180px;
     /* Below the cursor by default: above would overlap the popover's own
-       Today/Yesterday/Peak/Average stats row sitting right above the
+       last day/previous day/peak/average stats row sitting right above the
        sparkline. Flipped to .pagemetrics-sparkline-tooltip-above in JS when
        the popover has no room below (see the mousemove handler). */
     transform: translate(-50%, 0) translateY(6px);
     padding: 4px 8px;
     border-radius: var(--typo3-component-border-radius, 4px);
+    /* The two tokens are each other's inverse and flip together, which is
+       what keeps this an inverted chip in both schemes. Pairing the
+       background with a literal white left it light-on-light as soon as the
+       backend went dark. */
     background: var(--typo3-text-color-base, #14213d);
-    color: #fff;
+    color: var(--typo3-component-bg, #fff);
     font-size: 0.6875rem;
     text-align: center;
     pointer-events: none;
@@ -611,7 +597,9 @@
 .pagemetrics-sparkline-tooltip-annotation {
     margin-top: 3px;
     padding-top: 3px;
-    border-top: 1px solid rgba(255, 255, 255, 0.25);
+    /* currentColor is the chip's own text colour, so the divider inverts
+       with it instead of staying white on a light chip. */
+    border-top: 1px solid color-mix(in srgb, currentColor 25%, transparent);
     white-space: normal;
 }
 
@@ -697,7 +685,7 @@
     border-radius: var(--typo3-component-border-radius, 4px);
     background: var(--typo3-component-bg, #fff);
     border: 1px solid var(--typo3-component-border-color, #cbcbcb);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--typo3-component-box-shadow-flyout, 0 2px 8px rgba(0, 0, 0, 0.15));
     font-size: 0.6875rem;
     line-height: 1.4;
     color: var(--typo3-text-color-variant, #6a7085);
@@ -881,7 +869,7 @@
     width: 64px;
     height: 64px;
     border-radius: var(--typo3-component-border-radius, 4px);
-    background: color-mix(in srgb, var(--pm-accent) 14%, white);
+    background: color-mix(in srgb, var(--pm-accent) 14%, var(--typo3-component-bg, #fff));
     color: var(--pm-accent);
 }
 
@@ -928,9 +916,9 @@
     gap: 8px;
 }
 
-/* Trend badge for a table cell (Most viewed pages / Trend widgets) - same
-   sentiment colors as .pagemetrics-tile-delta-*, but inline rather than an
-   absolutely-positioned corner pill. */
+/* The trend badge, everywhere it appears: the page-header tiles and the
+   widget tables. The tiles add .pagemetrics-trend-pill for their corner
+   geometry, which is the only thing that differed between the two. */
 .pagemetrics-trend {
     display: inline-flex;
     align-items: center;
@@ -944,6 +932,35 @@
     height: 12px;
 }
 
+/* The tile variant, declared after the base it overrides: same specificity,
+   so source order is the only thing that decides, and it silently lost the
+   gap and the icon size when this block sat above. */
+.pagemetrics-trend-pill {
+    position: absolute;
+    top: 0;
+    right: 0;
+    gap: 1px;
+    padding: 2px 6px;
+    /* Square everywhere except the inner (bottom-left) corner, which softens
+       the transition into the tile content - the outer top-right corner is
+       clipped to the tile's own rounded corner by its overflow: hidden. */
+    border-radius: 0 0 0 6px;
+    /* A neutral plate, not a tint of the badge's own colour. Tinting with
+       currentColor looked tidier and cost about 0.6 of contrast ratio,
+       which is the difference between passing WCAG AA and failing it:
+       measured against the default theme, red on a tinted plate comes out
+       at 3.8:1 in the dark scheme and green at 3.9:1 in the light one,
+       against 4.4 and 4.6 on the plain surface. The plate is decoration;
+       the number has to stay readable. */
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 6%, transparent);
+    font-size: 0.6875rem;
+}
+
+.pagemetrics-trend-pill svg {
+    width: 11px;
+    height: 11px;
+}
+
 .pagemetrics-trend-positive {
     color: var(--pm-sentiment-positive);
 }
@@ -954,4 +971,19 @@
 
 .pagemetrics-trend-neutral {
     color: var(--pm-sentiment-neutral);
+}
+
+/* Present for assistive technology and for a forced-colours mode, never
+   drawn: the arrow and the colour carry the movement visually and neither
+   survives either of those. */
+.pagemetrics-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }

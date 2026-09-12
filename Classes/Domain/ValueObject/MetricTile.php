@@ -31,6 +31,14 @@ final readonly class MetricTile
     public TrendSentiment $sentiment;
 
     /**
+     * Same reason as TopPage::$isNew: Fluid's boolean parser has no concept
+     * of a null literal, so a template cannot ask whether $deltaPercent is
+     * null. The badge needs to know, because "improved by new" is not a
+     * sentence.
+     */
+    public bool $isNew;
+
+    /**
      * @param array<string, int|null> $sparkline              Y-m-d => value, covers the same period as the tile
      *                                                        itself; null for a day with no data at all, which is
      *                                                        not the same as a day with no traffic
@@ -60,5 +68,6 @@ final readonly class MetricTile
         public MetricPolarity $polarity = MetricPolarity::HigherIsBetter,
     ) {
         $this->sentiment = TrendSentiment::of($trend, $polarity);
+        $this->isNew = null === $deltaPercent;
     }
 }

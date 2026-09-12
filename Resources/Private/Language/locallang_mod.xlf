@@ -87,6 +87,21 @@
             <trans-unit id="trend.new" resname="trend.new">
                 <source>new</source>
             </trans-unit>
+            <trans-unit id="trend.movement" resname="trend.movement">
+                <source>%1$s by</source>
+            </trans-unit>
+            <trans-unit id="trend.movement.noComparison" resname="trend.movement.noComparison">
+                <source>No previous period to compare against</source>
+            </trans-unit>
+            <trans-unit id="trend.movement.improved" resname="trend.movement.improved">
+                <source>Improved</source>
+            </trans-unit>
+            <trans-unit id="trend.movement.declined" resname="trend.movement.declined">
+                <source>Declined</source>
+            </trans-unit>
+            <trans-unit id="trend.movement.unchanged" resname="trend.movement.unchanged">
+                <source>Unchanged</source>
+            </trans-unit>
             <trans-unit id="trend.explanation.current" resname="trend.explanation.current">
                 <source>This period (%1$s): %2$s</source>
             </trans-unit>
