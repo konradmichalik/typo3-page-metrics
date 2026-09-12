@@ -8,7 +8,7 @@
             <f:be.link route="web_layout" parameters="{id: pageId, tx_typo3pagemetrics_period: option}" additionalAttributes="{'data-period': option}" class="pagemetrics-period-link{f:if(condition: '{option} == {periodDays}', then: ' pagemetrics-period-link-active')}">{option} <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:period.days" default="days" /></f:be.link>
         </f:for>
     </nav>
-    <f:if condition="{hasSubpages}">
+    <f:if condition="{hasSubpages} || {addAnnotationUrl}">
         <div class="pagemetrics-options">
             <button type="button" class="pagemetrics-options-trigger{f:if(condition: includeSubpages, then: ' pagemetrics-options-trigger-has-active-filter')}" data-options-trigger aria-haspopup="true" aria-expanded="false" aria-label="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:options.label', default: 'More options')}">
                 <core:icon identifier="tabler-dots-vertical" alternativeMarkupIdentifier="inline" />
@@ -17,15 +17,29 @@
                 </f:if>
             </button>
             <div class="pagemetrics-options-menu" data-options-menu hidden>
-                <f:be.link route="web_layout" parameters="{id: pageId, tx_typo3pagemetrics_period: periodDays, tx_typo3pagemetrics_includeSubpages: includeSubpagesToggleValue}" additionalAttributes="{'data-include-subpages-toggle': 1}" class="pagemetrics-options-menu-item{f:if(condition: includeSubpages, then: ' pagemetrics-options-menu-item-active')}">
-                    <span class="pagemetrics-options-menu-check">
-                        <f:if condition="{includeSubpages}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5l10 -10" /></svg>
-                        </f:if>
-                    </span>
-                    <span class="pagemetrics-options-menu-icon" aria-hidden="true"><core:icon identifier="tabler-sitemap" size="small" alternativeMarkupIdentifier="inline" /></span>
-                    <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:subpages.include" default="Include subpages" />
-                </f:be.link>
+                <f:if condition="{hasSubpages}">
+                    <f:be.link route="web_layout" parameters="{id: pageId, tx_typo3pagemetrics_period: periodDays, tx_typo3pagemetrics_includeSubpages: includeSubpagesToggleValue}" additionalAttributes="{'data-include-subpages-toggle': 1}" class="pagemetrics-options-menu-item{f:if(condition: includeSubpages, then: ' pagemetrics-options-menu-item-active')}">
+                        <span class="pagemetrics-options-menu-check">
+                            <f:if condition="{includeSubpages}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5l10 -10" /></svg>
+                            </f:if>
+                        </span>
+                        <span class="pagemetrics-options-menu-icon" aria-hidden="true"><core:icon identifier="tabler-sitemap" size="small" alternativeMarkupIdentifier="inline" /></span>
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:subpages.include" default="Include subpages" />
+                    </f:be.link>
+                </f:if>
+                <f:comment>
+                    The link is built server-side from the site's own storage
+                    page and is only there for a user who may create the record
+                    on it, so the menu entry never promises a form that would
+                    refuse to save.
+                </f:comment>
+                <f:if condition="{addAnnotationUrl}">
+                    <a href="{addAnnotationUrl}" class="pagemetrics-options-menu-item pagemetrics-options-menu-action">
+                        <span class="pagemetrics-options-menu-icon" aria-hidden="true"><core:icon identifier="tabler-note" size="small" alternativeMarkupIdentifier="inline" /></span>
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:annotation.add" default="Add marker" />
+                    </a>
+                </f:if>
             </div>
         </div>
     </f:if>

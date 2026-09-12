@@ -44,6 +44,7 @@ final class SiteConfigurationReaderTest extends TestCase
         self::assertSame([], $configuration->keepQueryParams);
         self::assertSame(400, $configuration->retentionDays);
         self::assertSame([], $configuration->additionalHosts);
+        self::assertNull($configuration->annotationStoragePid);
     }
 
     public function testReadsFullyConfiguredSite(): void
@@ -184,6 +185,58 @@ final class SiteConfigurationReaderTest extends TestCase
 
         $this->expectException(InvalidSiteConfigurationException::class);
         $this->expectExceptionCode(1756000004);
+
+        $this->subject->read($site);
+    }
+
+    public function testReadsTheAnnotationStoragePage(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true, 'annotations' => ['storagePid' => 42]],
+        ]);
+
+        $configuration = $this->subject->read($site);
+
+        self::assertSame(42, $configuration->annotationStoragePid);
+    }
+
+    public function testLeavesTheAnnotationStoragePageUnsetWhenTheSiteNamesNone(): void
+    {
+        // Not an error: the markers such a site already has stay readable
+        // and editable, it simply offers no shortcut for creating new ones.
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true],
+        ]);
+
+        $configuration = $this->subject->read($site);
+
+        self::assertNull($configuration->annotationStoragePid);
+    }
+
+    public function testThrowsWhenAnnotationsIsNotAMapping(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true, 'annotations' => 42],
+        ]);
+
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionCode(1756000008);
+
+        $this->subject->read($site);
+    }
+
+    public function testThrowsWhenTheAnnotationStoragePageIsNotAPositiveInteger(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true, 'annotations' => ['storagePid' => 0]],
+        ]);
+
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionCode(1756000009);
 
         $this->subject->read($site);
     }

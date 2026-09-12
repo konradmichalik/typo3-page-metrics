@@ -1,0 +1,9 @@
+"be_groups"
+,"uid","pid","title","tables_select","tables_modify"
+,1,0,"Marker editors","tx_typo3pagemetrics_manual_annotation","tx_typo3pagemetrics_manual_annotation"
+,2,0,"Editors without the marker table","",""
+
+"be_users"
+,"uid","pid","username","password","admin","disable","deleted","usergroup","db_mountpoints"
+,10,0,"marker-editor","$argon2i$v=19$m=65536,t=16,p=1$Y29pbmNvaW5jb2luY29pbg$dGhpc2lzYWZha2VoYXNoZm9ydGVzdHM",0,0,0,"1","10,11"
+,11,0,"plain-editor","$argon2i$v=19$m=65536,t=16,p=1$Y29pbmNvaW5jb2luY29pbg$dGhpc2lzYWZha2VoYXNoZm9ydGVzdHM",0,0,0,"2","10"

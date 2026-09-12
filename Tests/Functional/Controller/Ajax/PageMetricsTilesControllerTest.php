@@ -286,6 +286,31 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         self::assertStringNotContainsString('data-include-subpages-toggle', $body);
     }
 
+    public function testOffersAddMarkerOnALeafPageOnceTheSiteNamesAStoragePage(): void
+    {
+        // Page 2 has no children, so before the marker entry existed this
+        // page had no options menu at all: the menu itself has to appear
+        // for the entry, not only the entry inside an existing menu.
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/', 4);
+
+        $body = (string) $this->dispatch(['id' => '2'])->getBody();
+
+        self::assertStringContainsString('data-options-trigger', $body);
+        self::assertStringContainsString('Add marker', $body);
+        // The generated path, not the route name.
+        self::assertStringContainsString('/typo3/record/edit', $body);
+    }
+
+    public function testOmitsAddMarkerWhenTheSiteNamesNoStoragePage(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+
+        $body = (string) $this->dispatch(['id' => '1'])->getBody();
+
+        self::assertStringContainsString('data-options-trigger', $body);
+        self::assertStringNotContainsString('Add marker', $body);
+    }
+
     public function testRendersEmptyResponseWhenBackendUserLacksPageAccess(): void
     {
         // Page 3 in the fixture has perms_everybody = 0 and perms_userid = 1,
@@ -330,7 +355,7 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         return $this->get(PageMetricsTilesController::class)->handleRequest($request);
     }
 
-    private function writeSiteConfiguration(string $identifier, int $rootPageId, string $base): void
+    private function writeSiteConfiguration(string $identifier, int $rootPageId, string $base, ?int $annotationStoragePid = null): void
     {
         $this->get(SiteWriter::class)->write($identifier, [
             'rootPageId' => $rootPageId,
@@ -348,7 +373,10 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
             ],
             'errorHandling' => [],
             'routes' => [],
-            'pageMetrics' => ['providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
+            'pageMetrics' => [
+                'providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']],
+                'annotations' => null !== $annotationStoragePid ? ['storagePid' => $annotationStoragePid] : [],
+            ],
         ]);
     }
 }

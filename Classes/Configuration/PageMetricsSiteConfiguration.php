@@ -24,6 +24,8 @@ final readonly class PageMetricsSiteConfiguration
      * @param array<string, array<string, mixed>> $providers
      * @param list<string>                        $keepQueryParams
      * @param list<string>                        $additionalHosts
+     * @param int|null                            $annotationStoragePid the page manual annotations are created on,
+     *                                                                  null when the site names none
      */
     public function __construct(
         public bool $enabled,
@@ -32,5 +34,6 @@ final readonly class PageMetricsSiteConfiguration
         public array $keepQueryParams,
         public int $retentionDays,
         public array $additionalHosts,
+        public ?int $annotationStoragePid,
     ) {}
 }

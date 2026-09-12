@@ -24,8 +24,10 @@ final readonly class PageMetricsViewData
      * @param list<MetricTile>   $tiles
      * @param list<int>          $periodOptions
      * @param list<Annotation>   $annotations
-     * @param DataFreshness|null $dataFreshness the last day these tiles have numbers for, null when no provider
-     *                                          of this site has recorded an imported window yet
+     * @param DataFreshness|null $dataFreshness    the last day these tiles have numbers for, null when no provider
+     *                                             of this site has recorded an imported window yet
+     * @param string|null        $addAnnotationUrl FormEngine link for a new marker on this page, null when the
+     *                                             site names no storage page or this user may not write there
      */
     public function __construct(
         public bool $hasPage,
@@ -40,5 +42,6 @@ final readonly class PageMetricsViewData
         public bool $includeSubpages,
         public bool $hasSubpages,
         public ?DataFreshness $dataFreshness,
+        public ?string $addAnnotationUrl,
     ) {}
 }

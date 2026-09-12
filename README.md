@@ -69,6 +69,10 @@ Each provider has its own settings and setup notes:
 - [GA4](docs/providers/ga4.md)
 - [Access log](docs/providers/accesslog.md)
 
+Name a storage page under `pageMetrics.annotations.storagePid` and editors can
+add their own markers straight from the page module, see
+[Adding a marker](docs/page-tiles.md#adding-a-marker).
+
 ## ⚡ Usage
 
 Run the import (also schedulable via the TYPO3 Scheduler). The same command

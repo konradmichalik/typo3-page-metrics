@@ -24,6 +24,9 @@
             <trans-unit id="collapse.show" resname="collapse.show">
                 <source>Metrics</source>
             </trans-unit>
+            <trans-unit id="annotation.add" resname="annotation.add">
+                <source>Add marker</source>
+            </trans-unit>
             <trans-unit id="options.label" resname="options.label">
                 <source>More options</source>
             </trans-unit>

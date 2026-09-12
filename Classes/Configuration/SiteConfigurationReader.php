@@ -37,51 +37,97 @@ final class SiteConfigurationReader
         $raw = $site->getConfiguration()['pageMetrics'] ?? null;
 
         if (null === $raw) {
-            return new PageMetricsSiteConfiguration(false, [], true, [], 400, []);
+            return new PageMetricsSiteConfiguration(false, [], true, [], 400, [], null);
         }
 
-        if (!is_array($raw)) {
-            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics" must be a mapping.', $site->getIdentifier()), 1756000000);
+        $raw = $this->mapping($raw, $site, 'pageMetrics', 1756000000);
+        $resolution = $this->mapping($raw['resolution'] ?? [], $site, 'pageMetrics.resolution', 1756000003);
+        $annotations = $this->mapping($raw['annotations'] ?? [], $site, 'pageMetrics.annotations', 1756000008);
+
+        /** @var array<string, array<string, mixed>> $providers */
+        $providers = $this->mapping($raw['providers'] ?? [], $site, 'pageMetrics.providers', 1756000002);
+        /** @var list<string> $keepQueryParams */
+        $keepQueryParams = $this->listOf($resolution['keepQueryParams'] ?? [], $site, 'pageMetrics.resolution.keepQueryParams', 1756000005);
+        /** @var list<string> $additionalHosts */
+        $additionalHosts = $this->listOf($resolution['additionalHosts'] ?? [], $site, 'pageMetrics.resolution.additionalHosts', 1756000007);
+
+        return new PageMetricsSiteConfiguration(
+            $this->boolean($raw['enabled'] ?? false, $site, 'pageMetrics.enabled', 1756000001),
+            $providers,
+            $this->boolean($resolution['dropQueryString'] ?? true, $site, 'pageMetrics.resolution.dropQueryString', 1756000004),
+            $keepQueryParams,
+            $this->positiveInteger($raw['retentionDays'] ?? 400, $site, 'pageMetrics.retentionDays', 1756000006),
+            $additionalHosts,
+            // Null, not an error: a site that names no storage page keeps
+            // every annotation it already has (they are read by site
+            // identifier, never by pid), it just offers no "add marker"
+            // shortcut until someone picks a page for new ones to live on.
+            $this->optionalPageUid($annotations['storagePid'] ?? null, $site, 'pageMetrics.annotations.storagePid', 1756000009),
+        );
+    }
+
+    /**
+     * One shape of "this key is wrong" per type, rather than the same
+     * if-and-throw written out once per key. The numeric code stays with the
+     * call site: it identifies the option, not the kind of mistake, and an
+     * installation may well be matching on it.
+     *
+     * @return array<mixed>
+     */
+    private function mapping(mixed $value, Site $site, string $key, int $code): array
+    {
+        if (!is_array($value)) {
+            throw $this->invalid($site, $key, 'a mapping', $code);
         }
 
-        $enabled = $raw['enabled'] ?? false;
-        if (!is_bool($enabled)) {
-            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.enabled" must be a boolean.', $site->getIdentifier()), 1756000001);
+        return $value;
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private function listOf(mixed $value, Site $site, string $key, int $code): array
+    {
+        if (!is_array($value) || !array_is_list($value)) {
+            throw $this->invalid($site, $key, 'a list', $code);
         }
 
-        $providers = $raw['providers'] ?? [];
-        if (!is_array($providers)) {
-            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.providers" must be a mapping.', $site->getIdentifier()), 1756000002);
+        return $value;
+    }
+
+    private function boolean(mixed $value, Site $site, string $key, int $code): bool
+    {
+        if (!is_bool($value)) {
+            throw $this->invalid($site, $key, 'a boolean', $code);
         }
 
-        $resolution = $raw['resolution'] ?? [];
-        if (!is_array($resolution)) {
-            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.resolution" must be a mapping.', $site->getIdentifier()), 1756000003);
+        return $value;
+    }
+
+    private function positiveInteger(mixed $value, Site $site, string $key, int $code): int
+    {
+        if (!is_int($value) || $value < 1) {
+            throw $this->invalid($site, $key, 'a positive integer', $code);
         }
 
-        $dropQueryString = $resolution['dropQueryString'] ?? true;
-        if (!is_bool($dropQueryString)) {
-            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.resolution.dropQueryString" must be a boolean.', $site->getIdentifier()), 1756000004);
+        return $value;
+    }
+
+    private function optionalPageUid(mixed $value, Site $site, string $key, int $code): ?int
+    {
+        if (null === $value) {
+            return null;
         }
 
-        $keepQueryParams = $resolution['keepQueryParams'] ?? [];
-        if (!is_array($keepQueryParams) || !array_is_list($keepQueryParams)) {
-            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.resolution.keepQueryParams" must be a list.', $site->getIdentifier()), 1756000005);
+        if (!is_int($value) || $value < 1) {
+            throw $this->invalid($site, $key, 'the uid of an existing page', $code);
         }
 
-        $retentionDays = $raw['retentionDays'] ?? 400;
-        if (!is_int($retentionDays) || $retentionDays < 1) {
-            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.retentionDays" must be a positive integer.', $site->getIdentifier()), 1756000006);
-        }
+        return $value;
+    }
 
-        $additionalHosts = $resolution['additionalHosts'] ?? [];
-        if (!is_array($additionalHosts) || !array_is_list($additionalHosts)) {
-            throw new InvalidSiteConfigurationException(sprintf('Site "%s": "pageMetrics.resolution.additionalHosts" must be a list.', $site->getIdentifier()), 1756000007);
-        }
-
-        /* @var array<string, array<string, mixed>> $providers */
-        /* @var list<string> $keepQueryParams */
-        /* @var list<string> $additionalHosts */
-        return new PageMetricsSiteConfiguration($enabled, $providers, $dropQueryString, $keepQueryParams, $retentionDays, $additionalHosts);
+    private function invalid(Site $site, string $key, string $expected, int $code): InvalidSiteConfigurationException
+    {
+        return new InvalidSiteConfigurationException(sprintf('Site "%s": "%s" must be %s.', $site->getIdentifier(), $key, $expected), $code);
     }
 }

@@ -31,18 +31,23 @@ return [
         'enablecolumns' => [
             'disabled' => 'hidden',
         ],
-        // Root level only (pid=0), not on regular pages: an annotation is
-        // scoped by its own "Site" field (see site_identifier below), not
-        // by where it happens to sit in a page tree, so there is no
-        // meaningful page to put it on - one shared list at the absolute
-        // root keeps every site's annotations in a single, predictable
-        // place instead of scattered across arbitrary pages. Same
-        // rootLevel convention as be_users/be_groups/sys_file. Only admins
-        // can create records at the true root (TYPO3 core requirement),
-        // so this is an admin-managed record, similar to those tables.
-        'rootLevel' => 1,
+        // Both the root and a regular page, because this record used to live
+        // at the root only. TYPO3 lets nobody but an admin write at pid 0, so
+        // the people who cause the events a marker explains could not record
+        // them. New records go on the page a site names as its
+        // pageMetrics.annotations.storagePid, where the ordinary page
+        // permissions decide who may create one; -1 rather than 0 keeps the
+        // records existing installations already have at pid 0 editable
+        // instead of stranding them in a place their own TCA forbids.
+        'rootLevel' => -1,
     ],
     'columns' => [
+        // "hidden" is the only exclude field here. Every other column carries
+        // what the marker says, and a field an editor's group has not been
+        // granted is not rendered and therefore never submitted: a marker
+        // saved without its site or its text is one nobody will ever see.
+        // The same split core makes on tt_content, where the content fields
+        // are open and the access ones are not.
         'hidden' => [
             'exclude' => true,
             'label' => 'LLL:EXT:core/Resources/Private/Language/locallang_general.xlf:LGL.hidden',
@@ -52,7 +57,6 @@ return [
             ],
         ],
         'site_identifier' => [
-            'exclude' => true,
             'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.site_identifier',
             'config' => [
                 'type' => 'select',
@@ -62,7 +66,6 @@ return [
             ],
         ],
         'date' => [
-            'exclude' => true,
             'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.date',
             'config' => [
                 'type' => 'datetime',
@@ -71,7 +74,6 @@ return [
             ],
         ],
         'date_until' => [
-            'exclude' => true,
             'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.date_until',
             'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.date_until.description',
             'config' => [
@@ -80,7 +82,6 @@ return [
             ],
         ],
         'category' => [
-            'exclude' => true,
             'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.category',
             'config' => [
                 'type' => 'select',
@@ -93,7 +94,6 @@ return [
             ],
         ],
         'page_uid' => [
-            'exclude' => true,
             'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.page_uid',
             'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.page_uid.description',
             'config' => [
@@ -104,7 +104,6 @@ return [
             ],
         ],
         'include_subpages' => [
-            'exclude' => true,
             'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.include_subpages',
             'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.include_subpages.description',
             'displayCond' => 'FIELD:page_uid:REQ:true',
@@ -114,7 +113,6 @@ return [
             ],
         ],
         'text' => [
-            'exclude' => true,
             'label' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_db.xlf:tx_typo3pagemetrics_manual_annotation.text',
             'config' => [
                 'type' => 'text',

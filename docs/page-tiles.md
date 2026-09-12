@@ -119,21 +119,44 @@ independent providers that are always merged together:
   already-configured `providers.matomo` is needed. GA4 has no equivalent API
   to import from.
 - **Manual**, created directly in the TYPO3 backend as a "Page metrics
-  annotation" record — pick the site, a category, a date and a text. An
-  annotation is scoped by its "Site" field, not by its position in a page tree,
-  so the record lives at the absolute root (`rootLevel = 1`, the same
-  convention as `be_users`/`be_groups`) rather than under any one page:
-  open the root page in the page tree (the extension/site name at the
-  very top) and use **New record** there. This also means only backend
-  admins can create one, the same restriction TYPO3 applies to any
-  root-level record. Manual annotations are the way to mark events on
-  GA4-only sites, or anything not tied to an external API at all, and
-  appear immediately, without waiting for the next import run.
+  annotation" record: pick the site, a category, a date and a text. Manual
+  annotations are the way to mark events on GA4-only sites, or anything not
+  tied to an external API at all, and appear immediately, without waiting for
+  the next import run. See [Adding a marker](#adding-a-marker) for where those
+  records live and who may create one.
 
 Annotations show up in two places: the markers on every sparkline
 (page-tile popovers and the [dashboard chart widget](dashboard-widgets.md)
 alike), and the dedicated
 [annotations dashboard widget](dashboard-widgets.md).
+
+### Adding a marker
+
+Give the site a page for its manual annotations to live on:
+
+```yaml
+pageMetrics:
+  annotations:
+    storagePid: 42
+```
+
+With that set, **Web → Page** offers **Add marker** in the options menu beside
+the tiles. It opens the record form with the site, today's date and the page
+already filled in, and returns to the page module once the record is saved.
+
+A marker created that way is an ordinary record on that page, so the ordinary
+page permissions decide who may create one. An editor needs the "Page metrics
+annotation" table under **Allowed tables** in their backend group, plus
+content-edit permission on the storage page. The menu entry is shown only to a
+user who has both, and TYPO3 checks the same two things again when the form is
+saved.
+
+Without `storagePid` there is no **Add marker** entry and nothing else changes:
+records are still created through **New record** on whichever page you keep
+them on. A marker is found by its "Site" field and never by the page it sits
+on, so everything an installation already has, including the records at the
+page tree's root from before this option existed, keeps appearing on the tiles
+and stays editable where it is. Moving those onto the storage page is optional.
 
 ### Category
 

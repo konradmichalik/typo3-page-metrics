@@ -94,6 +94,7 @@ final readonly class PageMetricsViewDataBuilder
         private SiteBenchmark $siteBenchmark,
         private MetricValueFormatter $valueFormatter,
         private DataFreshnessResolver $dataFreshness,
+        private ManualAnnotationLinkBuilder $annotationLinkBuilder,
         private EventDispatcherInterface $eventDispatcher,
         private iterable $providers,
     ) {}
@@ -133,6 +134,7 @@ final readonly class PageMetricsViewDataBuilder
         $annotations = [];
         $hasSubpages = false;
         $dataFreshness = null;
+        $addAnnotationUrl = null;
 
         if (null !== $site) {
             $tiles = $this->buildTiles($site, $pageId, $languageId, $tileRange, $previousRange, $includeSubpages, $withBenchmark);
@@ -140,6 +142,7 @@ final readonly class PageMetricsViewDataBuilder
             $annotations = $this->buildAnnotations($site->getIdentifier(), $tileRange, $pageId);
             $hasSubpages = $this->pageUidRepository->hasChildren($pageId);
             $dataFreshness = $this->dataFreshness->forSite($site, $tileRange->until);
+            $addAnnotationUrl = $this->annotationLinkBuilder->forPage($site, $pageId, $tileRange->until);
         }
 
         return new PageMetricsViewData(
@@ -155,6 +158,7 @@ final readonly class PageMetricsViewDataBuilder
             $includeSubpages,
             $hasSubpages,
             $dataFreshness,
+            $addAnnotationUrl,
         );
     }
 

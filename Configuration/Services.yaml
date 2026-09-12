@@ -117,6 +117,12 @@ services:
         arguments:
             $providers: !tagged_iterator page_metrics.metric_provider
 
+    # Public so functional tests can fetch it directly via $this->get() and
+    # assert the permission decision behind the "add marker" entry without
+    # rendering a page module.
+    KonradMichalik\Typo3PageMetrics\Service\ManualAnnotationLinkBuilder:
+        public: true
+
     # Public so functional tests can fetch it directly via $this->get() instead
     # of dispatching a full ModifyPageLayoutContentEvent.
     KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder:

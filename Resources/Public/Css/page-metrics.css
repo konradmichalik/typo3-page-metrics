@@ -183,6 +183,13 @@
     text-decoration: none;
 }
 
+/* An action has no checked state, so where the toggle above it carries a
+   checkbox it carries nothing, and its label would start further left than
+   the one it sits under. 30px is that checkbox plus the gap after it. */
+.pagemetrics-options-menu-action {
+    padding-left: 30px;
+}
+
 .pagemetrics-options-menu-check {
     display: flex;
     flex-shrink: 0;

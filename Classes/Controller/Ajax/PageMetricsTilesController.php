@@ -72,6 +72,7 @@ final readonly class PageMetricsTilesController
             'includeSubpages' => $viewData->includeSubpages,
             'hasSubpages' => $viewData->hasSubpages,
             'dataFreshness' => $viewData->dataFreshness,
+            'addAnnotationUrl' => $viewData->addAnnotationUrl,
             'annotations' => $this->annotationPayloadBuilder->build($viewData->annotations),
         ]);
 
