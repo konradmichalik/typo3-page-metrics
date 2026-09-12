@@ -100,6 +100,23 @@ final class BotAgentDetailCollectorTest extends FunctionalTestCase
         self::assertSame(1, $row['hits_suspicious']);
     }
 
+    public function testFlushSumsHitsAcrossDifferentUrlsResolvingToTheSamePage(): void
+    {
+        $date = new DateTimeImmutable('2026-10-10');
+        $this->subject->add($date, 'https://example.com/about', Bucket::AiCrawler, 'GPTBot', false);
+        $this->subject->add($date, 'https://example.com/about?utm_source=newsletter', Bucket::AiCrawler, 'GPTBot', true);
+
+        $this->subject->flush('main', true, []);
+
+        $rollup = $this->fetchRow('main', 0, 'ai_crawler', 'GPTBot');
+        self::assertSame(2, $rollup['hits']);
+        self::assertSame(1, $rollup['hits_suspicious']);
+
+        $pageScoped = $this->fetchRow('main', 2, 'ai_crawler', 'GPTBot');
+        self::assertSame(2, $pageScoped['hits']);
+        self::assertSame(1, $pageScoped['hits_suspicious']);
+    }
+
     public function testFlushClearsAccumulatedStateSoASecondFlushWithNoNewAddsWritesNothingNew(): void
     {
         $date = new DateTimeImmutable('2026-10-10');

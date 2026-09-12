@@ -99,6 +99,19 @@ class BotAgentDetailCollector
      */
     public function flush(string $siteIdentifier, bool $dropQueryString, array $keepQueryParams): void
     {
+        /**
+         * Re-aggregated by write identity, not by the raw URL `add()` keyed
+         * on: several source URLs (query variants, a redirect and its
+         * target) can resolve to the same page, and every row always
+         * contributes to the same site-wide page-zero rollup regardless of
+         * resolution - upsert() is replace-, not add-, semantics, so writing
+         * per raw-URL row would have later rows silently overwrite earlier
+         * ones instead of summing.
+         *
+         * @var array<string, array{pageUid: int, languageUid: int, bucket: Bucket, agent: string, date: DateTimeImmutable, hits: int, hitsSuspicious: int}>
+         */
+        $byWriteIdentity = [];
+
         foreach ($this->aggregated as $row) {
             $result = $this->resolver->resolve($row['url'], $dropQueryString, $keepQueryParams);
 
@@ -106,13 +119,43 @@ class BotAgentDetailCollector
                 continue;
             }
 
-            $this->repository->upsert($siteIdentifier, 0, 0, $row['bucket']->value, $row['agent'], $row['date'], $row['hits'], $row['hitsSuspicious']);
+            $byWriteIdentity = $this->foldIntoWriteIdentity($byWriteIdentity, 0, 0, $row);
 
             if ($result instanceof ResolvedUrl) {
-                $this->repository->upsert($siteIdentifier, $result->pageUid, $result->languageUid, $row['bucket']->value, $row['agent'], $row['date'], $row['hits'], $row['hitsSuspicious']);
+                $byWriteIdentity = $this->foldIntoWriteIdentity($byWriteIdentity, $result->pageUid, $result->languageUid, $row);
             }
         }
 
+        foreach ($byWriteIdentity as $row) {
+            $this->repository->upsert($siteIdentifier, $row['pageUid'], $row['languageUid'], $row['bucket']->value, $row['agent'], $row['date'], $row['hits'], $row['hitsSuspicious']);
+        }
+
         $this->aggregated = [];
+    }
+
+    /**
+     * @param array<string, array{pageUid: int, languageUid: int, bucket: Bucket, agent: string, date: DateTimeImmutable, hits: int, hitsSuspicious: int}> $byWriteIdentity
+     * @param array{date: DateTimeImmutable, url: string, bucket: Bucket, agent: string, hits: int, hitsSuspicious: int}                                   $row
+     *
+     * @return array<string, array{pageUid: int, languageUid: int, bucket: Bucket, agent: string, date: DateTimeImmutable, hits: int, hitsSuspicious: int}>
+     */
+    private function foldIntoWriteIdentity(array $byWriteIdentity, int $pageUid, int $languageUid, array $row): array
+    {
+        $key = implode('|', [$row['date']->format('Y-m-d'), $pageUid, $languageUid, $row['bucket']->value, $row['agent']]);
+
+        $entry = $byWriteIdentity[$key] ?? [
+            'pageUid' => $pageUid,
+            'languageUid' => $languageUid,
+            'bucket' => $row['bucket'],
+            'agent' => $row['agent'],
+            'date' => $row['date'],
+            'hits' => 0,
+            'hitsSuspicious' => 0,
+        ];
+
+        $entry['hits'] += $row['hits'];
+        $entry['hitsSuspicious'] += $row['hitsSuspicious'];
+
+        return [...$byWriteIdentity, $key => $entry];
     }
 }
