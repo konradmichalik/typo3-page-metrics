@@ -168,18 +168,19 @@
     color: var(--typo3-component-bg, #fff);
 }
 
-/* The data's own date, so a stalled scheduler is visible from the backend
-   instead of the tiles quietly repeating their last numbers forever. The
-   stale state is carried by an icon and its own wording as well as the
-   colour, never by the colour alone. Colours come from the TYPO3 tokens so
-   the dark scheme is handled by the backend, not by a second rule here. */
+/* The data's own date, as a mark rather than a line of text: on five
+   surfaces at once a standing footnote reads like a finding, and on a
+   healthy installation it says the same thing every day. The date is in the
+   title and in text that is present but not drawn; only the stale state
+   earns words, because at that point it has stopped being a footnote. */
 .pagemetrics-freshness {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 4px;
-    margin: 0;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     color: var(--typo3-text-color-variant, #6a7085);
+    /* There is an explanation behind it, so the pointer has to say so. */
+    cursor: help;
 }
 
 .pagemetrics-freshness-stale {
@@ -201,7 +202,7 @@
     margin: 0 3px;
 }
 
-/* In a widget the date belongs under the widget's own content, not wedged
+/* In a widget the mark belongs under the widget's own content, not wedged
    against it. */
 .pagemetrics-widget-site .pagemetrics-freshness,
 .pagemetrics-widget-chart + .pagemetrics-freshness {
@@ -935,8 +936,9 @@
 }
 
 /* Present for assistive technology and for a forced-colours mode, never
-   drawn: the arrow and the colour carry the movement visually and neither
-   survives either of those. */
+   drawn. Used wherever an icon carries the meaning visually: the trend
+   badge's arrow and colour, and the data-age mark, where a title attribute
+   is not an accessible name either. */
 .pagemetrics-visually-hidden {
     position: absolute;
     width: 1px;

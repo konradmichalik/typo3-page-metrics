@@ -44,13 +44,13 @@ The lowest value of the period is drawn clear of the bottom edge rather than on 
 
 ## Data age
 
-The toolbar above the tiles says which day the numbers are from, as "As of <date>". That day is the last one the import treats as complete, which is not today: a scheduled run may only catch part of today, so it always revisits it and marks the previous day instead. The tiles therefore trail the calendar by a day even when everything is working.
+The toolbar above the tiles marks which day the numbers are from with a small ⓘ, and hovering it names the date. It is a mark rather than a line of text: on a healthy installation it says the same thing every day, across five surfaces at once, and what it is there for is the day it stops doing that. That day is the last one the import treats as complete, which is not today: a scheduled run may only catch part of today, so it always revisits it and marks the previous day instead. The tiles therefore trail the calendar by a day even when everything is working.
 
 Where a site has more than one provider the earliest of their days is shown, because the row is only as current as its oldest number. A provider that has never run at all contributes no day, since its tiles are empty anyway and letting it decide would hide how fresh the working provider is.
 
 The date comes from the import's own resume cursor, which every run records, rather than from the window described under [Days without data](#days-without-data). That window can legitimately be unknown on a healthy installation, and saying nothing about the data's age is exactly the wrong answer to give about a scheduler that may have stopped.
 
-More than two days behind, the date is marked as stale with an icon and a note. At that point a scheduled import that simply has not run yet is no longer the likely explanation, and without this the backend would go on showing the last numbers it was given indefinitely, without ever saying they had stopped moving.
+More than two days behind, the mark changes to a clock and spells the warning out in words beside it. That is the point at which it stops being a footnote, so it stops behaving like one. At that point a scheduled import that simply has not run yet is no longer the likely explanation, and without this the backend would go on showing the last numbers it was given indefinitely, without ever saying they had stopped moving.
 
 This is also why the popover's first two figures are called "Last day" and "Previous day" rather than "Today" and "Yesterday": they are the last two days of the selected period, which is rarely today and yesterday.
 

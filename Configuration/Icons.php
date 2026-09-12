@@ -39,6 +39,10 @@ return [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-minus.svg',
     ],
+    'tabler-info-circle' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-info-circle.svg',
+    ],
     'tabler-clock' => [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-clock.svg',
