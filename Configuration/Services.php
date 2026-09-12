@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics;
 
-use KonradMichalik\Typo3PageMetrics\Service\{PageMetricsViewDataBuilder, SiteMetricsOverviewBuilder};
+use KonradMichalik\Typo3PageMetrics\Service\{PageMetricsViewDataBuilder, SiteMetricsOverviewBuilder, SparklineLabelProvider};
 use KonradMichalik\Typo3PageMetrics\Widgets\{AnnotationsWidget, NotFoundPagesWidget, PageMetricsChartWidget, PageMetricsWidget, TopPagesWidget, TrendWidget};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Reference};
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -53,6 +53,7 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
         ->arg('$viewDataBuilder', new Reference(PageMetricsViewDataBuilder::class))
         ->arg('$siteFinder', new Reference(SiteFinder::class))
         ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
+        ->arg('$labelProvider', new Reference(SparklineLabelProvider::class))
         ->tag('dashboard.widget', [
             'identifier' => 'pageMetrics',
             'groupNames' => 'pageMetrics',
@@ -69,6 +70,7 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
             ->arg('$overviewBuilder', new Reference(SiteMetricsOverviewBuilder::class))
             ->arg('$siteFinder', new Reference(SiteFinder::class))
             ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
+            ->arg('$labelProvider', new Reference(SparklineLabelProvider::class))
             ->tag('dashboard.widget', [
                 'identifier' => 'pageMetricsChart',
                 'groupNames' => 'pageMetrics',
@@ -84,6 +86,7 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
             ->arg('$overviewBuilder', new Reference(SiteMetricsOverviewBuilder::class))
             ->arg('$siteFinder', new Reference(SiteFinder::class))
             ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
+            ->arg('$labelProvider', new Reference(SparklineLabelProvider::class))
             ->tag('dashboard.widget', [
                 'identifier' => 'pageMetricsChartCompact',
                 'groupNames' => 'pageMetrics',

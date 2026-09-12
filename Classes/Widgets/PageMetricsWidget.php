@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\Annotation;
-use KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder;
+use KonradMichalik\Typo3PageMetrics\Service\{PageMetricsViewDataBuilder, SparklineLabelProvider};
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
@@ -44,6 +44,7 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
         private readonly PageMetricsViewDataBuilder $viewDataBuilder,
         private readonly SiteFinder $siteFinder,
         private readonly BackendViewFactory $backendViewFactory,
+        private readonly SparklineLabelProvider $labelProvider,
     ) {}
 
     public function setRequest(ServerRequestInterface $request): void
@@ -59,6 +60,7 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
         $view = $this->backendViewFactory->create($this->request, ['konradmichalik/typo3-page-metrics', 'typo3/cms-dashboard']);
         $view->assignMultiple([
             'sites' => $this->collectSiteTiles(),
+            'sparklineLabels' => $this->labelProvider->all(),
             'configuration' => $this->configuration,
         ]);
 

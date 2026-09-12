@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, SiteMetricsOverview};
-use KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder;
+use KonradMichalik\Typo3PageMetrics\Service\{SiteMetricsOverviewBuilder, SparklineLabelProvider};
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
@@ -53,6 +53,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
         private SiteMetricsOverviewBuilder $overviewBuilder,
         private SiteFinder $siteFinder,
         private BackendViewFactory $backendViewFactory,
+        private SparklineLabelProvider $labelProvider,
     ) {}
 
     /**
@@ -115,6 +116,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
         $view = $this->backendViewFactory->create($context->request, ['konradmichalik/typo3-page-metrics', 'typo3/cms-dashboard']);
         $view->assignMultiple([
             ...$this->buildViewVariables($overviews),
+            'sparklineLabels' => $this->labelProvider->all(),
             'configuration' => $this->configuration,
             'compact' => 'small' === $this->configuration->getHeight(),
         ]);

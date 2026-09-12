@@ -27,6 +27,36 @@
             <trans-unit id="dashboardPreset.description" resname="dashboardPreset.description">
                 <source>All page metrics widgets: tiles, chart, most viewed pages, trend, not found pages and annotations.</source>
             </trans-unit>
+            <trans-unit id="slider.previous" resname="slider.previous">
+                <source>Previous</source>
+            </trans-unit>
+            <trans-unit id="slider.next" resname="slider.next">
+                <source>Next</source>
+            </trans-unit>
+            <trans-unit id="slider.page" resname="slider.page">
+                <source>Page %1$s</source>
+            </trans-unit>
+            <trans-unit id="popover.today" resname="popover.today">
+                <source>Today</source>
+            </trans-unit>
+            <trans-unit id="popover.yesterday" resname="popover.yesterday">
+                <source>Yesterday</source>
+            </trans-unit>
+            <trans-unit id="popover.peak" resname="popover.peak">
+                <source>Peak</source>
+            </trans-unit>
+            <trans-unit id="popover.average" resname="popover.average">
+                <source>Average</source>
+            </trans-unit>
+            <trans-unit id="popover.viaRedirects" resname="popover.viaRedirects">
+                <source>Via redirects</source>
+            </trans-unit>
+            <trans-unit id="popover.noData" resname="popover.noData">
+                <source>No data</source>
+            </trans-unit>
+            <trans-unit id="popover.externalLink" resname="popover.externalLink">
+                <source>Open in analytics tool</source>
+            </trans-unit>
             <trans-unit id="trend.new" resname="trend.new">
                 <source>new</source>
             </trans-unit>

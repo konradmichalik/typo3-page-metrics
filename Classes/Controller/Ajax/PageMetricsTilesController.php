@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Controller\Ajax;
 
-use KonradMichalik\Typo3PageMetrics\Service\{PageMetricsAccessChecker, PageMetricsViewDataBuilder};
+use KonradMichalik\Typo3PageMetrics\Service\{PageMetricsAccessChecker, PageMetricsViewDataBuilder, SparklineLabelProvider};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Http\HtmlResponse;
@@ -35,6 +35,7 @@ final readonly class PageMetricsTilesController
         private PageMetricsViewDataBuilder $viewDataBuilder,
         private BackendViewFactory $backendViewFactory,
         private PageMetricsAccessChecker $accessChecker,
+        private SparklineLabelProvider $labelProvider,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
@@ -59,6 +60,7 @@ final readonly class PageMetricsTilesController
 
         $view = $this->backendViewFactory->create($request, ['konradmichalik/typo3-page-metrics']);
         $view->assignMultiple([
+            'sparklineLabels' => $this->labelProvider->all(),
             'pageId' => $viewData->pageId,
             'tiles' => $viewData->tiles,
             'unresolvedCount' => $viewData->unresolvedCount,

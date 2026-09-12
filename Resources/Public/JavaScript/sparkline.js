@@ -7,9 +7,41 @@ const SPARKLINE_HEIGHT = 52;
 const SPARKLINE_WIDTH = 29 * 4;
 const openTiles = new Set();
 
-// Hard-coded like every other string in this file; they move to the XLF
-// together, see the popover-strings issue.
-const NO_DATA_LABEL = 'No data';
+// Every user-facing string this file renders, aria-labels included, comes
+// from the XLF, handed over as one
+// data-labels attribute on the container the server already renders. A
+// second request just to fetch a handful of labels would be worse, and
+// hard-coding them here is what this replaced: they stayed English whatever
+// the backend language was, and the external link claimed "Matomo" even when
+// the tile came from GA4 or an access log.
+//
+// The fallbacks are not a translation, they are what keeps a sparkline
+// readable if the attribute is ever missing or malformed.
+const FALLBACK_LABELS = {
+  today: 'Today',
+  yesterday: 'Yesterday',
+  peak: 'Peak',
+  average: 'Average',
+  viaRedirects: 'Via redirects',
+  noData: 'No data',
+  externalLink: 'Open in analytics tool',
+  sliderPrevious: 'Previous',
+  sliderNext: 'Next',
+  sliderPage: 'Page %1$s',
+};
+
+function getLabels(element) {
+  const container = element.closest('[data-labels]');
+  if (!container) {
+    return FALLBACK_LABELS;
+  }
+
+  try {
+    return { ...FALLBACK_LABELS, ...JSON.parse(container.dataset.labels || '{}') };
+  } catch {
+    return FALLBACK_LABELS;
+  }
+}
 
 const CHEVRON_LEFT_PATH = 'M15 6l-6 6l6 6';
 const CHEVRON_RIGHT_PATH = 'M9 6l6 6l-6 6';
@@ -113,6 +145,7 @@ class PageMetricsTile {
   constructor(element) {
     this.element = element;
     this.data = JSON.parse(element.dataset.sparkline || '{}');
+    this.labels = getLabels(element);
     this.popover = null;
     element.addEventListener('click', (event) => {
       if (this.popover && this.popover.contains(event.target)) {
@@ -244,7 +277,7 @@ class PageMetricsTile {
       marker.hidden = point === null;
 
       const annotationText = annotationTextByDate.get(date);
-      tooltipValue.textContent = `${date}: ${value === null ? NO_DATA_LABEL : formatValueForUnit(value, this.element.dataset.unit)}`;
+      tooltipValue.textContent = `${date}: ${value === null ? this.labels.noData : formatValueForUnit(value, this.element.dataset.unit)}`;
       tooltipAnnotation.textContent = annotationText ?? '';
       tooltipAnnotation.hidden = !annotationText;
       tooltip.hidden = false;
@@ -332,8 +365,8 @@ class PageMetricsTile {
       externalLink.href = this.element.dataset.externalLink;
       externalLink.target = '_blank';
       externalLink.rel = 'noopener noreferrer';
-      externalLink.title = 'Open in Matomo';
-      externalLink.setAttribute('aria-label', 'Open in Matomo');
+      externalLink.title = this.labels.externalLink;
+      externalLink.setAttribute('aria-label', this.labels.externalLink);
       externalLink.innerHTML =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
         '<path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" />' +
@@ -350,24 +383,48 @@ class PageMetricsTile {
       this.popover.appendChild(description);
     }
 
-    const stat = (label, value) =>
-      `<div class="pagemetrics-popover-stat"><span class="pagemetrics-popover-stat-label">${label}</span><span class="pagemetrics-popover-stat-value">${value === null ? NO_DATA_LABEL : value}</span></div>`;
+    // Built as nodes rather than an innerHTML string: the labels come from
+    // the XLF now, which a language pack or a locallangXMLOverride can
+    // replace, and that must not be able to inject markup here.
+    const stat = (label, value) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'pagemetrics-popover-stat';
+
+      const labelElement = document.createElement('span');
+      labelElement.className = 'pagemetrics-popover-stat-label';
+      labelElement.textContent = label;
+
+      const valueElement = document.createElement('span');
+      valueElement.className = 'pagemetrics-popover-stat-value';
+      valueElement.textContent = value === null ? this.labels.noData : value;
+
+      wrapper.appendChild(labelElement);
+      wrapper.appendChild(valueElement);
+
+      return wrapper;
+    };
 
     const formatted = (value) => (value === null ? null : formatValueForUnit(value, unit));
 
     const stats = document.createElement('div');
     stats.className = 'pagemetrics-popover-stats';
-    stats.innerHTML =
-      stat('Today', formatted(today)) +
-      stat('Yesterday', formatted(yesterday)) +
-      stat('Peak', formatted(peak)) +
+    const statNodes = [
+      stat(this.labels.today, formatted(today)),
+      stat(this.labels.yesterday, formatted(yesterday)),
+      stat(this.labels.peak, formatted(peak)),
       // For a rate tile this is the simple mean of the daily rates, which
       // can differ from the tile's own headline value (a weighted average:
       // sum of numerator / sum of denominator over the period) on a page
       // with uneven day-to-day traffic - that divergence is itself useful
       // information, not redundant with the headline number.
-      stat('Average', formatted(average)) +
-      (redirectShare > 0 ? stat('Via redirects', `${redirectShare}%`) : '');
+      stat(this.labels.average, formatted(average)),
+    ];
+
+    if (redirectShare > 0) {
+      statNodes.push(stat(this.labels.viaRedirects, `${redirectShare}%`));
+    }
+
+    statNodes.forEach((node) => stats.appendChild(node));
     this.popover.appendChild(stats);
 
     const sparkline = this.buildSparklineSvg();
@@ -400,6 +457,8 @@ function initializeSlider(container) {
     return;
   }
 
+  const labels = getLabels(tiles);
+
   const track = document.createElement('div');
   track.className = 'pagemetrics-slider';
   tiles.parentNode.insertBefore(track, tiles);
@@ -407,7 +466,7 @@ function initializeSlider(container) {
   const prevButton = document.createElement('button');
   prevButton.type = 'button';
   prevButton.className = 'pagemetrics-slider-arrow pagemetrics-slider-arrow-prev';
-  prevButton.setAttribute('aria-label', 'Previous');
+  prevButton.setAttribute('aria-label', labels.sliderPrevious);
   prevButton.innerHTML = chevronSvg(CHEVRON_LEFT_PATH);
   track.appendChild(prevButton);
   track.appendChild(tiles);
@@ -415,7 +474,7 @@ function initializeSlider(container) {
   const nextButton = document.createElement('button');
   nextButton.type = 'button';
   nextButton.className = 'pagemetrics-slider-arrow pagemetrics-slider-arrow-next';
-  nextButton.setAttribute('aria-label', 'Next');
+  nextButton.setAttribute('aria-label', labels.sliderNext);
   nextButton.innerHTML = chevronSvg(CHEVRON_RIGHT_PATH);
   track.appendChild(nextButton);
 
@@ -491,7 +550,7 @@ function initializeSlider(container) {
       const dot = document.createElement('button');
       dot.type = 'button';
       dot.className = 'pagemetrics-slider-dot';
-      dot.setAttribute('aria-label', `Page ${page + 1}`);
+      dot.setAttribute('aria-label', labels.sliderPage.replace('%1$s', String(page + 1)));
       dot.addEventListener('click', () => {
         tiles.scrollTo({ left: maxScrollLeft * (page / (pageCount - 1)), behavior: 'smooth' });
       });
@@ -891,7 +950,7 @@ function buildTooltip(plotted) {
 // Wires up hover interactivity: on mousemove, positions every series'
 // marker and fills in the shared tooltip for whichever date the cursor is
 // nearest to; on mouseleave, hides all of it again.
-function attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotationTextByDate, dates, step, width }) {
+function attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotationTextByDate, dates, step, width, labels }) {
   const { tooltip, heading, values: tooltipValues, annotation: tooltipAnnotation } = tooltipParts;
   const isMultiSeries = plotted.length > 1;
 
@@ -914,7 +973,7 @@ function attachChartInteractivity({ svg, container, plotted, markers, tooltipPar
 
       const value = series.values[index];
       const tooltipPrefix = isMultiSeries ? series.label : date;
-      tooltipValues[seriesIndex].textContent = `${tooltipPrefix}: ${value === null ? NO_DATA_LABEL : formatValueForUnit(value, series.unit)}`;
+      tooltipValues[seriesIndex].textContent = `${tooltipPrefix}: ${value === null ? labels.noData : formatValueForUnit(value, series.unit)}`;
 
       if (0 === seriesIndex && point !== null) {
         centerY = markerCenterY;
@@ -1015,7 +1074,7 @@ function initializeStaticCharts(root) {
 
     const markers = buildSeriesMarkers(plotted);
     const tooltipParts = buildTooltip(plotted);
-    attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotationTextByDate, dates, step, width });
+    attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotationTextByDate, dates, step, width, labels: getLabels(container) });
 
     const wrapper = document.createElement('div');
     wrapper.className = 'pagemetrics-sparkline-wrapper';

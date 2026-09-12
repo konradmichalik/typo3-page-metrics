@@ -42,6 +42,20 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
     }
 
+    public function testHandsTheSparklineLabelsToTheClientInsteadOfHardCodingThemInJavaScript(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 7);
+
+        $body = (string) $this->dispatch(['id' => '2', 'period' => '30'])->getBody();
+
+        self::assertStringContainsString('data-labels=', $body);
+        // The link label no longer names a provider the tile may not come
+        // from: this same markup is rendered for GA4 and access-log tiles.
+        self::assertStringContainsString('Open in analytics tool', $body);
+        self::assertStringNotContainsString('Open in Matomo', $body);
+    }
+
     public function testRendersEmptyResponseWhenNoPageIsSelected(): void
     {
         $response = $this->dispatch(['id' => '0']);

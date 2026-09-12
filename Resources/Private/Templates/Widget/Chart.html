@@ -15,6 +15,7 @@
                         </f:if>
                         <div
                             class="pagemetrics-widget-chart"
+                            data-labels="{f:format.json(value: sparklineLabels)}"
                             data-unit="{overview.chartUnit.value}"
                             data-sparkline="{f:format.json(value: overview.series)}"
                             data-annotations="{f:format.json(value: overview.annotations)}"
