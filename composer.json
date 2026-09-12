@@ -29,6 +29,7 @@
 	},
 	"require-dev": {
 		"ext-openssl": "*",
+		"composer/class-map-generator": "^1.7",
 		"eliashaeussler/version-bumper": "^4.0.4",
 		"guzzlehttp/psr7": "^2.0",
 		"konradmichalik/ttt": "^0.4.0",
