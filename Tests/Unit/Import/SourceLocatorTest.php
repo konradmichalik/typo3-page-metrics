@@ -17,6 +17,9 @@ use KonradMichalik\Typo3PageMetrics\Import\SourceLocator;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 
+use function bin2hex;
+use function random_bytes;
+
 /**
  * SourceLocatorTest.
  *
@@ -32,7 +35,7 @@ final class SourceLocatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir().'/pagemetrics-sourcelocator-'.uniqid();
+        $this->tmpDir = sys_get_temp_dir().'/pagemetrics-sourcelocator-'.bin2hex(random_bytes(8));
         mkdir($this->tmpDir);
         mkdir($this->tmpDir.'/subdir');
         $this->locator = new SourceLocator();

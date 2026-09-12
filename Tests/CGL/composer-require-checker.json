@@ -1,0 +1,26 @@
+{
+	"symbol-whitelist": [
+		"null", "true", "false",
+		"static", "self", "parent",
+		"array", "string", "int", "float", "bool", "iterable", "callable", "void", "object",
+
+		"TYPO3\\CMS\\Dashboard\\Widgets\\AdditionalCssInterface",
+		"TYPO3\\CMS\\Dashboard\\Widgets\\JavaScriptInterface",
+		"TYPO3\\CMS\\Dashboard\\Widgets\\RequestAwareWidgetInterface",
+		"TYPO3\\CMS\\Dashboard\\Widgets\\WidgetConfigurationInterface",
+		"TYPO3\\CMS\\Dashboard\\Widgets\\WidgetContext",
+		"TYPO3\\CMS\\Dashboard\\Widgets\\WidgetInterface",
+		"TYPO3\\CMS\\Dashboard\\Widgets\\WidgetRendererInterface",
+		"TYPO3\\CMS\\Dashboard\\Widgets\\WidgetResult"
+	],
+	"php-core-extensions": [
+		"Core",
+		"date",
+		"pcre",
+		"Phar",
+		"Reflection",
+		"SPL",
+		"standard"
+	],
+	"scan-files": []
+}

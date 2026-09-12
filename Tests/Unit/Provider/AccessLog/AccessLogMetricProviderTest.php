@@ -77,8 +77,6 @@ final class AccessLogMetricProviderTest extends TestCase
                 unlink($file);
             }
         }
-
-        parent::tearDown();
     }
 
     public function testGetIdentifierReturnsAccesslog(): void

@@ -1,0 +1,66 @@
+name: CGL
+
+on:
+  push:
+    branches:
+      - '**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cgl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `cgl lint:editorconfig` runs `ec --git-only` and needs the full history.
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: intl, mbstring, json, zip
+          tools: composer:v2, composer-require-checker, composer-unused, cs2pr
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate
+
+      # `composer install` triggers post-install-cmd, which installs Tests/CGL.
+      - name: Install dependencies
+        run: composer install --no-progress --no-interaction
+
+      # A repo-owned config, not the tool's bare default: typo3/cms-dashboard is
+      # a suggested (not required) dependency - Classes/Widgets/ only loads its
+      # interfaces when EXT:dashboard is actually installed, see
+      # Configuration/Services.yaml. The default whitelist knows nothing about
+      # that pattern and would otherwise flag every Dashboard\Widgets symbol.
+      - name: Check dependencies
+        run: composer-require-checker check --config-file=Tests/CGL/composer-require-checker.json composer.json
+
+      - name: Check for unused dependencies
+        run: composer-unused
+
+      - name: Lint composer.json
+        run: composer cgl lint:composer
+
+      - name: Lint Editorconfig
+        run: composer cgl lint:editorconfig
+
+      - name: Lint PHP
+        run: composer cgl lint:php -- --format checkstyle | cs2pr
+
+      - name: SCA PHP
+        run: composer cgl sca:php -- --error-format github
+
+      - name: Dependency analysis
+        run: composer cgl analyze:dependencies
+
+      - name: Run Rector migration
+        run: composer cgl migration:rector -- --dry-run

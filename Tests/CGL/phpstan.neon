@@ -17,3 +17,6 @@ parameters:
 	typo3:
 		requestGetAttributeMapping:
 			id: 'string'
+
+	type_coverage:
+		constant: 0 # TODO: Remove when PHP 8.3 is minimum requirement

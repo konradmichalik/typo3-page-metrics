@@ -37,3 +37,26 @@ parameters:
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
 			count: 1
 			path: ../../Classes/Domain/ValueObject/UrlMetric.php
+		-
+			# LogLine has 10 same-shaped scalar/nullable-scalar parameters
+			# (ip, method, target, protocol, status, bytesSent, referer,
+			# userAgent, host, ...). Positional construction in tests would be
+			# exactly the kind of adjacent-parameter transposition named
+			# arguments exist to prevent - each fixture only overrides the one
+			# or two fields the test cares about. Accepted as safer than the
+			# rule it violates.
+			identifier: ergebnis.noNamedArgument
+			count: 10
+			path: ../../Tests/Unit/Analysis/Aggregate/AggregatorTest.php
+		-
+			identifier: ergebnis.noNamedArgument
+			count: 10
+			path: ../../Tests/Unit/Analysis/Guard/PathHeuristicGuardTest.php
+		-
+			identifier: ergebnis.noNamedArgument
+			count: 20
+			path: ../../Tests/Unit/Analysis/Parser/LogLineTest.php
+		-
+			identifier: ergebnis.noNamedArgument
+			count: 10
+			path: ../../Tests/Unit/Analysis/Taxonomy/BotTaxonomyTest.php
