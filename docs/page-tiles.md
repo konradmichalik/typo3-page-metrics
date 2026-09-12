@@ -30,9 +30,15 @@ Clicking (or focusing, via keyboard) a tile opens a popover with a
 day-by-day sparkline for that metric over the selected period. Dashed
 vertical markers on the sparkline mark any [annotation](#annotations) that
 falls in the shown range, and an annotation covering several days is drawn
-as a faint band across them rather than as a tick on the day it started.
-Hovering or focusing a marked date shows the kind of event and its text in
-the tooltip alongside that day's value.
+as a strip along the bottom of the chart spanning them, rather than as a
+tick on the day it started. Along the bottom rather than across the plot:
+the strip says which days without ever sitting between the reader and the
+curve. Both take the chart's own colour here, since this popover carries no
+legend for a category colour to be looked up in, and the kind of event is
+named in words in the tooltip anyway. The
+[dashboard chart](dashboard-widgets.md) keeps the category colours, because
+it does have a legend. Hovering or focusing a marked date shows the kind of
+event and its text in the tooltip alongside that day's value.
 
 ![Sparkline popover for the Visits tile, showing last day/previous day/peak/average and a dated tooltip](img/page-tiles-sparkline-popover.png)
 
@@ -204,10 +210,10 @@ categories existed.
 
 Leave **Last day** empty for an event that happened on one day and it is
 drawn as a tick. Set it for one that ran for a while, a campaign or a
-freeze, and the chart draws a band across those days instead. A band that
-started before the shown period, or has not ended within it, is still drawn:
-it is clamped to the edge of the chart rather than dropped, because it is
-still explaining the days on screen.
+freeze, and the chart draws a strip along its bottom edge spanning those
+days instead. A strip that started before the shown period, or has not
+ended within it, is still drawn: it is clamped to the edge of the chart
+rather than dropped, because it is still explaining the days on screen.
 
 ### Page scope
 

@@ -7,6 +7,12 @@ const SPARKLINE_HEIGHT = 52;
 // smallest number in the period.
 const PLOT_INSET_TOP = 3;
 const PLOT_INSET_BOTTOM = 9;
+
+// The period strip's thickness, in the same user units as the plot, so it
+// keeps its proportion whether it is drawn in a 52px popover sparkline or a
+// 260px dashboard chart. The curve's lowest point sits PLOT_INSET_BOTTOM
+// above the floor, so the strip never runs underneath it.
+const ANNOTATION_BAND_HEIGHT = 3;
 // Fixed total width regardless of how many days are plotted (7/30/90, per
 // the period selector): points get closer together for a longer period
 // rather than the popover growing wider. 29 * 4px matches the previous
@@ -400,9 +406,14 @@ function appendAnnotationMarker(svg, annotation, dates, step) {
     const lastIndex = untilIndex === -1 ? dates.length - 1 : untilIndex;
     const band = document.createElementNS(SVG_NS, 'rect');
     band.setAttribute('x', fromIndex * step);
-    band.setAttribute('y', '0');
+    // A strip along the floor, not a wash over the whole plot. Full height
+    // put a pale rectangle between the reader and the curve across a third
+    // of the chart, and the curve is what the chart is for. On the floor it
+    // still says "these days" without ever covering a value, which is how a
+    // Gantt row or a timeline band reads anyway.
+    band.setAttribute('y', String(SPARKLINE_HEIGHT - ANNOTATION_BAND_HEIGHT));
     band.setAttribute('width', Math.max((lastIndex - fromIndex) * step, 1));
-    band.setAttribute('height', String(SPARKLINE_HEIGHT));
+    band.setAttribute('height', String(ANNOTATION_BAND_HEIGHT));
     band.setAttribute('class', `pagemetrics-sparkline-annotation-band pagemetrics-annotation-${category}`);
     svg.appendChild(band);
 

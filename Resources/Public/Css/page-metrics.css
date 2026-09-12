@@ -600,6 +600,23 @@
     fill-opacity: 0.12;
 }
 
+/* In the page module's popover the markers take the chart's own colour
+   instead of the category's. There is no legend there, so a category colour
+   answers a question nobody can ask, and a purple strip under a blue curve
+   reads as a mistake rather than as a meaning. The kind of event is still
+   named in words in the tooltip, which is where it was already carried for
+   exactly this reason.
+
+   The dashboard chart keeps the category colours: it has a legend keyed to
+   them, so there the colour is answerable. */
+.pagemetrics-popover .pagemetrics-sparkline-annotation-band {
+    fill: currentColor;
+}
+
+.pagemetrics-popover .pagemetrics-sparkline-annotation {
+    stroke: currentColor;
+}
+
 /* The legend under a chart, naming the kinds actually present rather than
    every kind that exists: a key to seven colours when two are drawn is
    noise. */
