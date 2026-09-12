@@ -119,6 +119,13 @@ services:
     KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsTilesController:
         public: true
 
+    # Public so a functional test can assert the key list against the XLF
+    # directly. That seam fails silently otherwise: an unresolvable key is
+    # dropped on purpose and the client falls back to English, so a typo would
+    # only ever show up as an untranslated label on a translated backend.
+    KonradMichalik\Typo3PageMetrics\Service\SparklineLabelProvider:
+        public: true
+
     KonradMichalik\Typo3PageMetrics\Provider\Matomo\MatomoMetricProvider:
         tags:
             - name: page_metrics.metric_provider

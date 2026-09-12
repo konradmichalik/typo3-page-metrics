@@ -31,6 +31,16 @@ Every widget that shows imported numbers (tiles, chart, most viewed pages, trend
 
 Unlike the page module, a dashboard widget covers one site per row, so its date is that site's own provider's and never a compromise between several.
 
+## Reading the chart
+
+Each chart scales to its own data, so the shape of the curve says nothing about how big the numbers behind it are. The preset makes that concrete by putting two compact charts side by side: without a scale, a few dozen visits and a few thousand draw the same picture.
+
+The chart therefore labels the top and bottom of its plot area, formatted for the metric's unit, and the first and last day underneath. The two numbers are the bounds the curve is actually drawn against, which is what makes the height in between readable.
+
+Those bounds come from the 5th and 95th percentile rather than the plain extremes, so one freak day cannot flatten every ordinary one into a sliver. Days outside that band are drawn clamped to the edge they exceed, and the label there is prefixed with ≥ or ≤ to say it states a bound rather than a value. Without that a day at 120 and a day at 3000 would sit on the same edge under a number belonging to neither.
+
+Overlaying a second metric drops the value labels. Each series then has its own scale, so any single pair of numbers in the corner would belong to one of them and misdescribe the other. The legend tells the series apart instead, and the dates stay.
+
 ## Chart and trend metric selection
 
 The chart and trend widgets' **Metric** setting both default to each

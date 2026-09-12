@@ -42,6 +42,12 @@
             <trans-unit id="slider.page" resname="slider.page">
                 <source>Page %1$s</source>
             </trans-unit>
+            <trans-unit id="chart.summary" resname="chart.summary">
+                <source>Chart from %1$s to %2$s, values from %3$s to %4$s</source>
+            </trans-unit>
+            <trans-unit id="chart.summaryDates" resname="chart.summaryDates">
+                <source>Chart from %1$s to %2$s</source>
+            </trans-unit>
             <trans-unit id="popover.lastDay" resname="popover.lastDay">
                 <source>Last day</source>
             </trans-unit>

@@ -34,6 +34,10 @@ text in the tooltip alongside that day's value.
 
 ![Sparkline popover for the Visits tile, showing last day/previous day/peak/average and a dated tooltip](img/page-tiles-sparkline-popover.png)
 
+The sparkline is framed by its own axis: the bottom edge is zero and the top edge is the period's peak, which the stats row above already names. The first and last day of the period sit above it, so the chart closes the popover at its own bottom edge.
+
+No value labels are drawn on the popover's own chart. Peak and average are one line above it, and repeating the peak inside a 52 pixel tall chart would cost more room than it returns. The [dashboard chart](dashboard-widgets.md#reading-the-chart), which has no such stats beside it, does label its axis.
+
 ## Data age
 
 The toolbar above the tiles says which day the numbers are from, as "As of <date>". That day is the last one the import treats as complete, which is not today: a scheduled run may only catch part of today, so it always revisits it and marks the previous day instead. The tiles therefore trail the calendar by a day even when everything is working.

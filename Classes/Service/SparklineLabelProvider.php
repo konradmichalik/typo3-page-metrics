@@ -52,6 +52,8 @@ final readonly class SparklineLabelProvider
             'slider.previous' => 'sliderPrevious',
             'slider.next' => 'sliderNext',
             'slider.page' => 'sliderPage',
+            'chart.summary' => 'chartSummary',
+            'chart.summaryDates' => 'chartSummaryDates',
         ];
 
         $labels = [];

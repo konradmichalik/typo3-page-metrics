@@ -28,6 +28,8 @@ const FALLBACK_LABELS = {
   sliderPrevious: 'Previous',
   sliderNext: 'Next',
   sliderPage: 'Page %1$s',
+  chartSummary: 'Chart from %1$s to %2$s, values from %3$s to %4$s',
+  chartSummaryDates: 'Chart from %1$s to %2$s',
 };
 
 function getLabels(element) {
@@ -139,6 +141,91 @@ function formatValueForUnit(value, unit) {
     return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
   }
   return String(value);
+}
+
+// The lowest and highest value actually plotted, or null when the series has
+// nothing in it at all. Gaps are excluded rather than counted as zero: a day
+// with no data would otherwise pull the reported minimum to 0 and describe a
+// scale the line never touches.
+function boundsOf(values) {
+  const present = values.filter((value) => value !== null);
+
+  return present.length > 0 ? [Math.min(...present), Math.max(...present)] : null;
+}
+
+// The two numbers at the top and bottom of the plot area.
+//
+// They are the bounds the geometry actually maps against, not the series' own
+// minimum and maximum. computePlottedSeries() plots against the percentile
+// band from scaleBounds(), so a label carrying the raw extremes would invite
+// a linear reading that is wrong exactly when the band was needed: with 29
+// ordinary days around 100 and one spike at 3000, the band is roughly
+// [82, 108] and an ordinary day sits at 71% of the height. Under a "3000" top
+// label that day reads as about 2100.
+//
+// Values outside the band are clamped onto the edge they exceed, so the label
+// there states a bound rather than a value. The comparison sign says so, and
+// without it the two clamped days at 120 and at 3000 would look identical
+// under a number that belongs to neither.
+//
+// Hidden from assistive technology because the wrapper's own aria-label says
+// the same thing in a sentence; two bare numbers would only repeat it without
+// the context that makes them mean anything.
+function buildValueAxis(series, unit) {
+  const axis = document.createElement('div');
+  axis.className = 'pagemetrics-sparkline-axis';
+  axis.setAttribute('aria-hidden', 'true');
+
+  const [seriesLow, seriesHigh] = series.bounds;
+  const edges = [
+    [series.scaleHigh, seriesHigh > series.scaleHigh ? '\u2265\u202f' : ''],
+    [series.scaleLow, seriesLow < series.scaleLow ? '\u2264\u202f' : ''],
+  ];
+
+  edges.forEach(([value, sign]) => {
+    const label = document.createElement('span');
+    label.className = 'pagemetrics-sparkline-axis-value';
+    label.textContent = sign + formatValueForUnit(Math.round(value), unit);
+    axis.appendChild(label);
+  });
+
+  return axis;
+}
+
+// First and last day under the chart. Without them the curve says how the
+// numbers moved but not over what, and the period selector sits far enough
+// away (above the tiles, or in the widget's settings) to be no answer.
+function buildDateAxis(dates) {
+  const axis = document.createElement('div');
+  axis.className = 'pagemetrics-sparkline-dates';
+  axis.setAttribute('aria-hidden', 'true');
+
+  const shown = dates.length > 1 ? [dates[0], dates[dates.length - 1]] : [dates[0]];
+
+  shown.forEach((date) => {
+    const label = document.createElement('span');
+    label.textContent = date;
+    axis.appendChild(label);
+  });
+
+  return axis;
+}
+
+// The chart's textual equivalent. An SVG of clamped polylines conveys nothing
+// at all without sight, and the axis labels are bare numbers in the corners -
+// this is the one place the range gets stated as a sentence.
+function buildChartSummary(labels, dates, bounds, unit) {
+  const summary = (null !== bounds ? labels.chartSummary : labels.chartSummaryDates)
+    .replace('%1$s', dates[0])
+    .replace('%2$s', dates[dates.length - 1]);
+
+  if (null === bounds) {
+    return summary;
+  }
+
+  return summary
+    .replace('%3$s', formatValueForUnit(bounds[0], unit))
+    .replace('%4$s', formatValueForUnit(bounds[1], unit));
 }
 
 class PageMetricsTile {
@@ -298,7 +385,10 @@ class PageMetricsTile {
       // which reads as the tooltip flickering between above/below on every
       // move instead of settling.
       tooltip.classList.remove('pagemetrics-sparkline-tooltip-above');
-      const overflowsBelow = tooltip.getBoundingClientRect().bottom > this.popover.getBoundingClientRect().bottom;
+      // Measured against the plot area rather than the popover: the popover
+      // has content below the chart, so comparing against its bottom would
+      // let the tooltip spill over that content instead of flipping.
+      const overflowsBelow = tooltip.getBoundingClientRect().bottom > svg.getBoundingClientRect().bottom;
       tooltip.classList.toggle('pagemetrics-sparkline-tooltip-above', overflowsBelow);
 
       const halfTooltipWidth = tooltip.offsetWidth / 2;
@@ -313,6 +403,11 @@ class PageMetricsTile {
 
     const wrapper = document.createElement('div');
     wrapper.className = 'pagemetrics-sparkline-wrapper';
+    // Only the period is stated here, not the value range: the stats row
+    // directly above already gives the peak and the average, and the axis is
+    // [0, peak], so repeating it would add nothing.
+    wrapper.setAttribute('role', 'img');
+    wrapper.setAttribute('aria-label', buildChartSummary(this.labels, entries.map(([date]) => date), null, this.element.dataset.unit));
     wrapper.appendChild(svg);
     wrapper.appendChild(marker);
     wrapper.appendChild(tooltip);
@@ -435,6 +530,16 @@ class PageMetricsTile {
 
     const sparkline = this.buildSparklineSvg();
     if (sparkline) {
+      // The dates go above the chart, not below it, so the chart closes the
+      // popover flush at its bottom edge. They are a caption here rather
+      // than a tick axis, and they line up with the heading, description and
+      // stats column above them instead of with the full-bleed plot area.
+      //
+      // A sibling of the wrapper either way: the wrapper is the positioning
+      // context for the marker, the tooltip and the value axis, all of which
+      // span it edge to edge, so anything in its normal flow other than the
+      // SVG itself would move those off the plot area.
+      this.popover.appendChild(buildDateAxis(Object.keys(this.data)));
       this.popover.appendChild(sparkline);
     }
 
@@ -847,6 +952,7 @@ function computePlottedSeries(seriesList, dates, step) {
     const values = dates.map((date) => series.values[date] ?? null);
     const [low, high] = scaleBounds(values.filter((value) => value !== null));
     const range = high - low || 1;
+    const bounds = boundsOf(values);
     const points = values.map((value, index) => {
       if (value === null) {
         return null;
@@ -854,7 +960,7 @@ function computePlottedSeries(seriesList, dates, step) {
       const fraction = Math.min(1, Math.max(0, (value - low) / range));
       return [index * step, SPARKLINE_HEIGHT - fraction * SPARKLINE_HEIGHT];
     });
-    return { ...series, values, points };
+    return { ...series, values, points, scaleLow: low, scaleHigh: high, bounds };
   });
 }
 
@@ -1080,13 +1186,26 @@ function initializeStaticCharts(root) {
 
     const markers = buildSeriesMarkers(plotted);
     const tooltipParts = buildTooltip(plotted);
-    attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotationTextByDate, dates, step, width, labels: getLabels(container) });
+    const labels = getLabels(container);
+    attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotationTextByDate, dates, step, width, labels });
+
+    // Overlaid series each get their own scale (see computePlottedSeries),
+    // so there is no one axis to label - two numbers in the corners would
+    // belong to whichever series happened to be first and silently misread
+    // the others. The legend tells them apart instead.
+    const bounds = plotted.length > 1 ? null : boundsOf(plotted[0].values);
 
     const wrapper = document.createElement('div');
     wrapper.className = 'pagemetrics-sparkline-wrapper';
+    wrapper.setAttribute('role', 'img');
+    wrapper.setAttribute('aria-label', buildChartSummary(labels, dates, bounds, plotted[0].unit));
     wrapper.appendChild(svg);
     markers.forEach((marker) => wrapper.appendChild(marker));
     wrapper.appendChild(tooltipParts.tooltip);
+
+    if (null !== bounds) {
+      wrapper.appendChild(buildValueAxis(plotted[0], plotted[0].unit));
+    }
 
     const legend = buildLegend(plotted);
     if (legend) {
@@ -1094,6 +1213,7 @@ function initializeStaticCharts(root) {
     }
 
     container.appendChild(wrapper);
+    container.appendChild(buildDateAxis(dates));
   });
 }
 
