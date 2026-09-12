@@ -12,6 +12,13 @@
 -- fixture never goes stale. ON DUPLICATE KEY UPDATE makes re-import
 -- idempotent, matching AnnotationRepository/DailyMetricsRepository's own
 -- upsert() semantics.
+--
+-- It also seeds sys_history and, where EXT:redirects is installed,
+-- sys_redirect. Those are not metrics: they are what the `typo3` annotation
+-- provider derives its markers from, so the demo shows the derivation rather
+-- than only its result. The derived markers are written here as well, under
+-- the ids that provider generates, so a `page-metrics:import` run updates
+-- them instead of adding a second set.
 
 -- 60 days x 5 pages (Home=1, About=2, Services=3, Blog=4, Contact=5) x 5
 -- Matomo metrics - covers every page in page_metrics_demo.xml's tree, so the
@@ -129,13 +136,88 @@ VALUES
     ('matomo', 'main', DATE_SUB(CURDATE(), INTERVAL 59 DAY), CURDATE(), DATE_SUB(CURDATE(), INTERVAL 1 DAY), UNIX_TIMESTAMP())
 ON DUPLICATE KEY UPDATE covered_from_date = VALUES(covered_from_date), covered_until_date = VALUES(covered_until_date), last_imported_date = VALUES(last_imported_date), tstamp = VALUES(tstamp);
 
--- Two sample annotations (release/campaign markers) within the 30-day
--- window above, so the sparkline markers have something to render.
-INSERT INTO tx_typo3pagemetrics_annotation (date, site_identifier, provider, annotation_id, text)
+-- Authored markers within the 30-day window above, so the sparkline markers
+-- have something to render. One of each shape the chart can draw: a tick on a
+-- single day, a band across the days a campaign ran, and a marker scoped to
+-- one page rather than to the whole site.
+INSERT INTO tx_typo3pagemetrics_annotation (date, date_until, site_identifier, provider, annotation_id, category, page_uid, include_subpages, text)
 VALUES
-    (DATE_SUB(CURDATE(), INTERVAL 5 DAY), 'main', 'matomo', 'demo-1', 'Release 2.0 deployed'),
-    (DATE_SUB(CURDATE(), INTERVAL 15 DAY), 'main', 'matomo', 'demo-2', 'Marketing campaign started')
-ON DUPLICATE KEY UPDATE date = VALUES(date), text = VALUES(text);
+    (DATE_SUB(CURDATE(), INTERVAL 5 DAY), NULL, 'main', 'matomo', 'demo-1', 'release', 0, 0, 'Release 2.0 deployed'),
+    -- A band, not a tick: a campaign that ran for a fortnight drawn as a line
+    -- on the Monday it started would say it was over by the evening.
+    (DATE_SUB(CURDATE(), INTERVAL 20 DAY), DATE_SUB(CURDATE(), INTERVAL 6 DAY), 'main', 'matomo', 'demo-2', 'campaign', 0, 0, 'Spring campaign'),
+    -- Scoped to Services (uid 3) and its subtree, so the page module shows it
+    -- there and on nothing else, which is the whole point of page scope.
+    (DATE_SUB(CURDATE(), INTERVAL 11 DAY), NULL, 'main', 'matomo', 'demo-3', 'redesign', 3, 1, 'Services section relaunched')
+ON DUPLICATE KEY UPDATE date = VALUES(date), date_until = VALUES(date_until), category = VALUES(category), page_uid = VALUES(page_uid), include_subpages = VALUES(include_subpages), text = VALUES(text);
+
+-- Editorial history, so the markers the `typo3` annotation provider derives
+-- from the installation itself have something to derive from. These are the
+-- source rows, not the markers: running `page-metrics:import` folds them into
+-- one marker per page and day and writes those below. Seeded here as well as
+-- derived so a fresh `ddev install` shows them without an import run, and the
+-- annotation ids match exactly what the provider generates, so a later real
+-- import updates these rows instead of adding a second set.
+--
+-- Relative to CURDATE() like everything else here: the provider only looks
+-- back 90 days, so a fixture with absolute timestamps would stop producing
+-- markers a few months after it was written.
+--
+-- actiontype 2 is "record modified" (see TYPO3\CMS\Core\DataHandling\History\
+-- RecordHistoryStore::ACTION_MODIFY). userid is set because a real row has
+-- one; the provider never selects that column, which is the point.
+-- sys_history has no unique key to upsert against, so re-running this file
+-- would stack a second set of rows. The correlation id is what marks them as
+-- this fixture's own.
+DELETE FROM sys_history WHERE correlation_id LIKE 'demo-history-%';
+
+INSERT INTO sys_history (tstamp, actiontype, usertype, userid, recuid, tablename, history_data, workspace, correlation_id)
+VALUES
+    -- Three edits to About on one day. The marker says "3 changes", not three
+    -- markers.
+    (UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 4 DAY)) + 32400, 2, 'BE', 1, 2, 'pages', '{}', 0, 'demo-history-1'),
+    (UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 4 DAY)) + 36000, 2, 'BE', 1, 2, 'pages', '{}', 0, 'demo-history-2'),
+    (UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 4 DAY)) + 50400, 2, 'BE', 1, 2, 'pages', '{}', 0, 'demo-history-3'),
+    -- A single edit to Blog on another day, so both wordings appear.
+    (UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 9 DAY)) + 39600, 2, 'BE', 1, 4, 'pages', '{}', 0, 'demo-history-4'),
+    -- A content element rather than the page record. It sits on Home (uid 1),
+    -- and the marker lands on Home, because sys_history stores the element's
+    -- own uid and the page it belongs to has to be joined back in.
+    (UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 2 DAY)) + 43200, 2, 'BE', 1, 1, 'tt_content', '{}', 0, 'demo-history-5')
+ON DUPLICATE KEY UPDATE tstamp = VALUES(tstamp);
+
+-- A redirect pointing at Services, for the seo marker. EXT:redirects is
+-- optional, so this runs only where its table exists: without the guard the
+-- whole fixture import would abort on an installation that does not have it,
+-- which is the default one.
+SET @has_redirects = (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_redirect');
+
+-- Two statements, because PREPARE takes one each. The delete keeps re-running
+-- this file from stacking a second redirect.
+SET @redirect_delete = IF(@has_redirects > 0, 'DELETE FROM sys_redirect WHERE source_path = ''/old-services''', 'DO 0');
+PREPARE demo_redirect_delete FROM @redirect_delete;
+EXECUTE demo_redirect_delete;
+DEALLOCATE PREPARE demo_redirect_delete;
+
+SET @redirect_insert = IF(
+    @has_redirects > 0,
+    'INSERT INTO sys_redirect (pid, createdon, updatedon, deleted, disabled, source_host, source_path, target, target_statuscode) VALUES (0, UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 7 DAY)) + 45000, UNIX_TIMESTAMP(), 0, 0, ''*'', ''/old-services'', ''t3://page?uid=3'', 307)',
+    'DO 0'
+);
+PREPARE demo_redirect_insert FROM @redirect_insert;
+EXECUTE demo_redirect_insert;
+DEALLOCATE PREPARE demo_redirect_insert;
+
+-- What the `typo3` provider derives from the rows above. The ids follow its
+-- own format (<category>-<page uid>-<Ymd>), so `page-metrics:import` upserts
+-- these same rows rather than duplicating them.
+INSERT INTO tx_typo3pagemetrics_annotation (date, date_until, site_identifier, provider, annotation_id, category, page_uid, include_subpages, text)
+VALUES
+    (DATE_SUB(CURDATE(), INTERVAL 4 DAY), NULL, 'main', 'typo3', CONCAT('content-2-', DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 4 DAY), '%Y%m%d')), 'content', 2, 0, 'Page updated, 3 changes'),
+    (DATE_SUB(CURDATE(), INTERVAL 9 DAY), NULL, 'main', 'typo3', CONCAT('content-4-', DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 9 DAY), '%Y%m%d')), 'content', 4, 0, 'Page updated'),
+    (DATE_SUB(CURDATE(), INTERVAL 2 DAY), NULL, 'main', 'typo3', CONCAT('content-1-', DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 2 DAY), '%Y%m%d')), 'content', 1, 0, 'Page updated'),
+    (DATE_SUB(CURDATE(), INTERVAL 7 DAY), NULL, 'main', 'typo3', CONCAT('seo-3-', DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 7 DAY), '%Y%m%d')), 'seo', 3, 0, 'Redirect created')
+ON DUPLICATE KEY UPDATE date = VALUES(date), category = VALUES(category), page_uid = VALUES(page_uid), text = VALUES(text);
 
 -- Unresolved URLs, one per UnresolvedReason case, so the "not found pages"
 -- dashboard widget has all four reason badges to show. __VERSION__ and

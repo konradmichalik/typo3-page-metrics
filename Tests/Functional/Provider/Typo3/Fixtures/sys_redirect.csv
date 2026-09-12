@@ -1,0 +1,8 @@
+"sys_redirect"
+,"uid","pid","deleted","disabled","source_host","source_path","target","target_statuscode","createdon"
+,1,0,0,0,"*","/old-about","t3://page?uid=2",307,1789128000
+,2,0,0,0,"*","/older-about","t3://page?uid=2&_language=0",307,1789128060
+,3,0,0,0,"*","/old-external","https://example.com/new-external",307,1789128000
+,4,0,0,0,"*","/old-imprint","t3://page?uid=11",307,1789128000
+,5,0,0,1,"*","/disabled-source","t3://page?uid=2",307,1789128000
+,6,0,0,0,"*","/ancient-about","t3://page?uid=2",307,1787745600

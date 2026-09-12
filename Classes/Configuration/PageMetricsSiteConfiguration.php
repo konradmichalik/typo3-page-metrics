@@ -26,6 +26,9 @@ final readonly class PageMetricsSiteConfiguration
      * @param list<string>                        $additionalHosts
      * @param int|null                            $annotationStoragePid the page manual annotations are created on,
      *                                                                  null when the site names none
+     * @param bool                                $automaticAnnotations whether the markers TYPO3 can derive on its own
+     *                                                                  (a page edited, a redirect created) are written
+     *                                                                  during the import run
      */
     public function __construct(
         public bool $enabled,
@@ -35,5 +38,6 @@ final readonly class PageMetricsSiteConfiguration
         public int $retentionDays,
         public array $additionalHosts,
         public ?int $annotationStoragePid,
+        public bool $automaticAnnotations,
     ) {}
 }

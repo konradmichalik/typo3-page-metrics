@@ -175,6 +175,15 @@ services:
         tags:
             - name: page_metrics.annotation_provider
 
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Provider\Typo3\PageChangeLookup:
+        public: true
+
+    KonradMichalik\Typo3PageMetrics\Provider\Typo3\Typo3AnnotationProvider:
+        tags:
+            - name: page_metrics.annotation_provider
+
     KonradMichalik\Typo3PageMetrics\Command\ImportCommand:
         arguments:
             $providers: !tagged_iterator page_metrics.metric_provider

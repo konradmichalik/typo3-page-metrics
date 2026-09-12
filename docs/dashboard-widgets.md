@@ -32,6 +32,11 @@ kind, for a dashboard that only wants to line releases up against the curve.
 Left empty it shows all of them. Under the chart, a key names the categories
 actually drawn rather than every category that exists.
 
+That setting is worth using once
+[automatic markers](page-tiles.md#automatic-markers) are on: an active
+editorial team produces a `content` marker per edited page per day, and on a
+site-wide chart those add up.
+
 ## Data age
 
 Every widget that shows imported numbers (tiles, chart, most viewed pages, trend) prints the day its data is from underneath, and marks it as stale once the import is more than two days behind. See [Data age](page-tiles.md#data-age) for what that date means and why it is normally not today.

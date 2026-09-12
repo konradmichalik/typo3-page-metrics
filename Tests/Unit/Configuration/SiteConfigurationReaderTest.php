@@ -189,6 +189,26 @@ final class SiteConfigurationReaderTest extends TestCase
         $this->subject->read($site);
     }
 
+    public function testAutomaticAnnotationsAreOnUnlessTheSiteSaysOtherwise(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true],
+        ]);
+
+        self::assertTrue($this->subject->read($site)->automaticAnnotations);
+    }
+
+    public function testReadsAutomaticAnnotationsTurnedOff(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true, 'annotations' => ['automatic' => false]],
+        ]);
+
+        self::assertFalse($this->subject->read($site)->automaticAnnotations);
+    }
+
     public function testReadsTheAnnotationStoragePage(): void
     {
         $site = new Site('main', 1, [
@@ -224,6 +244,19 @@ final class SiteConfigurationReaderTest extends TestCase
 
         $this->expectException(InvalidSiteConfigurationException::class);
         $this->expectExceptionCode(1756000008);
+
+        $this->subject->read($site);
+    }
+
+    public function testThrowsWhenAutomaticAnnotationsIsNotBoolean(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true, 'annotations' => ['automatic' => 'no']],
+        ]);
+
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionCode(1756000011);
 
         $this->subject->read($site);
     }

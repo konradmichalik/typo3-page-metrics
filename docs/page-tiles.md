@@ -108,9 +108,14 @@ gap.
 
 ## Annotations
 
-Annotations are events worth explaining a change in the numbers by, from two
-independent providers that are always merged together:
+Annotations are events worth explaining a change in the numbers by, from three
+independent sources that are always merged together:
 
+- **Automatic**, derived by the `page-metrics:import` command from what TYPO3
+  records anyway: a page whose record or content was edited gets a `content`
+  marker for that day, and a redirect pointing at a page gets an `seo` marker
+  for the day it was created. Nothing has to be set up and nothing has to be
+  maintained, see [Automatic markers](#automatic-markers) below.
 - **Imported**, via the same `page-metrics:import` command, from any
   registered `AnnotationProviderInterface` (mirroring
   `MetricProviderInterface`'s extensibility, but for events rather than
@@ -188,3 +193,43 @@ appears on that page's tiles, plus, if **Also applies to subpages** is set,
 on everything below it. Dashboard widgets are site-wide and show every
 marker regardless of its page, since a marker on one page still explains a
 bump in the site's totals.
+
+### Automatic markers
+
+Annotations that nobody maintains are empty annotations, so the import run
+derives its own from records TYPO3 keeps regardless:
+
+| Marker | Derived from | Says |
+| --- | --- | --- |
+| `content` | `sys_history`, rows for the page record itself and for the content elements on it | This page changed on this day |
+| `seo` | `sys_redirect`, the day a redirect pointing at the page was created | A redirect now leads here |
+
+They are folded per page and per day, so five edits on one afternoon are one
+marker saying "Page updated, 5 changes", not five markers. They are always
+page-scoped (they explain one page, never the whole site), they never span
+days, and they are owned by the import: editing one by hand is pointless,
+because the next run writes it again. Use a manual annotation for anything
+you want to word yourself.
+
+Only the last 90 days are derived, which is the longest period any tile or
+widget draws. Workspace edits are ignored, since they explain nothing about
+published traffic, and redirects pointing at an external URL or a bare path
+are ignored too, because they name no page.
+
+A marker says that a page changed, never who changed it: the backend user
+`sys_history` records is not read at all.
+
+The `seo` markers need EXT:redirects. Without it there is no `sys_redirect`
+table, and only the `content` markers appear.
+
+To turn the whole thing off for a site:
+
+```yaml
+pageMetrics:
+  enabled: true
+  annotations:
+    automatic: false
+```
+
+Markers already written stay in the database; they simply stop being
+refreshed.

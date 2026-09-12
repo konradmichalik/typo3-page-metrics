@@ -36,9 +36,10 @@ doing" without leaving the backend.
 - Site-wide [EXT:dashboard](https://docs.typo3.org/permanent/typo3/cms-dashboard/main/en-us/)
   widgets plus a ready-made dashboard preset — see
   [Dashboard widgets](docs/dashboard-widgets.md)
-- Annotations, imported (e.g. Matomo release markers) or created by hand,
-  categorised, optionally spanning days or scoped to one page, and marked on
-  every sparkline — see [Annotations](docs/page-tiles.md#annotations)
+- Annotations, derived from TYPO3's own record history (a page edited, a
+  redirect created), imported (e.g. Matomo release markers) or created by
+  hand, categorised, optionally spanning days or scoped to one page, and
+  marked on every sparkline — see [Annotations](docs/page-tiles.md#annotations)
 - Matomo, GA4 and your own web server access log as pluggable providers,
   extensible with your own — see
   [Registering custom tiles](docs/extending.md)

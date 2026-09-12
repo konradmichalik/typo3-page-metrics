@@ -37,7 +37,7 @@ final class SiteConfigurationReader
         $raw = $site->getConfiguration()['pageMetrics'] ?? null;
 
         if (null === $raw) {
-            return new PageMetricsSiteConfiguration(false, [], true, [], 400, [], null);
+            return new PageMetricsSiteConfiguration(false, [], true, [], 400, [], null, true);
         }
 
         $raw = $this->mapping($raw, $site, 'pageMetrics', 1756000000);
@@ -63,6 +63,9 @@ final class SiteConfigurationReader
             // identifier, never by pid), it just offers no "add marker"
             // shortcut until someone picks a page for new ones to live on.
             $this->optionalPageUid($annotations['storagePid'] ?? null, $site, 'pageMetrics.annotations.storagePid', 1756000009),
+            // On by default: markers nobody has to maintain are the point,
+            // and a site that wants none can say so.
+            $this->boolean($annotations['automatic'] ?? true, $site, 'pageMetrics.annotations.automatic', 1756000011),
         );
     }
 
