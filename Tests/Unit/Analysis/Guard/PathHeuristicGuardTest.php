@@ -63,12 +63,6 @@ final class PathHeuristicGuardTest extends TestCase
         self::assertFalse($this->guard->isSuspicious($this->lineFor('/robots.txt')));
     }
 
-    #[Test]
-    public function doesNotFlagARealClaudeBotRobotsTxtRequest(): void
-    {
-        self::assertFalse($this->guard->isSuspicious($this->lineFor('/robots.txt')));
-    }
-
     private function lineFor(string $target): LogLine
     {
         return new LogLine(
