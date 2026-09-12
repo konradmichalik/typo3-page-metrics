@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Provider\Matomo;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, RateMetricDefinition, UrlMetric};
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
@@ -76,6 +76,10 @@ final readonly class MatomoMetricProvider implements MetricProviderInterface
                 '#bf8700',
                 'matomo.time_spent_seconds',
                 'matomo.visits',
+                // Neither direction is an improvement on its own: a long
+                // read is a good sign on an article and a bad one on a
+                // contact page, and this provider cannot know which it is.
+                MetricPolarity::Neutral,
             ),
             new RateMetricDefinition(
                 'matomo.bounce_rate',
@@ -87,6 +91,7 @@ final readonly class MatomoMetricProvider implements MetricProviderInterface
                 '#cf222e',
                 'matomo.entry_bounces',
                 'matomo.entries',
+                MetricPolarity::LowerIsBetter,
             ),
         ];
     }

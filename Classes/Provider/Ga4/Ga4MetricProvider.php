@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Provider\Ga4;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, RateMetricDefinition, UrlMetric};
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
@@ -81,6 +81,9 @@ final readonly class Ga4MetricProvider implements MetricProviderInterface
                 '#bf8700',
                 'ga4.engagement_time_seconds',
                 'ga4.sessions',
+                // See MatomoMetricProvider: neither direction is an
+                // improvement without knowing what the page is for.
+                MetricPolarity::Neutral,
             ),
             new RateMetricDefinition(
                 'ga4.bounce_rate',
@@ -92,6 +95,7 @@ final readonly class Ga4MetricProvider implements MetricProviderInterface
                 '#cf222e',
                 'ga4.landing_bounces',
                 'ga4.landing_sessions',
+                MetricPolarity::LowerIsBetter,
             ),
         ];
     }

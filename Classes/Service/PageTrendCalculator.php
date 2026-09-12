@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit, TrendDirection, TrendSentiment};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, RateMetricDefinition, TopPage};
 use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, SitePageUidRepository};
 
@@ -52,7 +52,7 @@ final readonly class PageTrendCalculator
         $trends = $this->computeTrends($pageUids, $languageId, $metric, $currentRange, $previousRange);
         usort($trends, static fn (array $a, array $b): int => $b['value'] <=> $a['value']);
 
-        return $this->toTopPages(array_slice($trends, 0, $limit), $metric->unit);
+        return $this->toTopPages(array_slice($trends, 0, $limit), $metric);
     }
 
     /**
@@ -60,19 +60,28 @@ final readonly class PageTrendCalculator
      *
      * @return list<TopPage>
      */
-    public function rankedByTrend(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, TrendDirection $direction, int $limit): array
+    public function rankedByTrend(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, TrendSentiment $sentiment, int $limit): array
     {
+        $polarity = $metric->polarity;
         $trends = $this->computeTrends($pageUids, $languageId, $metric, $currentRange, $previousRange);
-        $trends = array_filter($trends, static fn (array $trend): bool => null !== $trend['deltaPercent'] && $trend['trend'] === $direction);
-
-        usort(
+        $trends = array_filter(
             $trends,
-            TrendDirection::Down === $direction
-                ? static fn (array $a, array $b): int => $a['deltaPercent'] <=> $b['deltaPercent']
-                : static fn (array $a, array $b): int => $b['deltaPercent'] <=> $a['deltaPercent'],
+            static fn (array $trend): bool => null !== $trend['deltaPercent']
+                && $sentiment === self::rankingSentimentOf($trend['trend'], $polarity),
         );
 
-        return $this->toTopPages(array_slice($trends, 0, $limit), $metric->unit);
+        // Ranked by how far the change went in the asked-for direction, not
+        // by the raw percentage: for a metric where lower is better, the
+        // worst drops are the biggest *rises*, so the sign has to be
+        // normalised before sorting.
+        usort(
+            $trends,
+            TrendSentiment::Negative === $sentiment
+                ? static fn (array $a, array $b): int => self::signedDelta($a['deltaPercent'], $polarity) <=> self::signedDelta($b['deltaPercent'], $polarity)
+                : static fn (array $a, array $b): int => self::signedDelta($b['deltaPercent'], $polarity) <=> self::signedDelta($a['deltaPercent'], $polarity),
+        );
+
+        return $this->toTopPages(array_slice($trends, 0, $limit), $metric);
     }
 
     /**
@@ -98,7 +107,37 @@ final readonly class PageTrendCalculator
         $trends = $this->computeGroupedTrends($pageUidsByAnchor, $languageId, $metric->identifier, $currentRange, $previousRange);
         usort($trends, static fn (array $a, array $b): int => $b['value'] <=> $a['value']);
 
-        return $this->toTopPages(array_slice($trends, 0, $limit), $metric->unit);
+        return $this->toTopPages(array_slice($trends, 0, $limit), $metric);
+    }
+
+    /**
+     * A metric with no polarity (an average time on page is neither good nor
+     * bad when it rises) would otherwise produce nothing but
+     * TrendSentiment::Neutral, making the trend widget permanently empty for
+     * it. For those the widget's setting keeps its literal direction
+     * meaning: "improved" reads as "went up".
+     */
+    private static function rankingSentimentOf(TrendDirection $direction, MetricPolarity $polarity): TrendSentiment
+    {
+        if (MetricPolarity::Neutral !== $polarity) {
+            return TrendSentiment::of($direction, $polarity);
+        }
+
+        return match ($direction) {
+            TrendDirection::Up => TrendSentiment::Positive,
+            TrendDirection::Down => TrendSentiment::Negative,
+            TrendDirection::Flat => TrendSentiment::Neutral,
+        };
+    }
+
+    /**
+     * $deltaPercent is never actually null here: rankedByTrend() filters
+     * those out before sorting, since a page with no comparable previous
+     * period has no percentage to rank by in the first place.
+     */
+    private static function signedDelta(?int $deltaPercent, MetricPolarity $polarity): int
+    {
+        return MetricPolarity::LowerIsBetter === $polarity ? -(int) $deltaPercent : (int) $deltaPercent;
     }
 
     /**
@@ -256,7 +295,7 @@ final readonly class PageTrendCalculator
      *
      * @return list<TopPage>
      */
-    private function toTopPages(array $trends, MetricUnit $unit): array
+    private function toTopPages(array $trends, MetricDefinition|RateMetricDefinition $metric): array
     {
         $titlesByUid = $this->pageUidRepository->titlesFor(array_map(static fn (array $trend): int => $trend['pageUid'], $trends));
 
@@ -264,9 +303,10 @@ final readonly class PageTrendCalculator
             fn (array $trend): TopPage => new TopPage(
                 $trend['pageUid'],
                 $titlesByUid[$trend['pageUid']] ?? sprintf('#%d', $trend['pageUid']),
-                $this->formatValue($trend['value'], $unit),
+                $this->formatValue($trend['value'], $metric->unit),
                 $trend['deltaPercent'],
                 $trend['trend'],
+                $metric->polarity,
             ),
             $trends,
         );

@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit, TrendDirection, TrendSentiment};
 
 /**
  * MetricTile.
@@ -22,6 +22,14 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
  */
 final readonly class MetricTile
 {
+    /**
+     * Whether this tile's movement is an improvement, derived from the
+     * direction and the metric's own polarity. Templates colour the trend
+     * badge by this, never by $trend: a rising bounce rate points up and is
+     * bad at the same time.
+     */
+    public TrendSentiment $sentiment;
+
     /**
      * @param array<string, int|null> $sparkline              Y-m-d => value, covers the same period as the tile
      *                                                        itself; null for a day with no data at all, which is
@@ -49,5 +57,8 @@ final readonly class MetricTile
         public int $redirectSharePercent,
         public ?string $externalLink,
         public string $previousFormattedValue,
-    ) {}
+        public MetricPolarity $polarity = MetricPolarity::HigherIsBetter,
+    ) {
+        $this->sentiment = TrendSentiment::of($trend, $polarity);
+    }
 }

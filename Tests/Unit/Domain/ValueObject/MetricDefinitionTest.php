@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricDefinition;
 use PHPUnit\Framework\TestCase;
 
@@ -26,22 +26,22 @@ final class MetricDefinitionTest extends TestCase
 {
     public function testConstructorAssignsAllProperties(): void
     {
-        $definition = new MetricDefinition('matomo.pageviews', 'Page views', 'The number of times this page was viewed.', 'actions-view', MetricUnit::Count, 10, '#0969da', 5);
+        $definition = new MetricDefinition('matomo.bounce_rate', 'Bounce rate', 'The share of visits that left immediately.', 'actions-view', MetricUnit::Percent, 10, '#0969da', MetricPolarity::LowerIsBetter);
 
-        self::assertSame('matomo.pageviews', $definition->identifier);
-        self::assertSame('Page views', $definition->label);
-        self::assertSame('The number of times this page was viewed.', $definition->description);
+        self::assertSame('matomo.bounce_rate', $definition->identifier);
+        self::assertSame('Bounce rate', $definition->label);
+        self::assertSame('The share of visits that left immediately.', $definition->description);
         self::assertSame('actions-view', $definition->icon);
-        self::assertSame(MetricUnit::Count, $definition->unit);
+        self::assertSame(MetricUnit::Percent, $definition->unit);
         self::assertSame(10, $definition->sortOrder);
         self::assertSame('#0969da', $definition->color);
-        self::assertSame(5, $definition->maxDimensions);
+        self::assertSame(MetricPolarity::LowerIsBetter, $definition->polarity);
     }
 
-    public function testMaxDimensionsDefaultsToNull(): void
+    public function testPolarityDefaultsToHigherIsBetter(): void
     {
         $definition = new MetricDefinition('matomo.pageviews', 'Page views', 'The number of times this page was viewed.', 'actions-view', MetricUnit::Count, 10, '#0969da');
 
-        self::assertNull($definition->maxDimensions);
+        self::assertSame(MetricPolarity::HigherIsBetter, $definition->polarity);
     }
 }

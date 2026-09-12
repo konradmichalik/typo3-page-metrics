@@ -5,11 +5,13 @@
         <f:then>
             <div class="pagemetrics-widget-aside">
                 <div class="pagemetrics-widget-aside-icon-col">
-                    <span class="pagemetrics-widget-aside-icon pagemetrics-widget-trend-direction-{direction}" aria-hidden="true">
-                        <f:if condition="{direction} == 'up'">
-                            <f:then><core:icon identifier="tabler-trending-up" size="large" alternativeMarkupIdentifier="inline" /></f:then>
-                            <f:else><core:icon identifier="tabler-trending-down" size="large" alternativeMarkupIdentifier="inline" /></f:else>
-                        </f:if>
+                    <!-- Deliberately not an up/down arrow: the widget's rows can
+                         rank a metric where lower is better, where "improved" means
+                         the number fell. One icon for the whole widget cannot carry
+                         that, so the direction stays on the per-row badges and this
+                         one only carries the sentiment colour. -->
+                    <span class="pagemetrics-widget-aside-icon pagemetrics-widget-trend-sentiment-{sentiment}" aria-hidden="true">
+                        <core:icon identifier="tabler-chart-dots" size="large" alternativeMarkupIdentifier="inline" />
                     </span>
                 </div>
                 <div class="pagemetrics-widget-aside-content">
@@ -44,7 +46,7 @@
                                                                     <f:then><f:variable name="deltaText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable></f:then>
                                                                     <f:else><f:variable name="deltaText">{topPage.deltaPercent}%</f:variable></f:else>
                                                                 </f:if>
-                                                                <f:render partial="Widget/TrendBadge" arguments="{trend: topPage.trend, deltaText: deltaText}" />
+                                                                <f:render partial="Widget/TrendBadge" arguments="{trend: topPage.trend, sentiment: topPage.sentiment, deltaText: deltaText}" />
                                                             </div>
                                                         </td>
                                                     </tr>

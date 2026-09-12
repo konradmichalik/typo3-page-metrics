@@ -132,7 +132,7 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
 
         $response = $this->dispatch(['id' => '2', 'period' => '7']);
 
-        self::assertStringContainsString('pagemetrics-tile-delta-up', (string) $response->getBody());
+        self::assertStringContainsString('pagemetrics-tile-delta-positive', (string) $response->getBody());
         self::assertStringContainsString('50%', (string) $response->getBody());
         self::assertStringContainsString('data-redirect-share="20"', (string) $response->getBody());
     }
@@ -151,7 +151,7 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $response = $this->dispatch(['id' => '2', 'period' => '7']);
         $body = (string) $response->getBody();
 
-        self::assertStringContainsString('pagemetrics-tile-delta-flat', $body);
+        self::assertStringContainsString('pagemetrics-tile-delta-neutral', $body);
         self::assertStringContainsString('0%', $body);
     }
 

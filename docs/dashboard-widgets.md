@@ -17,7 +17,7 @@ skipped entirely for sites without one.
 | Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers | — | Metric, period (7/30/90 days) |
 | Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days) |
 | Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level, include subpages |
-| Page metrics trend | `pageMetricsTrend` | Pages with the biggest rise or drop against the previous period | 7/30/90 days | Metric, direction (drops/gains), period |
+| Page metrics trend | `pageMetricsTrend` | Pages that improved or declined most against the previous period | 7/30/90 days | Metric, movement (declines/improvements), period |
 | Not found pages | `pageMetricsNotFoundPages` | URLs the daily import could not resolve to a page, with the reason | 30 days | — |
 | Page metrics annotations | `pageMetricsAnnotations` | Recent site-wide annotations, such as Matomo release markers | 90 days | — |
 
@@ -30,6 +30,12 @@ than a single one.
 Every widget that shows imported numbers (tiles, chart, most viewed pages, trend) prints the day its data is from underneath, and marks it as stale once the import is more than two days behind. See [Data age](page-tiles.md#data-age) for what that date means and why it is normally not today.
 
 Unlike the page module, a dashboard widget covers one site per row, so its date is that site's own provider's and never a compromise between several.
+
+## Movement, not direction
+
+The trend widget ranks by whether a page improved or declined, not by whether its number went up or down. The two only coincide for a metric where higher is better: a rising bounce rate is a decline, and a page whose bounce rate fell shows a green down arrow. Which way round a metric reads is set by its provider, see [Polarity](extending.md#polarity).
+
+A metric with no polarity of its own, such as an average time on page, has no improvement to rank by, so for those the setting falls back to its literal direction meaning.
 
 ## Reading the chart
 
@@ -67,8 +73,9 @@ appears in the dashboard creation wizard once EXT:dashboard is installed, so
 a new dashboard covering every site's metrics is one click away.
 
 Below the tiles and the large chart, it places two compact charts (Visits,
-Bounce rate), then two trend widgets (Biggest gains, Biggest drops), then
-Most viewed pages and Not found pages, with the annotations widget last.
+Bounce rate), then two trend widgets (Biggest improvements, Biggest
+declines), then Most viewed pages and Not found pages, with the annotations
+widget last.
 The compact chart and trend widgets can each appear more than once with
 different settings pre-configured, see
 [Configuration/Backend/DashboardPresets.php](../Configuration/Backend/DashboardPresets.php).

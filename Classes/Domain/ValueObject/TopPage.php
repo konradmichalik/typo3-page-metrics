@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\TrendDirection;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, TrendDirection, TrendSentiment};
 
 /**
  * TopPage.
@@ -35,13 +35,22 @@ final readonly class TopPage
      */
     public bool $isNew;
 
+    /**
+     * Same reasoning as MetricTile::$sentiment: the row's colour has to say
+     * "better / worse", which direction alone cannot for a metric where a
+     * rise is the bad outcome.
+     */
+    public TrendSentiment $sentiment;
+
     public function __construct(
         public int $pageUid,
         public string $title,
         public string $formattedValue,
         public ?int $deltaPercent,
         public TrendDirection $trend,
+        public MetricPolarity $polarity,
     ) {
         $this->isNew = null === $deltaPercent;
+        $this->sentiment = TrendSentiment::of($trend, $polarity);
     }
 }

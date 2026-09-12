@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 namespace Vendor\MyExtension\EventListener;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit, TrendDirection};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricTile;
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
@@ -39,6 +39,7 @@ final class AddCustomTileEventListener
             redirectSharePercent: 0,
             externalLink: null,
             previousFormattedValue: '',
+            polarity: MetricPolarity::HigherIsBetter,
         ));
     }
 }
@@ -51,6 +52,20 @@ their own tiles via `$event->getTiles()`. It also exposes `$event->site`,
 built for (`$event->tileRange`, `$event->previousRange`,
 `$event->sparklineRange`), so a listener can tailor its tile to the same
 period the built-in tiles use.
+
+## Polarity
+
+`polarity` says whether a rise in your metric is an improvement, and nothing else can: the platform never interprets what a metric means. It decides the colour of the trend badge, so a metric where a rise is the bad outcome needs `MetricPolarity::LowerIsBetter` to avoid showing a worsening number in green.
+
+| Value | Use for |
+| --- | --- |
+| `HigherIsBetter` (default) | page views, visits, conversions |
+| `LowerIsBetter` | bounce rate, error counts |
+| `Neutral` | anything whose direction is not a judgement, such as an average time on page |
+
+The arrow icon always follows the actual direction, so `LowerIsBetter` shows a down arrow in green rather than inverting the arrow.
+
+`MetricDefinition` and `RateMetricDefinition` take the same parameter. Note that `MetricDefinition::$maxDimensions` was removed in the same change: it was never read. A positional call that passed it now fails loudly instead of silently landing in `polarity`.
 
 For a provider that needs its own daily-import step, its own configurable
 retention and to participate in the dashboard widgets, implement

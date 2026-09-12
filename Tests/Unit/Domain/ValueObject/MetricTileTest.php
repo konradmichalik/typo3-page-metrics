@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit, TrendDirection, TrendSentiment};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricTile;
 use PHPUnit\Framework\TestCase;
 
@@ -39,6 +39,7 @@ final class MetricTileTest extends TestCase
         self::assertSame(['2026-08-01' => 42], $tile->sparkline);
         self::assertSame(12, $tile->deltaPercent);
         self::assertSame(TrendDirection::Up, $tile->trend);
+        self::assertSame(TrendSentiment::Positive, $tile->sentiment);
         self::assertSame(5, $tile->redirectSharePercent);
         self::assertSame('https://matomo.example.com/', $tile->externalLink);
         self::assertSame('38', $tile->previousFormattedValue);
@@ -53,5 +54,13 @@ final class MetricTileTest extends TestCase
         self::assertSame(0, $tile->redirectSharePercent);
         self::assertNull($tile->externalLink);
         self::assertSame('', $tile->previousFormattedValue);
+    }
+
+    public function testARisingLowerIsBetterMetricReadsAsADecline(): void
+    {
+        $tile = new MetricTile('matomo.bounce_rate', 'Bounce rate', 'Share of visits that left immediately.', 'actions-door-exit', '#cf222e', MetricUnit::Percent, 31, '31%', [], 11, TrendDirection::Up, 0, null, '28%', MetricPolarity::LowerIsBetter);
+
+        self::assertSame(TrendDirection::Up, $tile->trend);
+        self::assertSame(TrendSentiment::Negative, $tile->sentiment);
     }
 }

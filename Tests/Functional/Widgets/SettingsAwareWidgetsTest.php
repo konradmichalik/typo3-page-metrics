@@ -238,7 +238,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
 
         $definitions = $widget->getSettingsDefinitions();
         $keys = array_map(static fn ($definition) => $definition->key, $definitions);
-        self::assertSame(['metric', 'direction', 'period'], $keys);
+        self::assertSame(['metric', 'sentiment', 'period'], $keys);
         self::assertArrayHasKey('matomo.bounce_rate', $definitions[0]->enum);
     }
 
@@ -259,7 +259,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         $this->writeSiteConfiguration();
         $today = new DateTimeImmutable('today');
         // Page 2 dropped from 100 to 10, page 3 grew from 10 to 100 - only
-        // the drop should show up when direction defaults to "down".
+        // the drop should show up while the setting defaults to "declined".
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 10);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.pageviews', 100);
         $this->get(DailyMetricsRepository::class)->upsert(3, 0, 'matomo', $today, 'matomo.pageviews', 100);
@@ -268,9 +268,9 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         $content = $this->renderTrendWidget([]);
 
         self::assertStringContainsString('About', $content);
-        self::assertStringContainsString('pagemetrics-trend-down', $content);
+        self::assertStringContainsString('pagemetrics-trend-negative', $content);
         self::assertStringNotContainsString('Restricted', $content);
-        self::assertStringContainsString('pagemetrics-widget-trend-direction-down', $content);
+        self::assertStringContainsString('pagemetrics-widget-trend-sentiment-negative', $content);
     }
 
     public function testTrendWidgetListsTheBiggestGainWhenConfigured(): void
@@ -282,13 +282,32 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         $this->get(DailyMetricsRepository::class)->upsert(3, 0, 'matomo', $today, 'matomo.pageviews', 100);
         $this->get(DailyMetricsRepository::class)->upsert(3, 0, 'matomo', $today->modify('-40 days'), 'matomo.pageviews', 10);
 
-        $content = $this->renderTrendWidget(['direction' => 'up']);
+        $content = $this->renderTrendWidget(['sentiment' => 'positive']);
 
         self::assertStringContainsString('Restricted', $content);
-        self::assertStringContainsString('pagemetrics-trend-up', $content);
+        self::assertStringContainsString('pagemetrics-trend-positive', $content);
         self::assertStringNotContainsString('About', $content);
-        self::assertStringContainsString('pagemetrics-widget-trend-direction-up', $content);
-        self::assertStringNotContainsString('pagemetrics-widget-trend-direction-down', $content);
+        self::assertStringContainsString('pagemetrics-widget-trend-sentiment-positive', $content);
+        self::assertStringNotContainsString('pagemetrics-widget-trend-sentiment-negative', $content);
+    }
+
+    public function testTrendWidgetIconStaysNeutralForAMetricWithoutPolarity(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        // Avg. time on page is MetricPolarity::Neutral: the ranking falls
+        // back to the literal direction, but no row carries a sentiment, so
+        // the widget's own icon must not claim one either.
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.time_spent_seconds', 300);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.visits', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.time_spent_seconds', 100);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.visits', 10);
+
+        $content = $this->renderTrendWidget(['metric' => 'matomo.avg_time_on_page', 'sentiment' => 'positive']);
+
+        self::assertStringContainsString('pagemetrics-widget-trend-sentiment-neutral', $content);
+        self::assertStringContainsString('pagemetrics-trend-neutral', $content);
+        self::assertStringNotContainsString('pagemetrics-widget-trend-sentiment-positive', $content);
     }
 
     public function testTrendWidgetRendersTheEmptyStateWhenNoSiteIsConfigured(): void
@@ -299,17 +318,17 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertNull($result->label);
     }
 
-    public function testTrendWidgetLabelIncludesTheConfiguredDirectionAndPeriod(): void
+    public function testTrendWidgetLabelIncludesTheConfiguredMovementAndPeriod(): void
     {
         $this->writeSiteConfiguration();
         $today = new DateTimeImmutable('today');
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 10);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.pageviews', 100);
 
-        $result = $this->renderTrendWidgetResult(['direction' => 'up', 'period' => 7]);
+        $result = $this->renderTrendWidgetResult(['sentiment' => 'positive', 'period' => 7]);
 
         self::assertStringContainsString('Page metrics trend', (string) $result->label);
-        self::assertStringContainsString('Biggest gains', (string) $result->label);
+        self::assertStringContainsString('Biggest improvements', (string) $result->label);
         self::assertStringContainsString('7 days', (string) $result->label);
     }
 
@@ -319,7 +338,10 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         $today = new DateTimeImmutable('today');
         $previous = $today->modify('-40 days');
         // Page 2's bounce rate worsens from 20% to 80% - page views stay
-        // flat, so this would only show up when ranking by bounce rate.
+        // flat, so this would only show up when ranking by bounce rate. A
+        // rising bounce rate is a decline, not a gain, which is why the
+        // setting here is "negative" rather than the direction the number
+        // moved in.
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entry_bounces', 8);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entries', 10);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $previous, 'matomo.entry_bounces', 2);
@@ -327,7 +349,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 50);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $previous, 'matomo.pageviews', 50);
 
-        $result = $this->renderTrendWidgetResult(['metric' => 'matomo.bounce_rate', 'direction' => 'up']);
+        $result = $this->renderTrendWidgetResult(['metric' => 'matomo.bounce_rate', 'sentiment' => 'negative']);
 
         self::assertStringContainsString('About', $result->content);
         self::assertStringContainsString('80%', $result->content);
@@ -366,7 +388,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('About', $content);
         self::assertStringContainsString('Team', $content);
         self::assertStringContainsString('&amp;id=2', $content);
-        self::assertStringContainsString('pagemetrics-trend-up', $content);
+        self::assertStringContainsString('pagemetrics-trend-positive', $content);
         self::assertStringContainsString('100%', $content);
     }
 

@@ -36,7 +36,7 @@
                                                                     <f:then><f:variable name="deltaText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable></f:then>
                                                                     <f:else><f:variable name="deltaText">{topPage.deltaPercent}%</f:variable></f:else>
                                                                 </f:if>
-                                                                <f:render partial="Widget/TrendBadge" arguments="{trend: topPage.trend, deltaText: deltaText}" />
+                                                                <f:render partial="Widget/TrendBadge" arguments="{trend: topPage.trend, sentiment: topPage.sentiment, deltaText: deltaText}" />
                                                             </div>
                                                         </td>
                                                     </tr>

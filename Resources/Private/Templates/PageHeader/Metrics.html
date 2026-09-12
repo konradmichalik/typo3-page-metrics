@@ -50,7 +50,7 @@
                                         <f:variable name="trendTitle"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.new" arguments="{0: previousRangeLabel}" default="No data in the previous period (%1$s) to compare against" /></f:variable>
                                     </f:else>
                                 </f:if>
-                                <span class="pagemetrics-tile-delta pagemetrics-tile-delta-{tile.trend.value}" title="{trendTitle}">
+                                <span class="pagemetrics-tile-delta pagemetrics-tile-delta-{tile.sentiment.value}" title="{trendTitle}">
                                     <f:if condition="{tile.trend.value} == 'up'"><f:then><core:icon identifier="tabler-trending-up" alternativeMarkupIdentifier="inline" /></f:then></f:if>
                                     <f:if condition="{tile.trend.value} == 'down'"><f:then><core:icon identifier="tabler-trending-down" alternativeMarkupIdentifier="inline" /></f:then></f:if>
                                     <f:if condition="{tile.trend.value} == 'flat'"><f:then><core:icon identifier="tabler-minus" alternativeMarkupIdentifier="inline" /></f:then></f:if>

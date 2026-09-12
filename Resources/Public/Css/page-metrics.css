@@ -1,3 +1,12 @@
+/* Sentiment, not direction: green means "got better", which for a bounce
+   rate is a number going down. Defined once here so the tile badge, the
+   table badge and the trend widget's aside icon cannot drift apart. */
+:root {
+    --pm-sentiment-positive: #1a7f37;
+    --pm-sentiment-negative: #c92a2a;
+    --pm-sentiment-neutral: var(--typo3-text-color-variant, #6a7085);
+}
+
 .pagemetrics-header {
     margin-bottom: 8px;
 }
@@ -437,16 +446,16 @@
     height: 11px;
 }
 
-.pagemetrics-tile-delta-up {
-    color: #1a7f37;
+.pagemetrics-tile-delta-positive {
+    color: var(--pm-sentiment-positive);
 }
 
-.pagemetrics-tile-delta-down {
-    color: #c92a2a;
+.pagemetrics-tile-delta-negative {
+    color: var(--pm-sentiment-negative);
 }
 
-.pagemetrics-tile-delta-flat {
-    color: var(--typo3-text-color-variant, #6a7085);
+.pagemetrics-tile-delta-neutral {
+    color: var(--pm-sentiment-neutral);
 }
 
 .pagemetrics-tile-label {
@@ -891,12 +900,16 @@
     margin-left: 0;
 }
 
-.pagemetrics-widget-trend-direction-up {
-    --pm-accent: #1a7f37;
+.pagemetrics-widget-trend-sentiment-positive {
+    --pm-accent: var(--pm-sentiment-positive);
 }
 
-.pagemetrics-widget-trend-direction-down {
-    --pm-accent: #c92a2a;
+.pagemetrics-widget-trend-sentiment-negative {
+    --pm-accent: var(--pm-sentiment-negative);
+}
+
+.pagemetrics-widget-trend-sentiment-neutral {
+    --pm-accent: var(--pm-sentiment-neutral);
 }
 
 @container (max-width: 420px) {
@@ -916,8 +929,8 @@
 }
 
 /* Trend badge for a table cell (Most viewed pages / Trend widgets) - same
-   up/down/flat colors as .pagemetrics-tile-delta-*, but inline rather than
-   an absolutely-positioned corner pill. */
+   sentiment colors as .pagemetrics-tile-delta-*, but inline rather than an
+   absolutely-positioned corner pill. */
 .pagemetrics-trend {
     display: inline-flex;
     align-items: center;
@@ -931,14 +944,14 @@
     height: 12px;
 }
 
-.pagemetrics-trend-up {
-    color: #1a7f37;
+.pagemetrics-trend-positive {
+    color: var(--pm-sentiment-positive);
 }
 
-.pagemetrics-trend-down {
-    color: #c92a2a;
+.pagemetrics-trend-negative {
+    color: var(--pm-sentiment-negative);
 }
 
-.pagemetrics-trend-flat {
-    color: var(--typo3-text-color-variant, #6a7085);
+.pagemetrics-trend-neutral {
+    color: var(--pm-sentiment-neutral);
 }

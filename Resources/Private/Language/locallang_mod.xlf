@@ -192,17 +192,17 @@
             <trans-unit id="widget.trend.empty" resname="widget.trend.empty">
                 <source>No trending pages in this period.</source>
             </trans-unit>
-            <trans-unit id="widget.trend.setting.direction.label" resname="widget.trend.setting.direction.label">
-                <source>Direction</source>
+            <trans-unit id="widget.trend.setting.sentiment.label" resname="widget.trend.setting.sentiment.label">
+                <source>Movement</source>
             </trans-unit>
-            <trans-unit id="widget.trend.setting.direction.description" resname="widget.trend.setting.direction.description">
-                <source>Whether to show the biggest drops or the biggest gains.</source>
+            <trans-unit id="widget.trend.setting.sentiment.description" resname="widget.trend.setting.sentiment.description">
+                <source>Whether to show the pages that improved most or the ones that declined most.</source>
             </trans-unit>
-            <trans-unit id="widget.trend.setting.direction.down" resname="widget.trend.setting.direction.down">
-                <source>Biggest drops</source>
+            <trans-unit id="widget.trend.setting.sentiment.declined" resname="widget.trend.setting.sentiment.declined">
+                <source>Biggest declines</source>
             </trans-unit>
-            <trans-unit id="widget.trend.setting.direction.up" resname="widget.trend.setting.direction.up">
-                <source>Biggest gains</source>
+            <trans-unit id="widget.trend.setting.sentiment.improved" resname="widget.trend.setting.sentiment.improved">
+                <source>Biggest improvements</source>
             </trans-unit>
             <trans-unit id="widget.trend.setting.period.label" resname="widget.trend.setting.period.label">
                 <source>Period</source>

@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
 
 /**
  * RateMetricDefinition.
@@ -41,5 +41,6 @@ final readonly class RateMetricDefinition
         public string $color,
         public string $numerator,
         public string $denominator,
+        public MetricPolarity $polarity = MetricPolarity::HigherIsBetter,
     ) {}
 }

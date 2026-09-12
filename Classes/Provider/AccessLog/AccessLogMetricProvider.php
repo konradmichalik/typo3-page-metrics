@@ -17,7 +17,7 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Analysis\Guard\PathHeuristicGuard;
 use KonradMichalik\Typo3PageMetrics\Analysis\Parser\{CombinedLogParser, LogLine};
 use KonradMichalik\Typo3PageMetrics\Analysis\Taxonomy\BotTaxonomy;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, UrlMetric};
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
@@ -150,11 +150,11 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
         return [
             new MetricDefinition('accesslog.pageviews', 'Page views', 'Successful (2xx) GET requests for this page in the selected period, parsed from the web server access log.', 'tabler-eye-search', MetricUnit::Count, 10, '#116329'),
             new MetricDefinition('accesslog.visits', 'Visits', 'Distinct IP address/user agent pairs that requested this page on the same day - an approximation, not a true session count.', 'tabler-chart-dots', MetricUnit::Count, 20, '#57606a'),
-            new MetricDefinition('bot.ai_chatbot', 'AI chatbots', 'Requests from AI chatbots fetching this page live in response to a specific user request.', 'tabler-robot', MetricUnit::Count, 30, '#4c6ef5'),
-            new MetricDefinition('bot.ai_crawler', 'AI crawlers', 'Requests from AI crawlers collecting content for model training or an AI search index.', 'tabler-spider', MetricUnit::Count, 40, '#ae3ec9'),
-            new MetricDefinition('bot.search', 'Search indexers', 'Requests from real search-engine indexers building their search index.', 'tabler-world-search', MetricUnit::Count, 50, '#0ca678'),
-            new MetricDefinition('bot.social', 'Social/link previews', 'Requests from social platforms generating link previews for shared URLs.', 'tabler-share', MetricUnit::Count, 60, '#f06595'),
-            new MetricDefinition('bot.tool', 'SEO tools & scripts', 'Requests from SEO tools, monitoring services and generic HTTP clients.', 'tabler-tool', MetricUnit::Count, 70, '#f59f00'),
+            new MetricDefinition('bot.ai_chatbot', 'AI chatbots', 'Requests from AI chatbots fetching this page live in response to a specific user request.', 'tabler-robot', MetricUnit::Count, 30, '#4c6ef5', MetricPolarity::Neutral),
+            new MetricDefinition('bot.ai_crawler', 'AI crawlers', 'Requests from AI crawlers collecting content for model training or an AI search index.', 'tabler-spider', MetricUnit::Count, 40, '#ae3ec9', MetricPolarity::Neutral),
+            new MetricDefinition('bot.search', 'Search indexers', 'Requests from real search-engine indexers building their search index.', 'tabler-world-search', MetricUnit::Count, 50, '#0ca678', MetricPolarity::Neutral),
+            new MetricDefinition('bot.social', 'Social/link previews', 'Requests from social platforms generating link previews for shared URLs.', 'tabler-share', MetricUnit::Count, 60, '#f06595', MetricPolarity::Neutral),
+            new MetricDefinition('bot.tool', 'SEO tools & scripts', 'Requests from SEO tools, monitoring services and generic HTTP clients.', 'tabler-tool', MetricUnit::Count, 70, '#f59f00', MetricPolarity::Neutral),
         ];
     }
 

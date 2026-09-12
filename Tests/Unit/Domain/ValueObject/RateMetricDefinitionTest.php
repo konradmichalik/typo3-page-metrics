@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\RateMetricDefinition;
 use PHPUnit\Framework\TestCase;
 
@@ -36,6 +36,7 @@ final class RateMetricDefinitionTest extends TestCase
             '#bf8700',
             'matomo.time_spent_seconds',
             'matomo.visits',
+            MetricPolarity::Neutral,
         );
 
         self::assertSame('matomo.avg_time_on_page', $definition->identifier);
@@ -47,5 +48,6 @@ final class RateMetricDefinitionTest extends TestCase
         self::assertSame('#bf8700', $definition->color);
         self::assertSame('matomo.time_spent_seconds', $definition->numerator);
         self::assertSame('matomo.visits', $definition->denominator);
+        self::assertSame(MetricPolarity::Neutral, $definition->polarity);
     }
 }

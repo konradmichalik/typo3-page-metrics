@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
 
 /**
  * MetricDefinition.
@@ -36,6 +36,6 @@ final readonly class MetricDefinition
         public MetricUnit $unit,
         public int $sortOrder,
         public string $color,
-        public ?int $maxDimensions = null,
+        public MetricPolarity $polarity = MetricPolarity::HigherIsBetter,
     ) {}
 }

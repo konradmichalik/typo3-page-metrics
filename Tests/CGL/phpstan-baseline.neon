@@ -22,17 +22,28 @@ parameters:
 			count: 1
 			path: ../../Classes/UserFunction/AnnotationSiteItemsProcFunc.php
 		-
-			# MetricDefinition and UrlMetric are `@api` value objects whose trailing
-			# nullable parameter (maxDimensions / dimension) means "not applicable"
-			# for the common case. Removing the default would force every call
-			# site (both production sources and their tests, several of which
-			# assert the "defaults to null" behaviour by name) to pass an explicit
-			# `null`, for no correctness benefit - the constructor is not
-			# ambiguous, it has a single obvious optional trailing field. Accepted
-			# as an intentional, already-tested API shape rather than a defect.
+			# MetricDefinition, RateMetricDefinition, MetricTile and UrlMetric are
+			# `@api` value objects whose trailing optional parameter (polarity /
+			# dimension) carries the overwhelmingly common case as its default:
+			# almost every metric is one where a rise is an improvement, and
+			# almost every UrlMetric has no dimension. Removing the default would
+			# force every call site, including third-party providers and tile
+			# listeners, to spell out that common case for no correctness
+			# benefit - the constructor is not ambiguous, it has a single obvious
+			# optional trailing field. Accepted as an intentional, already-tested
+			# API shape rather than a defect. TopPage, which is not `@api` and has
+			# exactly one call site, deliberately does not get a default.
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
 			count: 1
 			path: ../../Classes/Domain/ValueObject/MetricDefinition.php
+		-
+			identifier: ergebnis.noConstructorParameterWithDefaultValue
+			count: 1
+			path: ../../Classes/Domain/ValueObject/RateMetricDefinition.php
+		-
+			identifier: ergebnis.noConstructorParameterWithDefaultValue
+			count: 1
+			path: ../../Classes/Domain/ValueObject/MetricTile.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
 			count: 1

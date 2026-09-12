@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection, UnresolvedReason};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendSentiment, UnresolvedReason};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, DataFreshness, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
@@ -130,7 +130,7 @@ final readonly class SiteMetricsOverviewBuilder
      *
      * @return ?list<TopPage> null when no provider supports $site
      */
-    public function buildTrendPages(Site $site, int $languageId, int $periodDays, TrendDirection $direction, ?string $preferredMetricIdentifier = null, int $limit = self::TOP_PAGES_LIMIT): ?array
+    public function buildTrendPages(Site $site, int $languageId, int $periodDays, TrendSentiment $sentiment, ?string $preferredMetricIdentifier = null, int $limit = self::TOP_PAGES_LIMIT): ?array
     {
         $provider = $this->resolveProvider($site);
 
@@ -143,7 +143,7 @@ final readonly class SiteMetricsOverviewBuilder
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
 
-        return $this->trendCalculator->rankedByTrend($pageUids, $languageId, $metric, $currentRange, $previousRange, $direction, $limit);
+        return $this->trendCalculator->rankedByTrend($pageUids, $languageId, $metric, $currentRange, $previousRange, $sentiment, $limit);
     }
 
     /**

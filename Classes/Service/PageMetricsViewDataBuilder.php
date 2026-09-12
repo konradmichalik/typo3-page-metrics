@@ -342,6 +342,7 @@ final readonly class PageMetricsViewDataBuilder
             $redirectSharePercent,
             $externalLink,
             null !== $deltaPercent ? $this->formatValue($previousValue, $definition->unit) : '',
+            $definition->polarity,
         );
     }
 
@@ -389,6 +390,7 @@ final readonly class PageMetricsViewDataBuilder
             0,
             $externalLink,
             null !== $deltaPercent ? $this->formatValue($previousValue, $definition->unit) : '',
+            $definition->polarity,
         );
     }
 

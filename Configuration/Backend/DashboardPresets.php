@@ -33,11 +33,11 @@ return [
             ],
             [
                 'identifier' => 'pageMetricsTrend',
-                'settings' => ['direction' => 'up'],
+                'settings' => ['sentiment' => 'positive'],
             ],
             [
                 'identifier' => 'pageMetricsTrend',
-                'settings' => ['direction' => 'down'],
+                'settings' => ['sentiment' => 'negative'],
             ],
             'pageMetricsTopPages',
             'pageMetricsNotFoundPages',
