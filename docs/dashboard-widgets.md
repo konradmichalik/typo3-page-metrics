@@ -6,7 +6,7 @@ visible site-wide, without opening the page module. Registration is
 conditional: on installations without EXT:dashboard, none of this loads (see
 `Configuration/Services.php`).
 
-Each widget lists every site that has a configured metric source, and is
+Each widget lists every site that has a configured metric provider, and is
 skipped entirely for sites without one.
 
 ![The Page Metrics dashboard preset: tiles, chart, two compact charts, trend and most viewed pages](img/dashboard-widgets.png)
@@ -30,7 +30,7 @@ than a single one.
 The chart and trend widgets' **Metric** setting both default to each
 site's primary metric. Picking one explicitly is only meaningful for a
 single-site widget instance: a multi-site widget falls back to each
-site's own primary metric for any site whose source doesn't support the
+site's own primary metric for any site whose provider doesn't support the
 configured one.
 
 ## Most viewed pages: page level and subpages

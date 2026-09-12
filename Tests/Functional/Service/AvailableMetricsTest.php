@@ -22,10 +22,10 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 /**
  * AvailableMetricsTest.
  *
- * Covers SiteMetricsOverviewBuilder::availableMetrics() where several sources
+ * Covers SiteMetricsOverviewBuilder::availableMetrics() where several providers
  * are relevant for the same site and reuse each other's labels. Needs its own
  * test class because testExtensionsToLoad is fixed per class and this loads a
- * third-party source fixture on top of the two built-in ones.
+ * third-party provider fixture on top of the two built-in ones.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
@@ -33,7 +33,7 @@ final class AvailableMetricsTest extends FunctionalTestCase
 {
     protected array $testExtensionsToLoad = [
         'konradmichalik/typo3-page-metrics',
-        __DIR__.'/Fixtures/Extensions/page_metrics_demo_source',
+        __DIR__.'/Fixtures/Extensions/page_metrics_demo_provider',
     ];
 
     private SiteMetricsOverviewBuilder $subject;
@@ -61,27 +61,27 @@ final class AvailableMetricsTest extends FunctionalTestCase
         parent::tearDown();
     }
 
-    public function testPrefixesOnlyThoseLabelsSeveralRelevantSourcesShare(): void
+    public function testPrefixesOnlyThoseLabelsSeveralRelevantProvidersShare(): void
     {
-        $metrics = $this->subject->availableMetrics([$this->writeSiteWithBothBuiltInSources()]);
+        $metrics = $this->subject->availableMetrics([$this->writeSiteWithBothBuiltInProviders()]);
 
         // "Page views" exists in Matomo, GA4 and the third-party fixture, so
-        // every one of them is disambiguated by its source's display name.
+        // every one of them is disambiguated by its provider's display name.
         self::assertSame('Matomo: Page views', $metrics['matomo.pageviews']);
         self::assertSame('GA4: Page views', $metrics['ga4.pageviews']);
 
-        // A label unique among the relevant sources stays as it is.
+        // A label unique among the relevant providers stays as it is.
         self::assertSame('Visits', $metrics['matomo.visits']);
     }
 
-    public function testFallsBackToACapitalizedIdentifierForAThirdPartySource(): void
+    public function testFallsBackToACapitalizedIdentifierForAThirdPartyProvider(): void
     {
-        $metrics = $this->subject->availableMetrics([$this->writeSiteWithBothBuiltInSources()]);
+        $metrics = $this->subject->availableMetrics([$this->writeSiteWithBothBuiltInProviders()]);
 
         self::assertSame('Demo: Page views', $metrics['demo.pageviews']);
     }
 
-    private function writeSiteWithBothBuiltInSources(): Site
+    private function writeSiteWithBothBuiltInProviders(): Site
     {
         $this->get(SiteWriter::class)->write('main', [
             'rootPageId' => 1,
@@ -92,7 +92,7 @@ final class AvailableMetricsTest extends FunctionalTestCase
             'errorHandling' => [],
             'routes' => [],
             'pageMetrics' => [
-                'sources' => [
+                'providers' => [
                     'matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x'],
                     'ga4' => ['propertyId' => '123456789', 'serviceAccountKeyFilePath' => $this->keyFilePath],
                 ],

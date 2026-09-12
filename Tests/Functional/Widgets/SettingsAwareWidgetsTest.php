@@ -82,7 +82,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertArrayHasKey(30, $definitions[2]->enum);
     }
 
-    public function testChartWidgetMetricSettingOnlyOffersMetricsFromConfiguredSources(): void
+    public function testChartWidgetMetricSettingOnlyOffersMetricsFromConfiguredProviders(): void
     {
         $this->writeSiteConfiguration();
         $widget = $this->get('dashboard.widget.pageMetricsChart');
@@ -225,7 +225,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertArrayHasKey('matomo.bounce_rate', $definitions[0]->enum);
     }
 
-    public function testTrendWidgetMetricSettingOnlyOffersMetricsFromConfiguredSources(): void
+    public function testTrendWidgetMetricSettingOnlyOffersMetricsFromConfiguredProviders(): void
     {
         $this->writeSiteConfiguration();
         $widget = $this->get('dashboard.widget.pageMetricsTrend');
@@ -439,7 +439,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertSame($css, $topPages->getCssFiles());
     }
 
-    public function testEachSettingsAwareWidgetSkipsSitesWithoutAConfiguredMetricSource(): void
+    public function testEachSettingsAwareWidgetSkipsSitesWithoutAConfiguredMetricProvider(): void
     {
         $this->writeSiteConfiguration();
         $this->writeUnconfiguredSiteConfiguration();
@@ -561,7 +561,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
             ],
             'errorHandling' => [],
             'routes' => [],
-            'pageMetrics' => ['sources' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
+            'pageMetrics' => ['providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
         ]);
     }
 }

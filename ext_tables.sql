@@ -3,20 +3,20 @@ CREATE TABLE tx_typo3pagemetrics_daily (
 	date date NOT NULL,
 	page_uid int(11) unsigned DEFAULT '0' NOT NULL,
 	sys_language_uid int(11) DEFAULT '0' NOT NULL,
-	source varchar(32) DEFAULT '' NOT NULL,
+	provider varchar(32) DEFAULT '' NOT NULL,
 	metric varchar(64) DEFAULT '' NOT NULL,
 	dimension varchar(255) DEFAULT '' NOT NULL,
 	value int(11) DEFAULT '0' NOT NULL,
 
 	PRIMARY KEY (uid),
 	KEY page_date (page_uid,sys_language_uid,date),
-	UNIQUE KEY fact (date,page_uid,sys_language_uid,source,metric,dimension)
+	UNIQUE KEY fact (date,page_uid,sys_language_uid,provider,metric,dimension)
 );
 
 CREATE TABLE tx_typo3pagemetrics_unresolved (
 	uid int(11) unsigned NOT NULL auto_increment,
 	date date NOT NULL,
-	source varchar(32) DEFAULT '' NOT NULL,
+	provider varchar(32) DEFAULT '' NOT NULL,
 	url_hash varchar(40) DEFAULT '' NOT NULL,
 	url varchar(2048) DEFAULT '' NOT NULL,
 	metric varchar(64) DEFAULT '' NOT NULL,
@@ -24,32 +24,50 @@ CREATE TABLE tx_typo3pagemetrics_unresolved (
 	value int(11) DEFAULT '0' NOT NULL,
 
 	PRIMARY KEY (uid),
-	KEY date_source (date,source),
-	UNIQUE KEY fact (date,source,url_hash,metric)
+	KEY date_provider (date,provider),
+	UNIQUE KEY fact (date,provider,url_hash,metric)
 );
 
 CREATE TABLE tx_typo3pagemetrics_import (
 	uid int(11) unsigned NOT NULL auto_increment,
-	source varchar(32) DEFAULT '' NOT NULL,
+	provider varchar(32) DEFAULT '' NOT NULL,
 	site_identifier varchar(255) DEFAULT '' NOT NULL,
 	last_imported_date date NOT NULL,
 	tstamp int(11) unsigned DEFAULT '0' NOT NULL,
 
 	PRIMARY KEY (uid),
-	UNIQUE KEY source_site (source,site_identifier)
+	UNIQUE KEY provider_site (provider,site_identifier)
 );
 
 CREATE TABLE tx_typo3pagemetrics_annotation (
 	uid int(11) unsigned NOT NULL auto_increment,
 	date date NOT NULL,
 	site_identifier varchar(255) DEFAULT '' NOT NULL,
-	source varchar(32) DEFAULT '' NOT NULL,
+	provider varchar(32) DEFAULT '' NOT NULL,
 	annotation_id varchar(32) DEFAULT '' NOT NULL,
 	text varchar(1024) DEFAULT '' NOT NULL,
 
 	PRIMARY KEY (uid),
 	KEY site_date (site_identifier,date),
-	UNIQUE KEY fact (source,site_identifier,annotation_id)
+	UNIQUE KEY fact (provider,site_identifier,annotation_id)
+);
+
+CREATE TABLE tx_typo3pagemetrics_bot_agent_daily (
+	uid int(11) unsigned NOT NULL auto_increment,
+	date date NOT NULL,
+	site_identifier varchar(255) DEFAULT '' NOT NULL,
+	page_uid int(11) unsigned DEFAULT '0' NOT NULL,
+	sys_language_uid int(11) DEFAULT '0' NOT NULL,
+	bucket varchar(20) DEFAULT '' NOT NULL,
+	agent varchar(255) DEFAULT '' NOT NULL,
+	agent_hash char(40) DEFAULT '' NOT NULL,
+	hits int(11) unsigned DEFAULT '0' NOT NULL,
+	hits_suspicious int(11) unsigned DEFAULT '0' NOT NULL,
+
+	PRIMARY KEY (uid),
+	KEY site_date (site_identifier,date),
+	KEY page_date (page_uid,sys_language_uid,date),
+	UNIQUE KEY fact (date,site_identifier,page_uid,sys_language_uid,bucket,agent_hash)
 );
 
 # uid/pid and the standard ctrl fields (tstamp, crdate, cruser_id, deleted,

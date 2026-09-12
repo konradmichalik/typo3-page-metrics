@@ -88,7 +88,7 @@ final class SiteMetricsWidgetsTest extends FunctionalTestCase
         }
     }
 
-    public function testSkipsSitesWithoutAConfiguredMetricSource(): void
+    public function testSkipsSitesWithoutAConfiguredMetricProvider(): void
     {
         $this->writeSiteConfiguration();
         $this->get(SiteWriter::class)->write('unconfigured', [
@@ -143,7 +143,7 @@ final class SiteMetricsWidgetsTest extends FunctionalTestCase
             ],
             'errorHandling' => [],
             'routes' => [],
-            'pageMetrics' => ['sources' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
+            'pageMetrics' => ['providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
         ]);
     }
 }

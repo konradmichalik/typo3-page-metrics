@@ -18,9 +18,9 @@ use DateTimeImmutable;
 /**
  * UrlMetric.
  *
- * One (date, url, metric, value) fact yielded by a MetricSourceInterface,
+ * One (date, url, metric, value) fact yielded by a MetricProviderInterface,
  * before resolution. This is the deliberately narrow common denominator
- * every source must fit into.
+ * every provider must fit into.
  *
  * @api
  *

@@ -36,14 +36,14 @@ class DailyMetricsRepository
         private readonly ConnectionPool $connectionPool,
     ) {}
 
-    public function upsert(int $pageUid, int $languageUid, string $source, DateTimeImmutable $date, string $metric, int $value, ?string $dimension = null): void
+    public function upsert(int $pageUid, int $languageUid, string $provider, DateTimeImmutable $date, string $metric, int $value, ?string $dimension = null): void
     {
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $identity = [
             'date' => $date->format('Y-m-d'),
             'page_uid' => $pageUid,
             'sys_language_uid' => $languageUid,
-            'source' => $source,
+            'provider' => $provider,
             'metric' => $metric,
             'dimension' => $dimension ?? '',
         ];

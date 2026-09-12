@@ -145,7 +145,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
      * name(s), makes the settings a user picked visible without opening the
      * settings dialog. Reads the metric name(s) off the overview itself
      * rather than the raw "metric"/"metric2" settings: a configured metric
-     * the site's source doesn't support falls back to the primary metric or
+     * the site's provider doesn't support falls back to the primary metric or
      * is dropped (see build()), and the label needs to reflect what's
      * actually plotted, not what was asked for. A multi-site widget keeps
      * its per-site labels in the content instead, since different sites can
@@ -187,7 +187,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
         foreach ($this->siteFinder->getAllSites() as $site) {
             $overview = $this->overviewBuilder->build($site, 0, $periodDays, $preferredMetricIdentifier, $additionalMetricIdentifiers);
 
-            if (!$overview->hasSource) {
+            if (!$overview->hasProvider) {
                 continue;
             }
 

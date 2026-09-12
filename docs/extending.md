@@ -2,7 +2,7 @@
 
 Any extension can contribute an additional tile to the page module header
 by listening to `ModifyMetricTilesEvent`, without implementing the full
-`MetricSourceInterface` contract (`getIdentifier()`/`supports()`/`fetch()`/
+`MetricProviderInterface` contract (`getIdentifier()`/`supports()`/`fetch()`/
 definitions). This is the right approach when the tile's data does not come
 from the daily-import pipeline at all, e.g. a value computed on the fly or
 read from another extension's own storage.
@@ -27,7 +27,7 @@ final class AddCustomTileEventListener
         $event->addTile(new MetricTile(
             identifier: 'my_extension.custom_metric',
             label: 'Custom metric',
-            description: 'Shown on every page, regardless of the configured metric source.',
+            description: 'Shown on every page, regardless of the configured metric provider.',
             icon: 'actions-plus',
             color: '#57606a',
             unit: MetricUnit::Count,
@@ -45,14 +45,14 @@ final class AddCustomTileEventListener
 ```
 
 The event is dispatched once per page-header render, after the built-in
-`MetricSourceInterface` sources (Matomo, GA4) have already contributed their
-own tiles via `$event->getTiles()`. It also exposes `$event->site`,
+`MetricProviderInterface` providers (Matomo, GA4) have already contributed
+their own tiles via `$event->getTiles()`. It also exposes `$event->site`,
 `$event->pageId`, `$event->languageId` and the `DateRange`s the tiles were
 built for (`$event->tileRange`, `$event->previousRange`,
 `$event->sparklineRange`), so a listener can tailor its tile to the same
 period the built-in tiles use.
 
-For a source that needs its own daily-import step, its own configurable
+For a provider that needs its own daily-import step, its own configurable
 retention and to participate in the dashboard widgets, implement
-`MetricSourceInterface` instead, see the `Matomo` and `Ga4` sources under
-`Classes/Source/` for a full example.
+`MetricProviderInterface` instead, see the `Matomo`, `Ga4` and `AccessLog`
+providers under `Classes/Provider/` for a full example.

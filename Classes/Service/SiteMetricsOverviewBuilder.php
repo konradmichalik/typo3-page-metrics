@@ -17,7 +17,7 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection, UnresolvedReason};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
-use KonradMichalik\Typo3PageMetrics\Source\MetricSourceInterface;
+use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 use function in_array;
@@ -30,8 +30,8 @@ use function ucfirst;
  * The site-wide counterpart to PageMetricsViewDataBuilder - backs the four
  * dashboard widgets (chart, top pages, not-found pages, annotations) the
  * same way that class backs the PageHeader tiles. Ranks "most viewed pages"
- * by whichever metric a supporting source declares first (lowest
- * sortOrder), the source's own "pageviews"-equivalent by convention - the
+ * by whichever metric a supporting provider declares first (lowest
+ * sortOrder), the provider's own "pageviews"-equivalent by convention - the
  * chart can be pointed at a different metric via $preferredMetricIdentifier.
  * The "biggest trend" widget goes through buildTrendPages() instead, since
  * it has its own period and ranking axis independent of the others. Per-page
@@ -45,7 +45,7 @@ final readonly class SiteMetricsOverviewBuilder
     private const UNRESOLVED_LIMIT = 5;
 
     /**
-     * @param iterable<MetricSourceInterface> $sources
+     * @param iterable<MetricProviderInterface> $providers
      */
     public function __construct(
         private SitePageUidRepository $pageUidRepository,
@@ -54,22 +54,22 @@ final readonly class SiteMetricsOverviewBuilder
         private AnnotationRepository $annotationRepository,
         private ManualAnnotationRepository $manualAnnotationRepository,
         private PageTrendCalculator $trendCalculator,
-        private iterable $sources,
+        private iterable $providers,
     ) {}
 
     /**
-     * @param list<string> $additionalMetricIdentifiers overlaid on the chart alongside $preferredMetricIdentifier (see PageMetricsChartWidget's metric2 setting) - an identifier not belonging to this site's own source is silently dropped, the same fallback buildAdditionalChartSeries() already applies to $preferredMetricIdentifier
+     * @param list<string> $additionalMetricIdentifiers overlaid on the chart alongside $preferredMetricIdentifier (see PageMetricsChartWidget's metric2 setting) - an identifier not belonging to this site's own provider is silently dropped, the same fallback buildAdditionalChartSeries() already applies to $preferredMetricIdentifier
      */
     public function build(Site $site, int $languageId, int $periodDays, ?string $preferredMetricIdentifier = null, array $additionalMetricIdentifiers = []): SiteMetricsOverview
     {
-        $source = $this->resolveSource($site);
+        $provider = $this->resolveProvider($site);
 
-        if (null === $source) {
-            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], []);
+        if (null === $provider) {
+            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], []);
         }
 
-        $primary = $this->primaryDefinition($source);
-        $chartMetric = $this->resolveChartMetric($source, $preferredMetricIdentifier) ?? $primary;
+        $primary = $this->primaryDefinition($provider);
+        $chartMetric = $this->resolveChartMetric($provider, $preferredMetricIdentifier) ?? $primary;
 
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
@@ -85,7 +85,7 @@ final readonly class SiteMetricsOverviewBuilder
             $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT),
             $this->buildUnresolvedUrls($site),
             $this->buildAnnotations($site->getIdentifier(), $currentRange),
-            $this->buildAdditionalChartSeries($source, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange),
+            $this->buildAdditionalChartSeries($provider, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange),
         );
     }
 
@@ -93,22 +93,22 @@ final readonly class SiteMetricsOverviewBuilder
      * The highest (direction: Up) or lowest (direction: Down) trending
      * pages by $preferredMetricIdentifier (the site's primary metric when
      * null, or when the requested identifier does not belong to this
-     * site's own source), over their own period - used by the standalone
+     * site's own provider), over their own period - used by the standalone
      * "trend" widget, which is user-configurable for all three independent
      * of the other widgets' fixed periods.
      *
-     * @return ?list<TopPage> null when no source supports $site
+     * @return ?list<TopPage> null when no provider supports $site
      */
     public function buildTrendPages(Site $site, int $languageId, int $periodDays, TrendDirection $direction, ?string $preferredMetricIdentifier = null, int $limit = self::TOP_PAGES_LIMIT): ?array
     {
-        $source = $this->resolveSource($site);
+        $provider = $this->resolveProvider($site);
 
-        if (null === $source) {
+        if (null === $provider) {
             return null;
         }
 
-        $primary = $this->primaryDefinition($source);
-        $metric = $this->resolveChartMetric($source, $preferredMetricIdentifier) ?? $primary;
+        $primary = $this->primaryDefinition($provider);
+        $metric = $this->resolveChartMetric($provider, $preferredMetricIdentifier) ?? $primary;
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
 
@@ -126,17 +126,17 @@ final readonly class SiteMetricsOverviewBuilder
      * of its own subpages' - without a level, every individual page is
      * already its own row, so there is nothing to roll up into.
      *
-     * @return ?list<TopPage> null when no source supports $site
+     * @return ?list<TopPage> null when no provider supports $site
      */
     public function buildTopPagesForSite(Site $site, int $languageId, int $periodDays, ?int $level = null, bool $includeSubpages = false): ?array
     {
-        $source = $this->resolveSource($site);
+        $provider = $this->resolveProvider($site);
 
-        if (null === $source) {
+        if (null === $provider) {
             return null;
         }
 
-        $primary = $this->primaryDefinition($source);
+        $primary = $this->primaryDefinition($provider);
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
 
         if (null !== $level && $includeSubpages) {
@@ -156,33 +156,33 @@ final readonly class SiteMetricsOverviewBuilder
     }
 
     /**
-     * Which source ends up serving a given site is already resolved
-     * automatically from site configuration (see resolveSource()) - callers
+     * Which provider ends up serving a given site is already resolved
+     * automatically from site configuration (see resolveProvider()) - callers
      * pass the sites the resulting list needs to cover ($sites), so an
-     * installation only ever using one source never has to show it, even
+     * installation only ever using one provider never has to show it, even
      * though both Matomo and GA4 support classes are always registered
      * (see Configuration/Services.yaml) regardless of which sites actually
-     * use them. Within whatever sources are relevant, labels are only
-     * prefixed with the owning source's display name for the identifiers
-     * that actually need it: different sources reuse the same label text
+     * use them. Within whatever providers are relevant, labels are only
+     * prefixed with the owning provider's display name for the identifiers
+     * that actually need it: different providers reuse the same label text
      * for several metrics (Matomo and GA4 both call metrics "Page views",
      * "Avg. time on page" and "Bounce rate"), which would otherwise leave
      * identical-looking, differently-behaving entries in the dropdown once
-     * a site mix pulls in both. A label unique among the relevant sources
+     * a site mix pulls in both. A label unique among the relevant providers
      * (e.g. Matomo's "Visits" vs. GA4's "Sessions") is shown as-is.
      *
-     * @param array<Site> $sites restricts the result to sources supporting at least one of these sites
+     * @param array<Site> $sites restricts the result to providers supporting at least one of these sites
      *
-     * @return array<string, string> metric identifier => label, across every relevant source
+     * @return array<string, string> metric identifier => label, across every relevant provider
      */
     public function availableMetrics(array $sites): array
     {
-        $sources = $this->relevantSources($sites);
+        $providers = $this->relevantProviders($sites);
         $definitions = [];
 
-        foreach ($sources as $source) {
-            foreach ([...$source->getMetricDefinitions(), ...$source->getRateMetricDefinitions()] as $definition) {
-                $definitions[$definition->identifier] = ['source' => $source, 'label' => $definition->label];
+        foreach ($providers as $provider) {
+            foreach ([...$provider->getMetricDefinitions(), ...$provider->getRateMetricDefinitions()] as $definition) {
+                $definitions[$definition->identifier] = ['provider' => $provider, 'label' => $definition->label];
             }
         }
 
@@ -192,7 +192,7 @@ final readonly class SiteMetricsOverviewBuilder
 
         foreach ($definitions as $identifier => $definition) {
             $metrics[$identifier] = $labelCounts[$definition['label']] > 1
-                ? sprintf('%s: %s', $this->sourceDisplayName($definition['source']), $definition['label'])
+                ? sprintf('%s: %s', $this->providerDisplayName($definition['provider']), $definition['label'])
                 : $definition['label'];
         }
 
@@ -202,81 +202,81 @@ final readonly class SiteMetricsOverviewBuilder
     /**
      * @param array<Site> $sites
      *
-     * @return list<MetricSourceInterface>
+     * @return list<MetricProviderInterface>
      */
-    private function relevantSources(array $sites): array
+    private function relevantProviders(array $sites): array
     {
-        $sources = [];
+        $providers = [];
 
-        foreach ($this->sources as $source) {
+        foreach ($this->providers as $provider) {
             foreach ($sites as $site) {
-                if ($source->supports($site)) {
-                    $sources[] = $source;
+                if ($provider->supports($site)) {
+                    $providers[] = $provider;
 
                     continue 2;
                 }
             }
         }
 
-        return $sources;
+        return $providers;
     }
 
     /**
-     * MetricSourceInterface has no dedicated display-name method - adding
-     * one would be a breaking change for third-party sources (the interface
-     * is @api, see AnnotationSourceInterface's sibling comment) for the sake
-     * of cosmetics only relevant when several sources are mixed. First-party
-     * sources get a proper name here; anything else falls back to a
+     * MetricProviderInterface has no dedicated display-name method - adding
+     * one would be a breaking change for third-party providers (the interface
+     * is @api, see AnnotationProviderInterface's sibling comment) for the sake
+     * of cosmetics only relevant when several providers are mixed. First-party
+     * providers get a proper name here; anything else falls back to a
      * capitalized identifier rather than failing.
      */
-    private function sourceDisplayName(MetricSourceInterface $source): string
+    private function providerDisplayName(MetricProviderInterface $provider): string
     {
-        return match ($source->getIdentifier()) {
+        return match ($provider->getIdentifier()) {
             'matomo' => 'Matomo',
             'ga4' => 'GA4',
-            default => ucfirst($source->getIdentifier()),
+            default => ucfirst($provider->getIdentifier()),
         };
     }
 
-    private function resolveSource(Site $site): ?MetricSourceInterface
+    private function resolveProvider(Site $site): ?MetricProviderInterface
     {
-        foreach ($this->sources as $source) {
-            if ($source->supports($site)) {
-                return $source;
+        foreach ($this->providers as $provider) {
+            if ($provider->supports($site)) {
+                return $provider;
             }
         }
 
         return null;
     }
 
-    private function primaryDefinition(MetricSourceInterface $source): MetricDefinition
+    private function primaryDefinition(MetricProviderInterface $provider): MetricDefinition
     {
-        $definitions = $source->getMetricDefinitions();
+        $definitions = $provider->getMetricDefinitions();
         usort($definitions, static fn (MetricDefinition $a, MetricDefinition $b): int => $a->sortOrder <=> $b->sortOrder);
 
         return $definitions[0];
     }
 
     /**
-     * Resolves $preferredMetricIdentifier against $source's own metrics
+     * Resolves $preferredMetricIdentifier against $provider's own metrics
      * (count and rate alike) - null when no identifier was requested, or
-     * the requested one does not belong to this site's own source (e.g. a
+     * the requested one does not belong to this site's own provider (e.g. a
      * chart widget configured for a Matomo metric on a GA4-only site),
      * both cases falling back to the primary metric in build().
      */
-    private function resolveChartMetric(MetricSourceInterface $source, ?string $preferredMetricIdentifier): MetricDefinition|RateMetricDefinition|null
+    private function resolveChartMetric(MetricProviderInterface $provider, ?string $preferredMetricIdentifier): MetricDefinition|RateMetricDefinition|null
     {
         if (null === $preferredMetricIdentifier || '' === $preferredMetricIdentifier) {
             return null;
         }
 
-        foreach ($source->getMetricDefinitions() as $definition) {
+        foreach ($provider->getMetricDefinitions() as $definition) {
             if ($definition->identifier === $preferredMetricIdentifier) {
                 return $definition;
             }
         }
 
-        foreach ($source->getRateMetricDefinitions() as $definition) {
+        foreach ($provider->getRateMetricDefinitions() as $definition) {
             if ($definition->identifier === $preferredMetricIdentifier) {
                 return $definition;
             }
@@ -308,9 +308,9 @@ final readonly class SiteMetricsOverviewBuilder
     }
 
     /**
-     * Resolves each of $metricIdentifiers against $source the same way the
+     * Resolves each of $metricIdentifiers against $provider the same way the
      * primary chart metric is resolved (see resolveChartMetric()) - an
-     * identifier not belonging to this site's own source, or a duplicate of
+     * identifier not belonging to this site's own provider, or a duplicate of
      * one already resolved, is silently dropped rather than surfaced as an
      * error, matching the existing single-metric fallback behaviour.
      *
@@ -319,7 +319,7 @@ final readonly class SiteMetricsOverviewBuilder
      *
      * @return list<ChartSeries>
      */
-    private function buildAdditionalChartSeries(MetricSourceInterface $source, array $metricIdentifiers, array $pageUids, int $languageId, DateRange $range): array
+    private function buildAdditionalChartSeries(MetricProviderInterface $provider, array $metricIdentifiers, array $pageUids, int $languageId, DateRange $range): array
     {
         $series = [];
         $seenIdentifiers = [];
@@ -329,7 +329,7 @@ final readonly class SiteMetricsOverviewBuilder
                 continue;
             }
 
-            $metric = $this->resolveChartMetric($source, $identifier);
+            $metric = $this->resolveChartMetric($provider, $identifier);
 
             if (null === $metric) {
                 continue;

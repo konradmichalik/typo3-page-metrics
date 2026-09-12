@@ -131,7 +131,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
      * the settings dialog. Unlike the chart widget, the metric segment is
      * built from the raw setting value rather than a per-site resolved
      * label: direction and period are already setting-based here, and a
-     * per-site fallback (a configured metric one site's source doesn't
+     * per-site fallback (a configured metric one site's provider doesn't
      * support) is a rarer edge case for a ranking than for a single chart
      * line.
      */

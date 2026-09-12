@@ -95,7 +95,7 @@ abstract class AbstractSiteMetricsWidget implements WidgetInterface, RequestAwar
         foreach ($this->siteFinder->getAllSites() as $site) {
             $overview = $this->overviewBuilder->build($site, 0, $this->periodDays());
 
-            if (!$overview->hasSource) {
+            if (!$overview->hasProvider) {
                 continue;
             }
 

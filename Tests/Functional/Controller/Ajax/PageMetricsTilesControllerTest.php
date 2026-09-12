@@ -281,7 +281,7 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
             ],
             'errorHandling' => [],
             'routes' => [],
-            'pageMetrics' => ['sources' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
+            'pageMetrics' => ['providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
         ]);
     }
 }

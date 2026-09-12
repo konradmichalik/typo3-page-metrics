@@ -37,7 +37,7 @@ final readonly class SiteMetricsOverview
      */
     public function __construct(
         public Site $site,
-        public bool $hasSource,
+        public bool $hasProvider,
         public string $chartLabel,
         public string $chartIcon,
         public string $chartColor,
@@ -46,6 +46,6 @@ final readonly class SiteMetricsOverview
         public array $topPages,
         public array $unresolvedUrls,
         public array $annotations,
-        public array $additionalChartSeries = [],
+        public array $additionalChartSeries,
     ) {}
 }

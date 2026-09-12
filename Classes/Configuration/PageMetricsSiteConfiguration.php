@@ -21,13 +21,13 @@ namespace KonradMichalik\Typo3PageMetrics\Configuration;
 final readonly class PageMetricsSiteConfiguration
 {
     /**
-     * @param array<string, array<string, mixed>> $sources
+     * @param array<string, array<string, mixed>> $providers
      * @param list<string>                        $keepQueryParams
      * @param list<string>                        $additionalHosts
      */
     public function __construct(
         public bool $enabled,
-        public array $sources,
+        public array $providers,
         public bool $dropQueryString,
         public array $keepQueryParams,
         public int $retentionDays,

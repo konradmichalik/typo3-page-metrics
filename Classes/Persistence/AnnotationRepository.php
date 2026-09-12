@@ -34,11 +34,11 @@ class AnnotationRepository
         private readonly ConnectionPool $connectionPool,
     ) {}
 
-    public function upsert(string $siteIdentifier, string $source, string $annotationId, DateTimeImmutable $date, string $text): void
+    public function upsert(string $siteIdentifier, string $provider, string $annotationId, DateTimeImmutable $date, string $text): void
     {
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $identity = [
-            'source' => $source,
+            'provider' => $provider,
             'site_identifier' => $siteIdentifier,
             'annotation_id' => $annotationId,
         ];

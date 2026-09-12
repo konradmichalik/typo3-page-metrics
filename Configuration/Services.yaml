@@ -15,6 +15,9 @@ services:
         exclude:
             - '../Classes/Widgets/*'
 
+    KonradMichalik\Typo3PageMetrics\Analysis\Guard\SpoofingGuardInterface:
+        alias: KonradMichalik\Typo3PageMetrics\Analysis\Guard\PathHeuristicGuard
+
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming service references it.
     KonradMichalik\Typo3PageMetrics\Resolver\SlugLookup:
@@ -32,7 +35,7 @@ services:
 
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming service references it.
-    KonradMichalik\Typo3PageMetrics\Source\Matomo\MatomoConfigurationResolver:
+    KonradMichalik\Typo3PageMetrics\Provider\Matomo\MatomoConfigurationResolver:
         public: true
 
     # Public so functional tests can fetch it directly via $this->get() before
@@ -42,7 +45,12 @@ services:
 
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming service references it.
-    KonradMichalik\Typo3PageMetrics\Source\Ga4\Ga4ConfigurationResolver:
+    KonradMichalik\Typo3PageMetrics\Provider\Ga4\Ga4ConfigurationResolver:
+        public: true
+
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Provider\AccessLog\AccessLogConfigurationResolver:
         public: true
 
     # Public so functional tests can fetch it directly via $this->get() before
@@ -72,7 +80,17 @@ services:
 
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Persistence\BotAgentDailyRepository:
+        public: true
+
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
     KonradMichalik\Typo3PageMetrics\Persistence\SitePageUidRepository:
+        public: true
+
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector:
         public: true
 
     # Public because GeneralUtility::makeInstance() resolves itemsProcFunc
@@ -86,14 +104,14 @@ services:
     # of dispatching a full ModifyPageLayoutContentEvent.
     KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder:
         arguments:
-            $sources: !tagged_iterator page_metrics.metric_source
+            $providers: !tagged_iterator page_metrics.metric_provider
         public: true
 
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming widget references it.
     KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder:
         arguments:
-            $sources: !tagged_iterator page_metrics.metric_source
+            $providers: !tagged_iterator page_metrics.metric_provider
         public: true
 
     # Public so functional tests can fetch it directly via $this->get() instead
@@ -101,23 +119,33 @@ services:
     KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsTilesController:
         public: true
 
-    KonradMichalik\Typo3PageMetrics\Source\Matomo\MatomoMetricSource:
+    KonradMichalik\Typo3PageMetrics\Provider\Matomo\MatomoMetricProvider:
         tags:
-            - name: page_metrics.metric_source
+            - name: page_metrics.metric_provider
 
-    KonradMichalik\Typo3PageMetrics\Source\Ga4\Ga4MetricSource:
+    KonradMichalik\Typo3PageMetrics\Provider\Ga4\Ga4MetricProvider:
         tags:
-            - name: page_metrics.metric_source
+            - name: page_metrics.metric_provider
 
-    KonradMichalik\Typo3PageMetrics\Source\Matomo\MatomoAnnotationSource:
+    KonradMichalik\Typo3PageMetrics\Provider\AccessLog\AccessLogMetricProvider:
         tags:
-            - name: page_metrics.annotation_source
+            - name: page_metrics.metric_provider
+
+    KonradMichalik\Typo3PageMetrics\Provider\Matomo\MatomoAnnotationProvider:
+        tags:
+            - name: page_metrics.annotation_provider
 
     KonradMichalik\Typo3PageMetrics\Command\ImportCommand:
         arguments:
-            $sources: !tagged_iterator page_metrics.metric_source
-            $annotationSources: !tagged_iterator page_metrics.annotation_source
+            $providers: !tagged_iterator page_metrics.metric_provider
+            $annotationProviders: !tagged_iterator page_metrics.annotation_provider
         tags:
             - name: console.command
               command: 'page-metrics:import'
-              description: 'Import page metrics from configured sources'
+              description: 'Import page metrics from configured providers'
+
+    KonradMichalik\Typo3PageMetrics\Command\AnalyzeCommand:
+        tags:
+            - name: console.command
+              command: 'page-metrics:analyze'
+              description: 'Analyze access logs ad hoc, without writing to the database'

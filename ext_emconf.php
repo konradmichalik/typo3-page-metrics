@@ -11,7 +11,7 @@
 
 $EM_CONF[$_EXTKEY] = [
     'title' => 'Page Metrics',
-    'description' => 'Page-level metrics inside the TYPO3 backend, resolved from arbitrary URLs to page UIDs, from swappable data sources.',
+    'description' => 'Page-level metrics inside the TYPO3 backend, resolved from arbitrary URLs to page UIDs, from swappable data providers.',
     'category' => 'module',
     'author' => 'Konrad Michalik',
     'author_email' => 'hej@konradmichalik.dev',

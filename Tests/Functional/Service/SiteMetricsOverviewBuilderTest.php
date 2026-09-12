@@ -39,14 +39,14 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
         $this->setUpBackendUser(1);
     }
 
-    public function testHasSourceIsFalseWhenNoSiteConfigurationExists(): void
+    public function testHasProviderIsFalseWhenNoSiteConfigurationExists(): void
     {
-        $this->writeSiteConfigurationWithoutSource();
+        $this->writeSiteConfigurationWithoutProvider();
         $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
 
         $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 30);
 
-        self::assertFalse($overview->hasSource);
+        self::assertFalse($overview->hasProvider);
         self::assertSame([], $overview->chartSeries);
         self::assertSame([], $overview->topPages);
     }
@@ -61,7 +61,7 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
 
         $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7);
 
-        self::assertTrue($overview->hasSource);
+        self::assertTrue($overview->hasProvider);
         self::assertSame(15, $overview->chartSeries[$today->format('Y-m-d')]);
         self::assertSame('Page views', $overview->chartLabel);
     }
@@ -108,7 +108,7 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
 
     public function testAdditionalChartSeriesIsEmptyWhenNoSiteConfigurationExists(): void
     {
-        $this->writeSiteConfigurationWithoutSource();
+        $this->writeSiteConfigurationWithoutProvider();
         $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
 
         $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 30, null, ['matomo.visits']);
@@ -196,11 +196,11 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
             ],
             'errorHandling' => [],
             'routes' => [],
-            'pageMetrics' => ['sources' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
+            'pageMetrics' => ['providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
         ]);
     }
 
-    private function writeSiteConfigurationWithoutSource(): void
+    private function writeSiteConfigurationWithoutProvider(): void
     {
         $this->get(SiteWriter::class)->write('main', [
             'rootPageId' => 1,
