@@ -29,6 +29,7 @@ final readonly class PageMetricsSiteConfiguration
      * @param bool                                $automaticAnnotations whether the markers TYPO3 can derive on its own
      *                                                                  (a page edited, a redirect created) are written
      *                                                                  during the import run
+     * @param list<GoalConfiguration>             $goals
      */
     public function __construct(
         public bool $enabled,
@@ -39,5 +40,22 @@ final readonly class PageMetricsSiteConfiguration
         public array $additionalHosts,
         public ?int $annotationStoragePid,
         public bool $automaticAnnotations,
+        public array $goals,
     ) {}
+
+    /**
+     * The goals one provider owns. Goals are declared in a single list for
+     * the whole site rather than inside each provider's own subtree, because
+     * what an operator configures is "what counts as success here", and the
+     * provider is only which account that number is read from.
+     *
+     * @return list<GoalConfiguration>
+     */
+    public function goalsFor(string $providerIdentifier): array
+    {
+        return array_values(array_filter(
+            $this->goals,
+            static fn (GoalConfiguration $goal): bool => $goal->provider === $providerIdentifier,
+        ));
+    }
 }

@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Provider\Matomo;
 
 use DateTimeImmutable;
+use KonradMichalik\Typo3PageMetrics\Configuration\{GoalConfigurationParser, SiteConfigurationReader};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
-use KonradMichalik\Typo3PageMetrics\Provider\Matomo\{MatomoApiClient, MatomoConfiguration, MatomoConfigurationResolver, MatomoMetricProvider};
+use KonradMichalik\Typo3PageMetrics\Provider\Matomo\{MatomoApiClient, MatomoConfiguration, MatomoConfigurationResolver, MatomoGoalMetrics, MatomoMetricProvider};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -38,7 +40,7 @@ final class MatomoMetricProviderTest extends TestCase
     {
         $this->resolver = $this->createMock(MatomoConfigurationResolver::class);
         $this->apiClient = $this->createMock(MatomoApiClient::class);
-        $this->subject = new MatomoMetricProvider($this->resolver, $this->apiClient);
+        $this->subject = new MatomoMetricProvider($this->resolver, $this->apiClient, new MatomoGoalMetrics(new SiteConfigurationReader(new GoalConfigurationParser())));
         $this->site = new Site('main', 1, ['base' => 'https://example.com/']);
     }
 
@@ -65,6 +67,30 @@ final class MatomoMetricProviderTest extends TestCase
         );
 
         self::assertSame(['matomo.avg_time_on_page', 'matomo.bounce_rate'], $identifiers);
+    }
+
+    public function testGetSiteMetricDefinitionsIsEmptyForASiteWithoutGoals(): void
+    {
+        self::assertSame([], $this->subject->getSiteMetricDefinitions($this->site));
+    }
+
+    public function testGetSiteMetricDefinitionsDeclaresOneTilePerGoalPlusItsRevenue(): void
+    {
+        $definitions = $this->subject->getSiteMetricDefinitions($this->siteWithGoals());
+
+        $identifiers = array_map(static fn ($definition) => $definition->identifier, $definitions);
+        self::assertSame(['matomo.goal.3.conversions', 'matomo.goal.3.revenue', 'matomo.goal.ecommerceOrder.conversions'], $identifiers);
+
+        self::assertSame('Newsletter signup', $definitions[0]->label);
+        self::assertSame(MetricUnit::Count, $definitions[0]->unit);
+        self::assertSame(MetricPolarity::HigherIsBetter, $definitions[0]->polarity);
+
+        self::assertSame('Newsletter signup revenue', $definitions[1]->label);
+        self::assertSame(MetricUnit::Currency, $definitions[1]->unit);
+
+        // Behind the fixed metrics, which end at 40.
+        self::assertGreaterThan(40, $definitions[0]->sortOrder);
+        self::assertSame(MetricPolarity::Neutral, $definitions[2]->polarity);
     }
 
     public function testSupportsReturnsTrueWhenConfigurationResolves(): void
@@ -227,6 +253,76 @@ final class MatomoMetricProviderTest extends TestCase
         }
     }
 
+    public function testFetchAsksForGoalColumnsOnlyWhereGoalsAreConfigured(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
+
+        $calls = [];
+        $this->apiClient->method('request')->willReturnCallback(static function (MatomoConfiguration $configuration, array $parameters) use (&$calls): array {
+            $calls[] = $parameters;
+
+            return [];
+        });
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+
+        iterator_to_array($this->subject->fetch($this->site, $range));
+        self::assertArrayNotHasKey('idGoal', $calls[0]);
+        self::assertArrayNotHasKey('filter_update_columns_when_show_all_goals', $calls[0]);
+
+        iterator_to_array($this->subject->fetch($this->siteWithGoals(), $range));
+        self::assertSame(0, $calls[1]['idGoal']);
+        self::assertSame(1, $calls[1]['filter_update_columns_when_show_all_goals']);
+        self::assertSame('Actions.getPageUrls', $calls[1]['method']);
+    }
+
+    public function testFetchYieldsGoalConversionsAndRevenueInMinorUnits(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
+        $this->apiClient->method('request')->willReturn([
+            [
+                'label' => '/foo',
+                'url' => 'https://example.com/foo',
+                'nb_hits' => 10,
+                'goal_3_nb_conversions' => 2,
+                'goal_3_revenue' => 12.5,
+                'goal_ecommerceOrder_nb_conversions' => '1',
+            ],
+        ]);
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+        $metrics = iterator_to_array($this->subject->fetch($this->siteWithGoals(), $range), false);
+
+        self::assertCount(8, $metrics);
+        self::assertSame('matomo.goal.3.conversions', $metrics[5]->metric);
+        self::assertSame(2, $metrics[5]->value);
+        self::assertSame('matomo.goal.3.revenue', $metrics[6]->metric);
+        self::assertSame(1250, $metrics[6]->value);
+        self::assertSame('matomo.goal.ecommerceOrder.conversions', $metrics[7]->metric);
+        self::assertSame(1, $metrics[7]->value);
+    }
+
+    public function testFetchDropsGoalColumnsThatAreAbsentZeroOrNotNumeric(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
+        $this->apiClient->method('request')->willReturn([
+            [
+                'label' => '/foo',
+                'url' => 'https://example.com/foo',
+                'nb_hits' => 10,
+                'goal_3_nb_conversions' => 0,
+                'goal_3_revenue' => 'not-a-number',
+                'goal_ecommerceOrder_nb_conversions' => ['unexpected'],
+            ],
+        ]);
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+        $metrics = iterator_to_array($this->subject->fetch($this->siteWithGoals(), $range), false);
+
+        // Only the five fixed metrics, no goal rows at all.
+        self::assertCount(5, $metrics);
+    }
+
     public function testFetchSkipsRowsWithoutAUsableUrl(): void
     {
         $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
@@ -246,5 +342,20 @@ final class MatomoMetricProviderTest extends TestCase
         }
 
         self::assertNotSame([], $metrics);
+    }
+
+    private function siteWithGoals(): Site
+    {
+        return new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => [
+                'goals' => [
+                    ['provider' => 'matomo', 'id' => 3, 'label' => 'Newsletter signup', 'revenue' => true],
+                    ['provider' => 'matomo', 'id' => 'ecommerceOrder', 'label' => 'Orders', 'polarity' => 'neutral'],
+                    // A goal of another provider never reaches Matomo's tiles.
+                    ['provider' => 'ga4', 'id' => 'generate_lead', 'label' => 'Lead'],
+                ],
+            ],
+        ]);
     }
 }

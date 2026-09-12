@@ -32,12 +32,16 @@ use function sprintf;
  */
 final class SiteConfigurationReader
 {
+    public function __construct(
+        private readonly GoalConfigurationParser $goalConfigurationParser,
+    ) {}
+
     public function read(Site $site): PageMetricsSiteConfiguration
     {
         $raw = $site->getConfiguration()['pageMetrics'] ?? null;
 
         if (null === $raw) {
-            return new PageMetricsSiteConfiguration(false, [], true, [], 400, [], null, true);
+            return new PageMetricsSiteConfiguration(false, [], true, [], 400, [], null, true, []);
         }
 
         $raw = $this->mapping($raw, $site, 'pageMetrics', 1756000000);
@@ -50,6 +54,7 @@ final class SiteConfigurationReader
         $keepQueryParams = $this->listOf($resolution['keepQueryParams'] ?? [], $site, 'pageMetrics.resolution.keepQueryParams', 1756000005);
         /** @var list<string> $additionalHosts */
         $additionalHosts = $this->listOf($resolution['additionalHosts'] ?? [], $site, 'pageMetrics.resolution.additionalHosts', 1756000007);
+        $goals = $this->listOf($raw['goals'] ?? [], $site, 'pageMetrics.goals', 1756000010);
 
         return new PageMetricsSiteConfiguration(
             $this->boolean($raw['enabled'] ?? false, $site, 'pageMetrics.enabled', 1756000001),
@@ -66,6 +71,7 @@ final class SiteConfigurationReader
             // On by default: markers nobody has to maintain are the point,
             // and a site that wants none can say so.
             $this->boolean($annotations['automatic'] ?? true, $site, 'pageMetrics.annotations.automatic', 1756000011),
+            $this->goalConfigurationParser->parse($site->getIdentifier(), $goals),
         );
     }
 

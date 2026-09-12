@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Provider\Typo3;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Configuration\SiteConfigurationReader;
+use KonradMichalik\Typo3PageMetrics\Configuration\{GoalConfigurationParser, SiteConfigurationReader};
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\AnnotationCategory;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange};
 use KonradMichalik\Typo3PageMetrics\Provider\Typo3\{DailyPageChange, PageChangeLookup, Typo3AnnotationProvider};
@@ -38,7 +38,7 @@ final class Typo3AnnotationProviderTest extends TestCase
     protected function setUp(): void
     {
         $this->pageChangeLookup = $this->createMock(PageChangeLookup::class);
-        $this->subject = new Typo3AnnotationProvider(new SiteConfigurationReader(), $this->pageChangeLookup);
+        $this->subject = new Typo3AnnotationProvider(new SiteConfigurationReader(new GoalConfigurationParser()), $this->pageChangeLookup);
     }
 
     public function testGetIdentifierReturnsTypo3(): void

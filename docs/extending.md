@@ -103,6 +103,33 @@ Both figures have to be cleared, which is the point of having two. `relative` is
 Pick the floor from the volumes your metric actually sees. It exists to stop a page going from two to four leading a list of what rose, so it wants to sit just above the range where a handful of events is indistinguishable from noise. The bundled providers use ten views and three percentage points, deliberately half of what Matomo's Generated Insights plugin uses, because a TYPO3 site is usually smaller than the volumes that figure was calibrated on.
 
 Both `MetricDefinition` and `RateMetricDefinition` take it, appended last in each. Ordering within what survives the thresholds is not yours to set: it is the size of the movement weighted by the traffic behind it, which for a rate is the denominator.
+## Metrics that depend on the site
+
+`getMetricDefinitions()` describes the metrics a provider has everywhere. Some
+do not exist everywhere: a [goal](page-tiles.md#goal-tiles) exists only because
+an operator configured it on one site, with a label and a polarity of that
+site's choosing, so no static list can describe it.
+
+A provider that has such metrics implements `SiteAwareMetricProviderInterface`
+in addition, and returns them from `getSiteMetricDefinitions(Site $site)`:
+
+```php
+public function getSiteMetricDefinitions(Site $site): array
+{
+    return $this->goalMetrics->definitionsFor($site);
+}
+```
+
+What comes back is *additional* to `getMetricDefinitions()`, never a
+replacement for it, and the two lists are simply concatenated. Everything else
+is unchanged: the definitions are ordinary `MetricDefinition`s, the values
+behind them are ordinary metrics stored by the usual import, and a provider
+that does not implement this interface behaves exactly as it did.
+
+This is a second interface rather than a `Site` parameter on
+`getMetricDefinitions()` because `MetricProviderInterface` is `@api`: adding a
+parameter there would make PHP reject every third-party provider implementing
+it. Implementing this one is opt-in.
 
 For a provider that needs its own daily-import step, its own configurable
 retention and to participate in the dashboard widgets, implement

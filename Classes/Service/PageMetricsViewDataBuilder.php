@@ -18,7 +18,7 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, Me
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricDefinition, MetricTile, MetricTrend, PageMetricsViewData, RateMetricDefinition, SiteBenchmarkResult, TileBenchmark};
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
-use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
+use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface};
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Throwable;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
@@ -96,6 +96,7 @@ final readonly class PageMetricsViewDataBuilder
         private DataFreshnessResolver $dataFreshness,
         private ManualAnnotationLinkBuilder $annotationLinkBuilder,
         private EventDispatcherInterface $eventDispatcher,
+        private MetricDefinitionCollector $metricDefinitionCollector,
         private iterable $providers,
     ) {}
 
@@ -324,7 +325,7 @@ final readonly class PageMetricsViewDataBuilder
             $externalLink = null !== $pageUrl ? $provider->getExternalLink($site, $pageUrl, $tileRange) : null;
             $coverage = $this->importCoverage->forProvider($provider->getIdentifier(), $site->getIdentifier());
 
-            foreach ($provider->getMetricDefinitions() as $definition) {
+            foreach ($this->metricDefinitionCollector->forSite($provider, $site) as $definition) {
                 $externalLinkByIdentifier[$definition->identifier] = $externalLink;
                 $coverageByIdentifier[$definition->identifier] = $coverage;
 

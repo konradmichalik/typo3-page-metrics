@@ -103,6 +103,14 @@ return [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-sitemap.svg',
     ],
+    'tabler-target' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-target.svg',
+    ],
+    'tabler-coin' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-coin.svg',
+    ],
     'tabler-chevron-up' => [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-chevron-up.svg',

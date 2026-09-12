@@ -17,7 +17,7 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, MetricUnit, TrendSentiment, UnresolvedReason};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, DataFreshness, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
-use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
+use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface};
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 use function in_array;
@@ -57,6 +57,7 @@ final readonly class SiteMetricsOverviewBuilder
         private RateSeriesCalculator $rateSeriesCalculator,
         private ImportCoverage $importCoverage,
         private ImportStateRepository $importStateRepository,
+        private MetricDefinitionCollector $metricDefinitionCollector,
         private iterable $providers,
     ) {}
 
@@ -71,8 +72,8 @@ final readonly class SiteMetricsOverviewBuilder
             return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], [], null);
         }
 
-        $primary = $this->primaryDefinition($provider);
-        $chartMetric = $this->resolveChartMetric($provider, $preferredMetricIdentifier) ?? $primary;
+        $primary = $this->primaryDefinition($provider, $site);
+        $chartMetric = $this->resolveChartMetric($provider, $site, $preferredMetricIdentifier) ?? $primary;
 
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
@@ -89,7 +90,7 @@ final readonly class SiteMetricsOverviewBuilder
             $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT),
             $this->buildUnresolvedUrls($site),
             $this->buildAnnotations($site->getIdentifier(), $currentRange, $annotationCategory),
-            $this->buildAdditionalChartSeries($provider, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange, $coverage),
+            $this->buildAdditionalChartSeries($provider, $site, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange, $coverage),
             $this->dataFreshnessFor($site),
         );
     }
@@ -138,8 +139,8 @@ final readonly class SiteMetricsOverviewBuilder
             return null;
         }
 
-        $primary = $this->primaryDefinition($provider);
-        $metric = $this->resolveChartMetric($provider, $preferredMetricIdentifier) ?? $primary;
+        $primary = $this->primaryDefinition($provider, $site);
+        $metric = $this->resolveChartMetric($provider, $site, $preferredMetricIdentifier) ?? $primary;
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
 
@@ -167,7 +168,7 @@ final readonly class SiteMetricsOverviewBuilder
             return null;
         }
 
-        $primary = $this->primaryDefinition($provider);
+        $primary = $this->primaryDefinition($provider, $site);
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
 
         if (null !== $level && $includeSubpages) {
@@ -208,11 +209,10 @@ final readonly class SiteMetricsOverviewBuilder
      */
     public function availableMetrics(array $sites): array
     {
-        $providers = $this->relevantProviders($sites);
         $definitions = [];
 
-        foreach ($providers as $provider) {
-            foreach ([...$provider->getMetricDefinitions(), ...$provider->getRateMetricDefinitions()] as $definition) {
+        foreach ($this->relevantProviders($sites) as [$provider, $site]) {
+            foreach ([...$this->metricDefinitionCollector->forSite($provider, $site), ...$provider->getRateMetricDefinitions()] as $definition) {
                 $definitions[$definition->identifier] = ['provider' => $provider, 'label' => $definition->label];
             }
         }
@@ -231,25 +231,32 @@ final readonly class SiteMetricsOverviewBuilder
     }
 
     /**
+     * Each relevant provider with the first of $sites it supports. The site
+     * comes along because a provider's metric list can depend on it (see
+     * MetricDefinitionCollector): a provider serving several sites therefore
+     * contributes the goals of the first one to the dropdown, which is the
+     * same provider-level approximation availableMetrics() already makes by
+     * listing one provider once.
+     *
      * @param array<Site> $sites
      *
-     * @return list<MetricProviderInterface>
+     * @return list<array{0: MetricProviderInterface, 1: Site}>
      */
     private function relevantProviders(array $sites): array
     {
-        $providers = [];
+        $relevant = [];
 
         foreach ($this->providers as $provider) {
             foreach ($sites as $site) {
                 if ($provider->supports($site)) {
-                    $providers[] = $provider;
+                    $relevant[] = [$provider, $site];
 
                     continue 2;
                 }
             }
         }
 
-        return $providers;
+        return $relevant;
     }
 
     /**
@@ -280,9 +287,9 @@ final readonly class SiteMetricsOverviewBuilder
         return null;
     }
 
-    private function primaryDefinition(MetricProviderInterface $provider): MetricDefinition
+    private function primaryDefinition(MetricProviderInterface $provider, Site $site): MetricDefinition
     {
-        $definitions = $provider->getMetricDefinitions();
+        $definitions = $this->metricDefinitionCollector->forSite($provider, $site);
         usort($definitions, static fn (MetricDefinition $a, MetricDefinition $b): int => $a->sortOrder <=> $b->sortOrder);
 
         return $definitions[0];
@@ -295,13 +302,13 @@ final readonly class SiteMetricsOverviewBuilder
      * chart widget configured for a Matomo metric on a GA4-only site),
      * both cases falling back to the primary metric in build().
      */
-    private function resolveChartMetric(MetricProviderInterface $provider, ?string $preferredMetricIdentifier): MetricDefinition|RateMetricDefinition|null
+    private function resolveChartMetric(MetricProviderInterface $provider, Site $site, ?string $preferredMetricIdentifier): MetricDefinition|RateMetricDefinition|null
     {
         if (null === $preferredMetricIdentifier || '' === $preferredMetricIdentifier) {
             return null;
         }
 
-        foreach ($provider->getMetricDefinitions() as $definition) {
+        foreach ($this->metricDefinitionCollector->forSite($provider, $site) as $definition) {
             if ($definition->identifier === $preferredMetricIdentifier) {
                 return $definition;
             }
@@ -346,7 +353,7 @@ final readonly class SiteMetricsOverviewBuilder
      *
      * @return list<ChartSeries>
      */
-    private function buildAdditionalChartSeries(MetricProviderInterface $provider, array $metricIdentifiers, array $pageUids, int $languageId, DateRange $range, ?DateRange $coverage): array
+    private function buildAdditionalChartSeries(MetricProviderInterface $provider, Site $site, array $metricIdentifiers, array $pageUids, int $languageId, DateRange $range, ?DateRange $coverage): array
     {
         $series = [];
         $seenIdentifiers = [];
@@ -356,7 +363,7 @@ final readonly class SiteMetricsOverviewBuilder
                 continue;
             }
 
-            $metric = $this->resolveChartMetric($provider, $identifier);
+            $metric = $this->resolveChartMetric($provider, $site, $identifier);
 
             if (null === $metric) {
                 continue;

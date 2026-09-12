@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3PageMetrics\Provider\Ga4;
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricSignificance, RateMetricDefinition, UrlMetric};
-use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
+use KonradMichalik\Typo3PageMetrics\Provider\SiteAwareMetricProviderInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 use function count;
@@ -39,9 +39,12 @@ use function str_starts_with;
  * same definitions Matomo uses - see the descriptions on their
  * RateMetricDefinitions.
  *
+ * A third report joins them where the site configured goals, and only then
+ * (see Ga4KeyEventMetrics).
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final readonly class Ga4MetricProvider implements MetricProviderInterface
+final readonly class Ga4MetricProvider implements SiteAwareMetricProviderInterface
 {
     private const IDENTIFIER = 'ga4';
 
@@ -58,6 +61,7 @@ final readonly class Ga4MetricProvider implements MetricProviderInterface
     public function __construct(
         private Ga4ConfigurationResolver $configurationResolver,
         private Ga4ApiClient $apiClient,
+        private Ga4KeyEventMetrics $keyEventMetrics,
     ) {}
 
     public function getIdentifier(): string
@@ -76,6 +80,11 @@ final readonly class Ga4MetricProvider implements MetricProviderInterface
             new MetricDefinition('ga4.pageviews', 'Page views', 'GA4 screenPageViews for this page in the selected period.', 'tabler-eye-search', MetricUnit::Count, 10, '#0969da', MetricPolarity::HigherIsBetter, MetricGroup::Audience, new MetricSignificance(0.1, self::MOVEMENT_FLOOR_VIEWS)),
             new MetricDefinition('ga4.sessions', 'Sessions', 'GA4 sessions that included this page in the selected period.', 'tabler-chart-dots', MetricUnit::Count, 20, '#8250df', MetricPolarity::HigherIsBetter, MetricGroup::Audience, new MetricSignificance(0.1, self::MOVEMENT_FLOOR_VIEWS)),
         ];
+    }
+
+    public function getSiteMetricDefinitions(Site $site): array
+    {
+        return $this->keyEventMetrics->definitionsFor($site);
     }
 
     public function getRateMetricDefinitions(): array
@@ -165,6 +174,12 @@ final readonly class Ga4MetricProvider implements MetricProviderInterface
             // a raw count - derive a plain summable integer from it here so
             // it behaves like every other raw rate component.
             yield new UrlMetric($url, $day, 'ga4.landing_bounces', (int) round($sessions * $bounceRate));
+        }
+
+        $keyEventBody = $this->keyEventMetrics->reportBody($site, $dateRange);
+
+        if (null !== $keyEventBody) {
+            yield from $this->keyEventMetrics->metricsFor($site, $baseUrl, $this->runReportAllPages($configuration, $keyEventBody));
         }
     }
 

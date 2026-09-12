@@ -18,6 +18,12 @@ namespace KonradMichalik\Typo3PageMetrics\Domain\Enum;
  *
  * Determines how a tile's raw integer value is formatted for display.
  *
+ * Every value in the fact table is a plain integer in its own unit, money
+ * included: Currency counts minor units (cents), so a revenue of 12.50 is
+ * stored as 1250 and rendered with two decimals. Goal revenue would
+ * otherwise be the only floating-point path through a table whose whole
+ * point is that daily rows can be summed exactly.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 enum MetricUnit: string
@@ -25,4 +31,5 @@ enum MetricUnit: string
     case Count = 'count';
     case Seconds = 'seconds';
     case Percent = 'percent';
+    case Currency = 'currency';
 }

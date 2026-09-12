@@ -189,6 +189,11 @@ function formatValueForUnit(value, unit) {
   if (unit === 'seconds') {
     return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
   }
+  // Money is stored in minor units so the daily rows stay exact integers,
+  // which is also why this divides rather than formats a decimal it was given.
+  if (unit === 'currency') {
+    return (value / 100).toFixed(2);
+  }
   return String(value);
 }
 

@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Provider\Matomo;
 
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricSignificance, RateMetricDefinition, UrlMetric};
-use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
+use KonradMichalik\Typo3PageMetrics\Provider\SiteAwareMetricProviderInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 use function is_array;
@@ -34,9 +34,12 @@ use function sprintf;
  * flat=1 so Matomo returns an already-flattened page table instead of a
  * tree needing manual flattening.
  *
+ * Site-aware because of goals: the fixed metrics below exist on every Matomo
+ * site, a goal only where one was configured (see MatomoGoalMetrics).
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final readonly class MatomoMetricProvider implements MetricProviderInterface
+final readonly class MatomoMetricProvider implements SiteAwareMetricProviderInterface
 {
     private const IDENTIFIER = 'matomo';
 
@@ -53,6 +56,7 @@ final readonly class MatomoMetricProvider implements MetricProviderInterface
     public function __construct(
         private MatomoConfigurationResolver $configurationResolver,
         private MatomoApiClient $apiClient,
+        private MatomoGoalMetrics $goalMetrics,
     ) {}
 
     public function getIdentifier(): string
@@ -71,6 +75,11 @@ final readonly class MatomoMetricProvider implements MetricProviderInterface
             new MetricDefinition('matomo.pageviews', 'Page views', 'The number of times this page was viewed in the selected period.', 'tabler-eye-search', MetricUnit::Count, 10, '#0969da', MetricPolarity::HigherIsBetter, MetricGroup::Audience, new MetricSignificance(0.1, self::MOVEMENT_FLOOR_VIEWS)),
             new MetricDefinition('matomo.visits', 'Visits', 'The number of visits that included this page in the selected period.', 'tabler-chart-dots', MetricUnit::Count, 20, '#8250df', MetricPolarity::HigherIsBetter, MetricGroup::Audience, new MetricSignificance(0.1, self::MOVEMENT_FLOOR_VIEWS)),
         ];
+    }
+
+    public function getSiteMetricDefinitions(Site $site): array
+    {
+        return $this->goalMetrics->definitionsFor($site);
     }
 
     public function getRateMetricDefinitions(): array
@@ -141,6 +150,9 @@ final readonly class MatomoMetricProvider implements MetricProviderInterface
             return;
         }
 
+        $goals = $this->goalMetrics->goalsFor($site);
+        $goalParameters = $this->goalMetrics->requestParameters($goals);
+
         foreach ($range->days() as $day) {
             $rows = $this->apiClient->request($configuration, [
                 'method' => 'Actions.getPageUrls',
@@ -151,7 +163,7 @@ final readonly class MatomoMetricProvider implements MetricProviderInterface
                 // the documented "return all rows" value, without it any day
                 // with more than 100 distinct URLs silently loses the rest.
                 'filter_limit' => -1,
-            ]);
+            ] + $goalParameters);
 
             foreach ($rows as $row) {
                 if (!is_array($row) || !is_string($row['url'] ?? null) || '' === $row['url']) {
@@ -166,6 +178,8 @@ final readonly class MatomoMetricProvider implements MetricProviderInterface
                 yield new UrlMetric($row['url'], $day, 'matomo.time_spent_seconds', (int) ($row['sum_time_spent'] ?? 0));
                 yield new UrlMetric($row['url'], $day, 'matomo.entries', (int) ($row['entry_nb_visits'] ?? 0));
                 yield new UrlMetric($row['url'], $day, 'matomo.entry_bounces', (int) ($row['entry_bounce_count'] ?? 0));
+
+                yield from $this->goalMetrics->metricsForRow($goals, $row['url'], $day, $row);
             }
         }
     }

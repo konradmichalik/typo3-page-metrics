@@ -68,6 +68,30 @@ Nothing about the import changes. Each bucket is still fetched, resolved and sto
 
 A provider decides which side of this its metrics fall on, see [Audience and machine metrics](extending.md#audience-and-machine-metrics).
 
+## Goal tiles
+
+Traffic is not business value. A page view count cannot say whether a page did
+what it exists to do, and a goal is the site's own answer to that: a Matomo
+goal or a GA4 key event, configured per site because only the operator knows
+which one counts.
+
+Each configured goal gets a tile of its own, behind the traffic tiles, with
+the label the operator gave it rather than the one the analytics account uses.
+Where a Matomo goal carries revenue, a second tile shows it, formatted as
+money. It behaves like every other tile: its own sparkline, its own trend
+badge against the previous period, its own place in the subpages rollup.
+
+A goal's polarity is configurable too, because not every goal is one to
+maximise. A "form abandoned" goal going up is bad news, and a tile that
+coloured it green would say the opposite of what happened. See
+[Polarity](extending.md#polarity) for what the three values do.
+
+Goals are stored as ordinary metrics, so a site that configures none behaves
+exactly as it did before: no extra tiles, and for Matomo not even a different
+API request. Configuration is per provider:
+[Matomo goals](providers/matomo.md#goals),
+[GA4 key events](providers/ga4.md#key-events).
+
 ## Data age
 
 The toolbar above the tiles marks which day the numbers are from with a small ⓘ, and hovering it names the date. It is a mark rather than a line of text: on a healthy installation it says the same thing every day, across five surfaces at once, and what it is there for is the day it stops doing that. That day is the last one the import treats as complete, which is not today: a scheduled run may only catch part of today, so it always revisits it and marks the previous day instead. The tiles therefore trail the calendar by a day even when everything is working.

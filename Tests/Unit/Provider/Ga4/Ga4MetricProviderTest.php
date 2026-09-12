@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Provider\Ga4;
 
 use DateTimeImmutable;
+use KonradMichalik\Typo3PageMetrics\Configuration\{GoalConfigurationParser, SiteConfigurationReader};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricPolarity;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
-use KonradMichalik\Typo3PageMetrics\Provider\Ga4\{Ga4ApiClient, Ga4Configuration, Ga4ConfigurationResolver, Ga4MetricProvider};
+use KonradMichalik\Typo3PageMetrics\Provider\Ga4\{Ga4ApiClient, Ga4Configuration, Ga4ConfigurationResolver, Ga4KeyEventMetrics, Ga4MetricProvider};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -38,7 +40,7 @@ final class Ga4MetricProviderTest extends TestCase
     {
         $this->resolver = $this->createMock(Ga4ConfigurationResolver::class);
         $this->apiClient = $this->createMock(Ga4ApiClient::class);
-        $this->subject = new Ga4MetricProvider($this->resolver, $this->apiClient);
+        $this->subject = new Ga4MetricProvider($this->resolver, $this->apiClient, new Ga4KeyEventMetrics(new SiteConfigurationReader(new GoalConfigurationParser())));
         $this->site = new Site('main', 1, ['base' => 'https://example.com/']);
     }
 
@@ -59,6 +61,22 @@ final class Ga4MetricProviderTest extends TestCase
         $identifiers = array_map(static fn ($definition) => $definition->identifier, $this->subject->getRateMetricDefinitions());
 
         self::assertSame(['ga4.avg_time_on_page', 'ga4.bounce_rate'], $identifiers);
+    }
+
+    public function testGetSiteMetricDefinitionsIsEmptyForASiteWithoutGoals(): void
+    {
+        self::assertSame([], $this->subject->getSiteMetricDefinitions($this->site));
+    }
+
+    public function testGetSiteMetricDefinitionsDeclaresOneTilePerConfiguredKeyEvent(): void
+    {
+        $definitions = $this->subject->getSiteMetricDefinitions($this->siteWithGoals());
+
+        $identifiers = array_map(static fn ($definition) => $definition->identifier, $definitions);
+        self::assertSame(['ga4.key_event.generate_lead', 'ga4.key_event.purchase'], $identifiers);
+        self::assertSame('Lead', $definitions[0]->label);
+        self::assertSame(MetricPolarity::HigherIsBetter, $definitions[0]->polarity);
+        self::assertGreaterThan(40, $definitions[0]->sortOrder);
     }
 
     public function testSupportsReturnsTrueWhenConfigurationResolves(): void
@@ -121,6 +139,74 @@ final class Ga4MetricProviderTest extends TestCase
         self::assertSame('ga4.engagement_time_seconds', $metrics[2]->metric);
         self::assertSame(124, $metrics[2]->value);
         self::assertSame('2026-08-01', $metrics[0]->date->format('Y-m-d'));
+    }
+
+    public function testFetchSendsNoKeyEventReportForASiteWithoutGoals(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+
+        $bodies = [];
+        $this->apiClient->method('runReport')->willReturnCallback(static function (Ga4Configuration $configuration, array $body) use (&$bodies): array {
+            $bodies[] = $body;
+
+            return ['rows' => []];
+        });
+
+        iterator_to_array($this->subject->fetch($this->site, new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'))), false);
+
+        self::assertCount(2, $bodies);
+        self::assertArrayNotHasKey('dimensionFilter', $bodies[0]);
+        self::assertArrayNotHasKey('dimensionFilter', $bodies[1]);
+    }
+
+    public function testFetchYieldsKeyEventsFromAReportOfTheirOwn(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+
+        $keyEventBodies = [];
+        $this->apiClient->method('runReport')->willReturnCallback(static function (Ga4Configuration $configuration, array $body) use (&$keyEventBodies): array {
+            if (!isset($body['dimensionFilter'])) {
+                return ['rows' => []];
+            }
+
+            $keyEventBodies[] = $body;
+
+            return [
+                'rows' => [
+                    [
+                        'dimensionValues' => [['value' => '20260801'], ['value' => '/about'], ['value' => 'generate_lead']],
+                        'metricValues' => [['value' => '3']],
+                    ],
+                    // Zero, a malformed count and an event nobody configured
+                    // are all dropped rather than stored.
+                    [
+                        'dimensionValues' => [['value' => '20260801'], ['value' => '/about'], ['value' => 'purchase']],
+                        'metricValues' => [['value' => '0']],
+                    ],
+                    [
+                        'dimensionValues' => [['value' => '20260801'], ['value' => '/about'], ['value' => 'purchase']],
+                        'metricValues' => [['value' => 'many']],
+                    ],
+                    [
+                        'dimensionValues' => [['value' => '20260801'], ['value' => '/about'], ['value' => 'scroll']],
+                        'metricValues' => [['value' => '9']],
+                    ],
+                ],
+            ];
+        });
+
+        $metrics = iterator_to_array($this->subject->fetch($this->siteWithGoals(), new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'))), false);
+
+        self::assertCount(1, $metrics);
+        self::assertSame('ga4.key_event.generate_lead', $metrics[0]->metric);
+        self::assertSame(3, $metrics[0]->value);
+        self::assertSame('https://example.com/about', $metrics[0]->url);
+        self::assertSame('2026-08-01', $metrics[0]->date->format('Y-m-d'));
+
+        self::assertCount(1, $keyEventBodies);
+        self::assertSame([['name' => 'date'], ['name' => 'pagePath'], ['name' => 'eventName']], $keyEventBodies[0]['dimensions']);
+        self::assertSame([['name' => 'keyEvents']], $keyEventBodies[0]['metrics']);
+        self::assertSame(['generate_lead', 'purchase'], $keyEventBodies[0]['dimensionFilter']['filter']['inListFilter']['values']);
     }
 
     public function testFetchYieldsLandingSessionsAndDerivedBouncesFromTheLandingReport(): void
@@ -289,5 +375,20 @@ final class Ga4MetricProviderTest extends TestCase
         $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
 
         self::assertSame([], iterator_to_array($this->subject->fetch($this->site, $range)));
+    }
+
+    private function siteWithGoals(): Site
+    {
+        return new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => [
+                'goals' => [
+                    ['provider' => 'ga4', 'id' => 'generate_lead', 'label' => 'Lead'],
+                    ['provider' => 'ga4', 'id' => 'purchase', 'label' => 'Purchase'],
+                    // A goal of another provider never reaches GA4's tiles.
+                    ['provider' => 'matomo', 'id' => 3, 'label' => 'Newsletter signup'],
+                ],
+            ],
+        ]);
     }
 }

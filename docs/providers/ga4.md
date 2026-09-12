@@ -21,6 +21,42 @@ credentials) with read access to the GA4 property's Data API. "Avg. time
 on page" and "bounce rate" are GA4 approximations, not the same
 definitions Matomo's tiles use: see each tile's own description text.
 
+## Key events
+
+GA4 calls a conversion a key event. Which key events matter is a business
+question, so they are declared per site, in the same `pageMetrics.goals` list
+the [Matomo provider](matomo.md#goals) uses.
+
+```yaml
+pageMetrics:
+  enabled: true
+  providers:
+    ga4:
+      propertyId: '123456789'
+      serviceAccountKeyFilePath: '%env(GA4_KEY_FILE_PATH)%'
+  goals:
+    - provider: ga4
+      id: 'generate_lead'
+      label: 'Lead'
+    - provider: ga4
+      id: 'purchase'
+      label: 'Purchase'
+```
+
+`id` is the GA4 event name exactly as the property records it. `label`,
+`polarity` and the rest behave as they do for Matomo, except `revenue`, which
+has no equivalent here: GA4 reports event value separately from key events,
+and a revenue tile that quietly counted something else would be worse than
+none.
+
+Each key event becomes one tile, stored as the ordinary metric
+`ga4.key_event.<name>`. Unlike Matomo's goal columns, these cannot ride along
+in the page report: splitting a key event by name needs the `eventName`
+dimension, and adding that dimension to the existing report would split every
+page-view row by event name too. So a site with key events configured sends
+one additional `runReport` per import, filtered server-side to the configured
+names. A site without them sends exactly the requests it always sent.
+
 GA4's Data API can take 24-48 hours to finalize a day's data, so its most
 recently imported days may be understated. Periodically re-run the import
 with `--force` (see the main [README](../../README.md#usage)) to pick up

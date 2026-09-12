@@ -41,6 +41,11 @@ final readonly class MetricValueFormatter
             // Minutes and seconds rather than a bare count: "0:03" is a time
             // on page, "3" is a number nobody can place.
             MetricUnit::Seconds => sprintf('%d:%02d', intdiv($value, 60), $value % 60),
+            // Minor units in, major units out, and no currency symbol: which
+            // currency a goal's revenue is in is the analytics account's
+            // setting and never something this extension is told, so the
+            // goal's own label is where it belongs.
+            MetricUnit::Currency => sprintf('%.2f', $value / 100),
             MetricUnit::Count => (string) $value,
         };
     }

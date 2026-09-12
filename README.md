@@ -40,6 +40,12 @@ doing" without leaving the backend.
   redirect created), imported (e.g. Matomo release markers) or created by
   hand, categorised, optionally spanning days or scoped to one page, and
   marked on every sparkline — see [Annotations](docs/page-tiles.md#annotations)
+- Goal conversions per page, from Matomo goals or GA4 key events, as a tile
+  of their own beside the traffic ones, with optional revenue — see
+  [Goal tiles](docs/page-tiles.md#goal-tiles)
+- Annotations, imported (e.g. Matomo release markers) or created by hand,
+  categorised, optionally spanning days or scoped to one page, and marked on
+  every sparkline — see [Annotations](docs/page-tiles.md#annotations)
 - Matomo, GA4 and your own web server access log as pluggable providers,
   extensible with your own — see
   [Registering custom tiles](docs/extending.md)
