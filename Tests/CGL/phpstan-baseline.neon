@@ -52,7 +52,7 @@ parameters:
 			path: ../../Classes/Domain/ValueObject/RateMetricDefinition.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
-			count: 2
+			count: 3
 			path: ../../Classes/Domain/ValueObject/MetricTile.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue

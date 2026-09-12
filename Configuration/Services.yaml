@@ -106,6 +106,17 @@ services:
     KonradMichalik\Typo3PageMetrics\UserFunction\AnnotationCategoryItemsProcFunc:
         public: true
 
+    # Public so a functional test can exercise the median and the band
+    # directly, rather than inferring them from rendered tile markup.
+    KonradMichalik\Typo3PageMetrics\Service\SiteBenchmark:
+        public: true
+
+    # The tagged iterator has to be named: autowiring cannot guess which
+    # services an iterable parameter stands for.
+    KonradMichalik\Typo3PageMetrics\Service\DataFreshnessResolver:
+        arguments:
+            $providers: !tagged_iterator page_metrics.metric_provider
+
     # Public so functional tests can fetch it directly via $this->get() instead
     # of dispatching a full ModifyPageLayoutContentEvent.
     KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder:

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, TrendDirection, UnresolvedReason};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, BenchmarkBand, TrendDirection, UnresolvedReason};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricTile, PageMetricsViewData};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder;
@@ -44,6 +44,163 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         // The machine-traffic summary is labelled by this class rather than
         // by a provider, so the builder resolves one string of its own.
         $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
+    }
+
+    public function testNoBenchmarkWhileOnlyOnePageHasData(): void
+    {
+        // Nothing to compare against but itself.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 40);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.pageviews');
+
+        self::assertNull($tile->benchmark);
+    }
+
+    public function testMedianOfAnEvenFieldIsTheMeanOfTheMiddleTwo(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 10);
+        $repository->upsert(3, 0, 'matomo', $today, 'matomo.pageviews', 30);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.pageviews');
+
+        self::assertNotNull($tile->benchmark);
+        self::assertSame('20', $tile->benchmark->formattedMedian);
+        // The tooltip names the width of the field, so a median taken over
+        // two pages cannot be read as one taken over the whole site.
+        self::assertSame(2, $tile->benchmark->pageCount);
+    }
+
+    public function testPagesWithoutDataDoNotCountTowardsTheMedian(): void
+    {
+        // Page 5 has no row at all. Counting it as a zero would drag the
+        // typical page down to a number no page actually had.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 10);
+        $repository->upsert(3, 0, 'matomo', $today, 'matomo.pageviews', 30);
+        $repository->upsert(4, 0, 'matomo', $today, 'matomo.pageviews', 50);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.pageviews');
+
+        self::assertNotNull($tile->benchmark);
+        self::assertSame('30', $tile->benchmark->formattedMedian);
+    }
+
+    public function testNoBandUntilThereAreEnoughPagesToDivideIntoFifths(): void
+    {
+        // Four pages: a median, but a fifth of four is not a fifth.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        foreach ([[1, 10], [2, 20], [3, 30], [4, 40]] as [$pageUid, $value]) {
+            $repository->upsert($pageUid, 0, 'matomo', $today, 'matomo.pageviews', $value);
+        }
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.pageviews');
+
+        self::assertNotNull($tile->benchmark);
+        self::assertSame('25', $tile->benchmark->formattedMedian);
+        self::assertNull($tile->benchmark->band);
+    }
+
+    public function testTheBandNamesWhereThePageSitsInTheField(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        foreach ([[1, 50], [2, 10], [3, 30], [4, 40], [5, 20]] as [$pageUid, $value]) {
+            $repository->upsert($pageUid, 0, 'matomo', $today, 'matomo.pageviews', $value);
+        }
+
+        $builder = $this->get(PageMetricsViewDataBuilder::class);
+        $lowest = $this->tileFor($builder->build(2, 0, 30), 'matomo.pageviews');
+        $middle = $this->tileFor($builder->build(3, 0, 30), 'matomo.pageviews');
+
+        self::assertNotNull($lowest->benchmark);
+        self::assertSame(BenchmarkBand::BottomFifth, $lowest->benchmark->band);
+        self::assertNotNull($middle->benchmark);
+        self::assertSame(BenchmarkBand::AtMedian, $middle->benchmark->band);
+        self::assertSame('30', $middle->benchmark->formattedMedian);
+    }
+
+    public function testAFieldWithNoSpreadGetsNoBand(): void
+    {
+        // Every page on the same number: there is no ranking in it, and any
+        // band would report how ties were broken rather than how the page did.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        foreach ([1, 2, 3, 4, 5] as $pageUid) {
+            $repository->upsert($pageUid, 0, 'matomo', $today, 'matomo.pageviews', 25);
+        }
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.pageviews');
+
+        self::assertNotNull($tile->benchmark);
+        self::assertSame('25', $tile->benchmark->formattedMedian);
+        self::assertNull($tile->benchmark->band);
+    }
+
+    public function testARateBenchmarkDividesPerPageRatherThanAcrossTheSite(): void
+    {
+        // Page 2 bounces 1 of 4, page 3 bounces 300 of 400, so the per-page
+        // rates are 25% and 75% and the typical page sits at 50%. Pooling the
+        // site's totals instead would give 301 of 404, about 75%, which is
+        // the busy page's rate wearing the whole site's name.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.entries', 4);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.entry_bounces', 1);
+        $repository->upsert(3, 0, 'matomo', $today, 'matomo.entries', 400);
+        $repository->upsert(3, 0, 'matomo', $today, 'matomo.entry_bounces', 300);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.bounce_rate');
+
+        self::assertNotNull($tile->benchmark);
+        self::assertSame('50%', $tile->benchmark->formattedMedian);
+        // Never a band for a rate: "top fifth" would mean best for one metric
+        // and worst for another.
+        self::assertNull($tile->benchmark->band);
+    }
+
+    public function testAPageWithNoEntriesIsLeftOutOfARateBenchmark(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.entries', 4);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.entry_bounces', 1);
+        $repository->upsert(3, 0, 'matomo', $today, 'matomo.entries', 4);
+        $repository->upsert(3, 0, 'matomo', $today, 'matomo.entry_bounces', 3);
+        // Denominator zero: no rate at all, rather than a rate of nought.
+        $repository->upsert(5, 0, 'matomo', $today, 'matomo.entries', 0);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.bounce_rate');
+
+        self::assertNotNull($tile->benchmark);
+        self::assertSame('50%', $tile->benchmark->formattedMedian);
+    }
+
+    public function testAggregatingASubtreeSuppressesTheBenchmark(): void
+    {
+        // The tile is then a section total, and the field it would be
+        // measured against is made of individual pages.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(3, 0, 'matomo', $today, 'matomo.pageviews', 10);
+        $repository->upsert(5, 0, 'matomo', $today, 'matomo.pageviews', 30);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(3, 0, 30, true), 'matomo.pageviews');
+
+        self::assertNull($tile->benchmark);
     }
 
     public function testReturnsNoPageWhenPageIdIsZero(): void

@@ -30,6 +30,13 @@ const FALLBACK_LABELS = {
   peak: 'Peak',
   average: 'Average',
   viaRedirects: 'Via redirects',
+  typicalPage: 'Typical page',
+  typicalPageHint: 'The median of the %1$s pages on this site with data in this period',
+  typicalPageTopFifth: 'This page is in the top fifth',
+  typicalPageAboveMedian: 'This page is above it',
+  typicalPageAtMedian: 'This page is the typical one',
+  typicalPageBelowMedian: 'This page is below it',
+  typicalPageBottomFifth: 'This page is in the bottom fifth',
   lastDayHint: 'The most recent day of the selected period',
   previousDayHint: 'The day before the most recent one',
   peakHint: 'The highest value a single day reached',
@@ -78,6 +85,7 @@ const STAT_ICON_PATHS = {
   peak: ['M12 4l0 10', 'M12 4l4 4', 'M12 4l-4 4', 'M4 20l16 0'],
   average: ['M3 21l18 -18', 'M4 12a8 8 0 1 0 16 0a8 8 0 1 0 -16 0'],
   viaRedirects: ['M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0', 'M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4', 'M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5'],
+  typicalPage: ['M7 20l10 0', 'M6 6l6 -1l6 1', 'M12 3l0 17', 'M9 12l-3 -6l-3 6a3 3 0 0 0 6 0', 'M21 12l-3 -6l-3 6a3 3 0 0 0 6 0'],
 };
 
 function statIconSvg(paths) {
@@ -452,14 +460,24 @@ class PageMetricsTile {
     });
   }
 
-  // A tooltip of our own rather than the browser's title attribute: that one
-  // waits about a second, cannot be styled to match the backend, and shows a
-  // single run-on string. This one appears at once and keeps the name and the
-  // explanation apart, which matters here because the name is no longer drawn
-  // anywhere else.
+  // "Typical page: 44%", and for a count metric where this page sits in that
+  // field. Deliberately a band and not a percentile: on a site with eleven
+  // pages the difference between the 63rd and the 72nd percentile is one page
+  // changing its mind, and a number that moves that easily invites a reading
+  // it cannot support.
   //
-  // Appended to <body> like the popover itself: the popover clips its own
-  // overflow, so a tooltip inside it would be cut off at the card's edge.
+  // The band and the width of the field live in the tooltip rather than in
+  // the row, because the row has space for a number and this figure's number
+  // is the median. Where the page sits relative to it is the sentence you
+  // ask for, not the one you read five times over while scanning the chips.
+  benchmarkHint() {
+    const hint = this.labels.typicalPageHint.replace('%1$s', this.element.dataset.benchmarkPages || '0');
+    const band = this.element.dataset.benchmarkBand;
+    const bandLabel = band ? this.labels[`typicalPage${band.charAt(0).toUpperCase()}${band.slice(1)}`] : '';
+
+    return bandLabel ? `${hint}. ${bandLabel}` : hint;
+  }
+
   closePopover() {
     if (!this.popover) {
       return;
@@ -747,9 +765,9 @@ class PageMetricsTile {
     // locallangXMLOverride can replace, and that must not be able to inject
     // markup here. Only the icon, whose path data is a constant in this
     // file, is set as markup.
-    const stat = (key, value) => {
+    const stat = (key, value, hintOverride = null) => {
       const name = this.labels[key];
-      const hint = this.labels[`${key}Hint`] ?? '';
+      const hint = hintOverride ?? this.labels[`${key}Hint`] ?? '';
 
       const button = document.createElement('button');
       button.type = 'button';
@@ -797,6 +815,13 @@ class PageMetricsTile {
 
     if (redirectShare > 0) {
       statNodes.push(stat('viaRedirects', `${redirectShare}%`));
+    }
+
+    // Last in the row, and the only chip that is about the other pages of the
+    // site rather than about this one over the period.
+    const benchmarkMedian = this.element.dataset.benchmarkMedian;
+    if (benchmarkMedian) {
+      statNodes.push(stat('typicalPage', benchmarkMedian, this.benchmarkHint()));
     }
 
     statNodes.forEach((node) => stats.appendChild(node));

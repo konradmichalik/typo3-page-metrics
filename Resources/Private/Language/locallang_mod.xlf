@@ -99,6 +99,27 @@
             <trans-unit id="popover.viaRedirects" resname="popover.viaRedirects">
                 <source>Via redirects</source>
             </trans-unit>
+            <trans-unit id="popover.typicalPage" resname="popover.typicalPage">
+                <source>Typical page</source>
+            </trans-unit>
+            <trans-unit id="popover.typicalPageHint" resname="popover.typicalPageHint">
+                <source>The median of the %1$s pages on this site with data in this period</source>
+            </trans-unit>
+            <trans-unit id="popover.typicalPage.topFifth" resname="popover.typicalPage.topFifth">
+                <source>This page is in the top fifth</source>
+            </trans-unit>
+            <trans-unit id="popover.typicalPage.aboveMedian" resname="popover.typicalPage.aboveMedian">
+                <source>This page is above it</source>
+            </trans-unit>
+            <trans-unit id="popover.typicalPage.atMedian" resname="popover.typicalPage.atMedian">
+                <source>This page is the typical one</source>
+            </trans-unit>
+            <trans-unit id="popover.typicalPage.belowMedian" resname="popover.typicalPage.belowMedian">
+                <source>This page is below it</source>
+            </trans-unit>
+            <trans-unit id="popover.typicalPage.bottomFifth" resname="popover.typicalPage.bottomFifth">
+                <source>This page is in the bottom fifth</source>
+            </trans-unit>
             <trans-unit id="popover.noData" resname="popover.noData">
                 <source>No data</source>
             </trans-unit>

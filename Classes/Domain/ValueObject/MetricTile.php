@@ -55,6 +55,9 @@ final readonly class MetricTile
      *                                                                                   that one folds a provider's whole MetricGroup::Machine set
      *                                                                                   into a single headline, and the parts are the only way back
      *                                                                                   to which crawler did what
+     * @param TileBenchmark|null                                 $benchmark              what the rest of this site did on the same metric over
+     *                                                                                   the same period, null where the site has too few pages
+     *                                                                                   with data for the comparison to say anything
      */
     public function __construct(
         public string $identifier,
@@ -73,6 +76,7 @@ final readonly class MetricTile
         public string $previousFormattedValue,
         public MetricPolarity $polarity = MetricPolarity::HigherIsBetter,
         public array $breakdown = [],
+        public ?TileBenchmark $benchmark = null,
     ) {
         $this->sentiment = TrendSentiment::of($trend, $polarity);
         $this->isNew = null === $deltaPercent;

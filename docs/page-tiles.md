@@ -44,6 +44,20 @@ The axis does not start at zero. It uses the same percentile band as the [dashbo
 
 The lowest value of the period is drawn clear of the bottom edge rather than on it, so a page whose quietest day still had traffic does not read as having dropped to nothing.
 
+## Is that good?
+
+A number on its own does not say whether a page is doing well. "31% bounce rate" only means something once you know whether the rest of the site sits at 20% or at 60%, so the popover carries a "Typical page" figure alongside the others: the median across every page of the same site over the same period. Hovering it says how many pages that median was taken over.
+
+For a count metric the same hover also says roughly where this page sits in that field, as a band rather than a percentile. It is a sentence rather than a chip of its own because it is the one thing here you look up once and not on every scan of the row. On a site with eleven pages the difference between the 63rd and the 72nd percentile is one page changing its mind, and a number that moves that easily invites a reading it cannot support. The five bands are top fifth, above the typical page, the typical page itself, below it, and bottom fifth.
+
+A rate metric gets the median but no band, because "in the top fifth" would mean the best fifth for page views and the worst fifth for a bounce rate, and a phrase that flips its meaning from tile to tile is worse than no phrase.
+
+Pages with no data are left out rather than counted as zero, since a zero would drag the typical page towards a value no page actually had. For a rate the same applies to a page with nothing in its denominator: it has no rate at all. The comparison needs at least two pages with data to appear, and at least five before it names a band, because a fifth of four pages is not a fifth.
+
+While the tiles aggregate a subtree the comparison disappears: the number is then a section total, and the field it would be measured against is made of individual pages.
+
+The dashboard's own tiles widget does not show the comparison at all. It renders synchronously, and the field costs one aggregate over every page of the site per metric; the page module can afford that because its tiles arrive through an AJAX route, and a widget cannot.
+
 ## Bot traffic
 
 A page's tiles answer how it performs with people. Crawler traffic is a different question, and when the access-log provider is configured it used to arrive as five more tiles of the same size and weight beside the two an editor came for, pushing the answer off the end of the row.

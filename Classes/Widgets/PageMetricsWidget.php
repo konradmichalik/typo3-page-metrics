@@ -99,7 +99,7 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
         $result = [];
 
         foreach ($this->siteFinder->getAllSites() as $site) {
-            $viewData = $this->viewDataBuilder->build($site->getRootPageId(), 0, self::PERIOD_DAYS);
+            $viewData = $this->viewDataBuilder->build($site->getRootPageId(), 0, self::PERIOD_DAYS, false, false);
 
             if (!$viewData->hasPage || [] === $viewData->tiles) {
                 continue;

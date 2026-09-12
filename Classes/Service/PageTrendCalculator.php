@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit, TrendDirection, TrendSentiment};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, RateMetricDefinition, TopPage};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, TrendDirection, TrendSentiment};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricTrend, RateMetricDefinition, TopPage};
 use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, SitePageUidRepository};
 
 use function array_slice;
@@ -40,6 +40,7 @@ final readonly class PageTrendCalculator
         private DailyMetricsRepository $dailyMetricsRepository,
         private SitePageUidRepository $pageUidRepository,
         private RateSeriesCalculator $rateSeriesCalculator,
+        private MetricValueFormatter $valueFormatter,
     ) {}
 
     /**
@@ -177,7 +178,9 @@ final readonly class PageTrendCalculator
                 continue;
             }
 
-            [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
+            $metricTrend = MetricTrend::between($value, $previousValue);
+            $deltaPercent = $metricTrend->deltaPercent;
+            $trend = $metricTrend->direction;
             $trends[] = ['pageUid' => $pageUid, 'value' => $value, 'deltaPercent' => $deltaPercent, 'trend' => $trend];
         }
 
@@ -204,7 +207,9 @@ final readonly class PageTrendCalculator
                 continue;
             }
 
-            [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
+            $metricTrend = MetricTrend::between($value, $previousValue);
+            $deltaPercent = $metricTrend->deltaPercent;
+            $trend = $metricTrend->direction;
             $trends[] = ['pageUid' => $anchorUid, 'value' => $value, 'deltaPercent' => $deltaPercent, 'trend' => $trend];
         }
 
@@ -264,30 +269,13 @@ final readonly class PageTrendCalculator
             $value = $this->rateSeriesCalculator->ratio($currentNumerator[$pageUid] ?? 0, $denominator, $metric->unit);
             $previousValue = $this->rateSeriesCalculator->ratio($previousNumerator[$pageUid] ?? 0, $previousDenominatorValue, $metric->unit);
 
-            [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
+            $metricTrend = MetricTrend::between($value, $previousValue);
+            $deltaPercent = $metricTrend->deltaPercent;
+            $trend = $metricTrend->direction;
             $trends[] = ['pageUid' => $pageUid, 'value' => $value, 'deltaPercent' => $deltaPercent, 'trend' => $trend];
         }
 
         return $trends;
-    }
-
-    /**
-     * @return array{0: ?int, 1: TrendDirection}
-     */
-    private function computeTrend(int $value, int $previousValue): array
-    {
-        if (0 === $previousValue) {
-            return [null, $value > 0 ? TrendDirection::Up : TrendDirection::Flat];
-        }
-
-        $deltaPercent = (int) round(($value - $previousValue) / $previousValue * 100);
-        $trend = match (true) {
-            $value > $previousValue => TrendDirection::Up,
-            $value < $previousValue => TrendDirection::Down,
-            default => TrendDirection::Flat,
-        };
-
-        return [$deltaPercent, $trend];
     }
 
     /**
@@ -303,21 +291,12 @@ final readonly class PageTrendCalculator
             fn (array $trend): TopPage => new TopPage(
                 $trend['pageUid'],
                 $titlesByUid[$trend['pageUid']] ?? sprintf('#%d', $trend['pageUid']),
-                $this->formatValue($trend['value'], $metric->unit),
+                $this->valueFormatter->format($trend['value'], $metric->unit),
                 $trend['deltaPercent'],
                 $trend['trend'],
                 $metric->polarity,
             ),
             $trends,
         );
-    }
-
-    private function formatValue(int $value, MetricUnit $unit): string
-    {
-        return match ($unit) {
-            MetricUnit::Percent => sprintf('%d%%', $value),
-            MetricUnit::Seconds => sprintf('%d:%02d', intdiv($value, 60), $value % 60),
-            MetricUnit::Count => (string) $value,
-        };
     }
 }

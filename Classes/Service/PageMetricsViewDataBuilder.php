@@ -14,10 +14,10 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit, TrendDirection};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DataFreshness, DateRange, MetricDefinition, MetricTile, PageMetricsViewData, RateMetricDefinition};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricDefinition, MetricTile, MetricTrend, PageMetricsViewData, RateMetricDefinition, SiteBenchmarkResult, TileBenchmark};
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Throwable;
@@ -31,7 +31,6 @@ use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 
 use function in_array;
-use function intdiv;
 use function sprintf;
 
 /**
@@ -92,12 +91,20 @@ final readonly class PageMetricsViewDataBuilder
         private SitePageUidRepository $pageUidRepository,
         private RateSeriesCalculator $rateSeriesCalculator,
         private ImportCoverage $importCoverage,
-        private ImportStateRepository $importStateRepository,
+        private SiteBenchmark $siteBenchmark,
+        private MetricValueFormatter $valueFormatter,
+        private DataFreshnessResolver $dataFreshness,
         private EventDispatcherInterface $eventDispatcher,
         private iterable $providers,
     ) {}
 
-    public function build(int $pageId, int $languageId, int $requestedPeriodDays, bool $includeSubpages = false): PageMetricsViewData
+    /**
+     * $withBenchmark is off for callers that render synchronously. The
+     * comparison costs one aggregate over every page of the site per metric,
+     * which the page module can afford because its tiles arrive through an
+     * AJAX route, and a dashboard widget cannot because its does not.
+     */
+    public function build(int $pageId, int $languageId, int $requestedPeriodDays, bool $includeSubpages = false, bool $withBenchmark = true): PageMetricsViewData
     {
         if ($pageId > 0) {
             $pageRow = BackendUtility::readPageAccess($pageId, $this->getBackendUser()->getPagePermsClause(Permission::PAGE_SHOW));
@@ -128,11 +135,11 @@ final readonly class PageMetricsViewDataBuilder
         $dataFreshness = null;
 
         if (null !== $site) {
-            $tiles = $this->buildTiles($site, $pageId, $languageId, $tileRange, $previousRange, $includeSubpages);
+            $tiles = $this->buildTiles($site, $pageId, $languageId, $tileRange, $previousRange, $includeSubpages, $withBenchmark);
             $unresolvedCount = $this->unresolvedUrlRepository->countForSite($site->getBase()->getHost(), (new DateTimeImmutable('today'))->modify('-30 days'));
             $annotations = $this->buildAnnotations($site->getIdentifier(), $tileRange, $pageId);
             $hasSubpages = $this->pageUidRepository->hasChildren($pageId);
-            $dataFreshness = $this->resolveDataFreshness($site, $tileRange->until);
+            $dataFreshness = $this->dataFreshness->forSite($site, $tileRange->until);
         }
 
         return new PageMetricsViewData(
@@ -149,42 +156,6 @@ final readonly class PageMetricsViewDataBuilder
             $hasSubpages,
             $dataFreshness,
         );
-    }
-
-    /**
-     * The tile row is only as fresh as its stalest number, so a site whose
-     * providers are at different days reports the earliest of them rather
-     * than flattering itself with the newest.
-     *
-     * A provider that has never imported contributes no day at all: its
-     * tiles are empty, which is visible on its own, and letting it veto the
-     * whole row's date would hide the freshness of the providers that do
-     * work. Only when no provider has ever run is the answer unknown.
-     *
-     * Read from the resume cursor, not from the covered window: the cursor
-     * is the last day the import considers complete, which is what "the
-     * numbers are current up to here" means, and it is recorded by every run
-     * including one that returned nothing. The covered window can be unknown
-     * on a perfectly healthy installation, and a missing date is exactly the
-     * wrong answer to give about a scheduler that may have stopped.
-     */
-    private function resolveDataFreshness(Site $site, DateTimeImmutable $today): ?DataFreshness
-    {
-        $earliest = null;
-
-        foreach ($this->providers as $provider) {
-            if (!$provider->supports($site)) {
-                continue;
-            }
-
-            $lastImported = $this->importStateRepository->getLastImportedDate($provider->getIdentifier(), $site->getIdentifier());
-
-            if (null !== $lastImported && (null === $earliest || $lastImported < $earliest)) {
-                $earliest = $lastImported;
-            }
-        }
-
-        return null !== $earliest ? new DataFreshness($earliest, $today) : null;
     }
 
     /**
@@ -226,6 +197,21 @@ final readonly class PageMetricsViewDataBuilder
         return [$tileRange, $previousRange];
     }
 
+    /**
+     * The raw comparison with the tile's own unit applied to it, or nothing at
+     * all. SiteBenchmark answers in the metric's integer units, and a median
+     * of 183 has to read "3:03" on a duration tile exactly as the headline
+     * beside it does.
+     */
+    private function tileBenchmark(?SiteBenchmarkResult $benchmark, MetricUnit $unit): ?TileBenchmark
+    {
+        return null === $benchmark ? null : new TileBenchmark(
+            $this->valueFormatter->format($benchmark->median, $unit),
+            $benchmark->band,
+            $benchmark->pageCount,
+        );
+    }
+
     private function formatRangeLabel(DateRange $range): string
     {
         return sprintf('%s – %s', $range->from->format('Y-m-d'), $range->until->format('Y-m-d'));
@@ -234,13 +220,19 @@ final readonly class PageMetricsViewDataBuilder
     /**
      * @return list<MetricTile>
      */
-    private function buildTiles(Site $site, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange, bool $includeSubpages): array
+    private function buildTiles(Site $site, int $pageId, int $languageId, DateRange $tileRange, DateRange $previousRange, bool $includeSubpages, bool $withBenchmark): array
     {
         // No external link when aggregating: it deep-links into Matomo
         // filtered by a single page's URL (segment=pageUrl==...), and
         // there's no equivalent for an arbitrary page subtree without a
         // different segment filtering scheme entirely - not resolving a
         // page URL at all is what makes collectDefinitions() skip it.
+        // No benchmark while the tiles aggregate a subtree: the number on one
+        // is then a section total, and the field it would be measured against
+        // is made of individual pages. Comparing the two would say a section
+        // is in the top fifth of the pages it contains.
+        $withBenchmark = $withBenchmark && !$includeSubpages;
+
         $pageUrl = $includeSubpages ? null : $this->resolvePageUrl($site, $pageId);
         $pageUids = $includeSubpages ? $this->pageUidRepository->descendantsOf($pageId) : [$pageId];
         [$definitions, $rateDefinitions, $externalLinkByIdentifier, $coverageByIdentifier, $machineDefinitionsByProvider] = $this->collectDefinitions($site, $pageUrl, $tileRange);
@@ -251,7 +243,7 @@ final readonly class PageMetricsViewDataBuilder
         foreach ($definitions as $definition) {
             $ordered[] = [
                 'sortOrder' => $definition->sortOrder,
-                'tile' => $this->buildCountTile($definition, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null, $coverageByIdentifier[$definition->identifier] ?? null),
+                'tile' => $this->buildCountTile($definition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null, $coverageByIdentifier[$definition->identifier] ?? null, $includeSubpages, $withBenchmark),
             ];
         }
 
@@ -270,7 +262,7 @@ final readonly class PageMetricsViewDataBuilder
         foreach ($rateDefinitions as $rateDefinition) {
             $ordered[] = [
                 'sortOrder' => $rateDefinition->sortOrder,
-                'tile' => $this->buildRateTile($rateDefinition, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$rateDefinition->identifier] ?? null, $coverageByIdentifier[$rateDefinition->identifier] ?? null),
+                'tile' => $this->buildRateTile($rateDefinition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$rateDefinition->identifier] ?? null, $coverageByIdentifier[$rateDefinition->identifier] ?? null, $includeSubpages, $withBenchmark),
             ];
         }
 
@@ -372,7 +364,7 @@ final readonly class PageMetricsViewDataBuilder
     /**
      * @param list<int> $pageUids
      */
-    private function buildCountTile(MetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage): MetricTile
+    private function buildCountTile(MetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, bool $includeSubpages, bool $withBenchmark): MetricTile
     {
         $series = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
         $sparkline = $this->importCoverage->mask($series, $coverage);
@@ -380,8 +372,11 @@ final readonly class PageMetricsViewDataBuilder
         $previousValue = array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $previousRange));
         $redirectValue = array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange, 'via_redirect'));
 
-        [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
+        $metricTrend = MetricTrend::between($value, $previousValue);
+        $deltaPercent = $metricTrend->deltaPercent;
+        $trend = $metricTrend->direction;
         $redirectSharePercent = $value > 0 ? (int) round($redirectValue / $value * 100) : 0;
+        $benchmark = $withBenchmark ? $this->siteBenchmark->forCountMetric($site, $pageId, $languageId, $definition, $tileRange, $value) : null;
 
         return new MetricTile(
             $definition->identifier,
@@ -391,14 +386,18 @@ final readonly class PageMetricsViewDataBuilder
             $definition->color,
             $definition->unit,
             $value,
-            $this->formatValue($value, $definition->unit),
+            $this->valueFormatter->format($value, $definition->unit),
             $sparkline,
             $deltaPercent,
             $trend,
             $redirectSharePercent,
             $externalLink,
-            null !== $deltaPercent ? $this->formatValue($previousValue, $definition->unit) : '',
+            null !== $deltaPercent ? $this->valueFormatter->format($previousValue, $definition->unit) : '',
             $definition->polarity,
+            // No breakdown: a tile that stands for one metric has nothing to
+            // break down. Only the machine-traffic summary does.
+            [],
+            $this->tileBenchmark($benchmark, $definition->unit),
         );
     }
 
@@ -438,7 +437,9 @@ final readonly class PageMetricsViewDataBuilder
         }
 
         $value = array_sum($series);
-        [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
+        $metricTrend = MetricTrend::between($value, $previousValue);
+        $deltaPercent = $metricTrend->deltaPercent;
+        $trend = $metricTrend->direction;
         $redirectSharePercent = $value > 0 ? (int) round($redirectValue / $value * 100) : 0;
         $languageService = $this->getLanguageService();
 
@@ -454,7 +455,7 @@ final readonly class PageMetricsViewDataBuilder
             self::MACHINE_SUMMARY_COLOR,
             MetricUnit::Count,
             $value,
-            $this->formatValue($value, MetricUnit::Count),
+            $this->valueFormatter->format($value, MetricUnit::Count),
             $this->importCoverage->mask($series, $coverage),
             $deltaPercent,
             $trend,
@@ -463,7 +464,7 @@ final readonly class PageMetricsViewDataBuilder
             // deep-link into, and a summary spanning several metrics has no
             // single thing to point at even where a provider does.
             null,
-            null !== $deltaPercent ? $this->formatValue($previousValue, MetricUnit::Count) : '',
+            null !== $deltaPercent ? $this->valueFormatter->format($previousValue, MetricUnit::Count) : '',
             // Neutral throughout: more crawler traffic is neither an
             // achievement nor a failure, and colouring it green or red would
             // tell an editor to act on something they cannot influence.
@@ -472,13 +473,6 @@ final readonly class PageMetricsViewDataBuilder
         );
     }
 
-    /**
-     * A bounce rate or an average duration is a ratio, not a count: summing
-     * daily ratios would weight a quiet day the same as a busy one. Instead
-     * this divides the sum of the numerator by the sum of the denominator
-     * over each range, for the sparkline's daily points as well as the
-     * tile/previous period totals.
-     */
     /**
      * One bucket's contribution to the summary: its days added into the
      * running series, its totals added to the running previous and
@@ -504,7 +498,7 @@ final readonly class PageMetricsViewDataBuilder
 
         $breakdown[] = [
             'label' => $definition->label,
-            'formattedValue' => $this->formatValue(array_sum($bucketSeries), $definition->unit),
+            'formattedValue' => $this->valueFormatter->format(array_sum($bucketSeries), $definition->unit),
         ];
 
         return [
@@ -518,7 +512,7 @@ final readonly class PageMetricsViewDataBuilder
     /**
      * @param list<int> $pageUids
      */
-    private function buildRateTile(RateMetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage): MetricTile
+    private function buildRateTile(RateMetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, bool $includeSubpages, bool $withBenchmark): MetricTile
     {
         $numeratorSparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->numerator, $tileRange);
         $denominatorSparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->denominator, $tileRange);
@@ -535,7 +529,10 @@ final readonly class PageMetricsViewDataBuilder
             $definition->unit,
         );
 
-        [$deltaPercent, $trend] = $this->computeTrend($value, $previousValue);
+        $metricTrend = MetricTrend::between($value, $previousValue);
+        $deltaPercent = $metricTrend->deltaPercent;
+        $trend = $metricTrend->direction;
+        $benchmark = $withBenchmark ? $this->siteBenchmark->forRateMetric($site, $pageId, $languageId, $definition, $tileRange, $value) : null;
 
         return new MetricTile(
             $definition->identifier,
@@ -545,50 +542,19 @@ final readonly class PageMetricsViewDataBuilder
             $definition->color,
             $definition->unit,
             $value,
-            $this->formatValue($value, $definition->unit),
+            $this->valueFormatter->format($value, $definition->unit),
             $sparkline,
             $deltaPercent,
             $trend,
             0,
             $externalLink,
-            null !== $deltaPercent ? $this->formatValue($previousValue, $definition->unit) : '',
+            null !== $deltaPercent ? $this->valueFormatter->format($previousValue, $definition->unit) : '',
             $definition->polarity,
+            // No breakdown: a tile that stands for one metric has nothing to
+            // break down. Only the machine-traffic summary does.
+            [],
+            $this->tileBenchmark($benchmark, $definition->unit),
         );
-    }
-
-    private function formatValue(int $value, MetricUnit $unit): string
-    {
-        return match ($unit) {
-            MetricUnit::Percent => sprintf('%d%%', $value),
-            MetricUnit::Seconds => $this->formatDuration($value),
-            MetricUnit::Count => (string) $value,
-        };
-    }
-
-    private function formatDuration(int $seconds): string
-    {
-        return sprintf('%d:%02d', intdiv($seconds, 60), $seconds % 60);
-    }
-
-    /**
-     * @return array{0: ?int, 1: TrendDirection}
-     */
-    private function computeTrend(int $value, int $previousValue): array
-    {
-        if (0 === $previousValue) {
-            // No meaningful percentage base: value > 0 is "new" (null percent,
-            // still an upward trend), value === 0 is genuinely flat.
-            return [null, $value > 0 ? TrendDirection::Up : TrendDirection::Flat];
-        }
-
-        $deltaPercent = (int) round(($value - $previousValue) / $previousValue * 100);
-        $trend = match (true) {
-            $value > $previousValue => TrendDirection::Up,
-            $value < $previousValue => TrendDirection::Down,
-            default => TrendDirection::Flat,
-        };
-
-        return [$deltaPercent, $trend];
     }
 
     private function resolveSite(int $pageId): ?Site
