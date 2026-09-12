@@ -185,6 +185,23 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
         $base = $site->getBase();
         $baseUrl = $base->getScheme().'://'.$base->getAuthority();
 
+        [$pageviews, $visitors, $botHits] = $this->aggregate($configuration->pathPattern, $allowedDates, $baseUrl);
+
+        yield from $this->yieldPageviewMetrics($pageviews, $visitors, $baseUrl);
+        yield from $this->yieldBotMetrics($botHits);
+    }
+
+    /**
+     * @param array<string, true> $allowedDates
+     *
+     * @return array{
+     *     0: array<string, array<string, int>>,
+     *     1: array<string, array<string, array<string, true>>>,
+     *     2: array<string, array<string, array<string, int>>>,
+     * } [pageviews, visitors, botHits], each keyed date => ...
+     */
+    private function aggregate(string $pathPattern, array $allowedDates, string $baseUrl): array
+    {
         /** @var array<string, array<string, int>> $pageviews date => path => hit count */
         $pageviews = [];
         /** @var array<string, array<string, array<string, true>>> $visitors date => path => "ip|userAgent" set */
@@ -192,7 +209,7 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
         /** @var array<string, array<string, array<string, int>>> $botHits date => bucket value => url => hit count */
         $botHits = [];
 
-        foreach ($this->lines($configuration->pathPattern) as $rawLine) {
+        foreach ($this->lines($pathPattern) as $rawLine) {
             $line = $this->lineParser->parseLine($rawLine);
 
             if (null === $line) {
@@ -223,6 +240,17 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
             $visitors[$date][$line->target][$line->ip.'|'.$line->userAgent] = true;
         }
 
+        return [$pageviews, $visitors, $botHits];
+    }
+
+    /**
+     * @param array<string, array<string, int>>                 $pageviews date => path => hit count
+     * @param array<string, array<string, array<string, true>>> $visitors  date => path => "ip|userAgent" set
+     *
+     * @return iterable<UrlMetric>
+     */
+    private function yieldPageviewMetrics(array $pageviews, array $visitors, string $baseUrl): iterable
+    {
         foreach ($pageviews as $date => $paths) {
             $day = new DateTimeImmutable($date);
 
@@ -232,7 +260,15 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
                 yield new UrlMetric($url, $day, 'accesslog.visits', count($visitors[$date][$path] ?? []));
             }
         }
+    }
 
+    /**
+     * @param array<string, array<string, array<string, int>>> $botHits date => bucket value => url => hit count
+     *
+     * @return iterable<UrlMetric>
+     */
+    private function yieldBotMetrics(array $botHits): iterable
+    {
         foreach ($botHits as $date => $byBucket) {
             $day = new DateTimeImmutable($date);
 

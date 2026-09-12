@@ -18,6 +18,8 @@ use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
+use function bin2hex;
+use function random_bytes;
 use function strlen;
 
 /**
@@ -34,7 +36,7 @@ final class LogFileReaderTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir().'/pagemetrics-logfilereader-'.uniqid();
+        $this->tmpDir = sys_get_temp_dir().'/pagemetrics-logfilereader-'.bin2hex(random_bytes(8));
         mkdir($this->tmpDir);
         $this->reader = new LogFileReader();
     }
