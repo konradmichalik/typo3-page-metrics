@@ -47,10 +47,10 @@ final class DailyAggregationBuffer
      */
     private const CLOSING_LAG_DAYS = 1;
 
-    /** @var array<string, array<string, int>> date => path => hit count */
+    /** @var array<string, array<string, int>> date => url => hit count */
     private array $pageviews = [];
 
-    /** @var array<string, array<string, array<string, true>>> date => path => visitor key set */
+    /** @var array<string, array<string, array<string, true>>> date => url => visitor key set */
     private array $visitors = [];
 
     /** @var array<string, array<string, array<string, int>>> date => bucket => url => hit count */
@@ -86,10 +86,10 @@ final class DailyAggregationBuffer
         return true;
     }
 
-    public function addPageview(string $date, string $path, string $visitorKey): void
+    public function addPageview(string $date, string $url, string $visitorKey): void
     {
-        $this->pageviews[$date][$path] = ($this->pageviews[$date][$path] ?? 0) + 1;
-        $this->visitors[$date][$path][$visitorKey] = true;
+        $this->pageviews[$date][$url] = ($this->pageviews[$date][$url] ?? 0) + 1;
+        $this->visitors[$date][$url][$visitorKey] = true;
     }
 
     public function addBotHit(string $date, string $bucket, string $url): void
@@ -144,16 +144,16 @@ final class DailyAggregationBuffer
     }
 
     /**
-     * @return array<string, int> path => hit count
+     * @return array<string, int> url => hit count
      */
     public function pageviewsOn(string $date): array
     {
         return $this->pageviews[$date] ?? [];
     }
 
-    public function visitorCountOn(string $date, string $path): int
+    public function visitorCountOn(string $date, string $url): int
     {
-        return count($this->visitors[$date][$path] ?? []);
+        return count($this->visitors[$date][$url] ?? []);
     }
 
     /**

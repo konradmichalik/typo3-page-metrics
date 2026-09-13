@@ -672,6 +672,28 @@ document.addEventListener('keydown', (event) => {
 // space - the same reason the hover dot is an HTML element rather than an
 // SVG circle - so it can be tabbed to, announced, and given an area a finger
 // can find.
+// Which day of a marker's band the pointer is over. A single day marker has
+// only one answer; a band is as wide as the days it spans, so the offset
+// within it picks one. Clamped at both ends because a click can land on the
+// button's border, a pixel outside the range it stands for.
+function dayAtPointer(button, dates, fromIndex, lastIndex, event) {
+  if (lastIndex === fromIndex) {
+    return dates[fromIndex];
+  }
+
+  const bounds = button.getBoundingClientRect();
+
+  if (bounds.width === 0) {
+    return dates[fromIndex];
+  }
+
+  const share = (event.clientX - bounds.left) / bounds.width;
+  const span = lastIndex - fromIndex;
+  const offset = Math.min(span, Math.max(0, Math.round(share * span)));
+
+  return dates[fromIndex + offset];
+}
+
 function buildAnnotationTrigger(svg, annotation, dates, step, width, labels, context) {
   const index = dates.indexOf(annotation.date);
 
@@ -681,7 +703,13 @@ function buildAnnotationTrigger(svg, annotation, dates, step, width, labels, con
 
   const fromIndex = index === -1 ? 0 : index;
   const untilIndex = annotation.dateUntil ? dates.indexOf(annotation.dateUntil) : -1;
-  const lastIndex = annotation.dateUntil ? (untilIndex === -1 ? dates.length - 1 : untilIndex) : fromIndex;
+  // Never before the day it starts on. date_until has no TCA range check
+  // tying it to date, so a record can end before it begins; read literally
+  // that draws a band from the marker to the right edge of the plot and
+  // swallows it. ComparisonWindow::around() refuses the same record on the
+  // server for the same reason.
+  const rawLastIndex = annotation.dateUntil ? (untilIndex === -1 ? dates.length - 1 : untilIndex) : fromIndex;
+  const lastIndex = Math.max(fromIndex, rawLastIndex);
   const category = annotation.category || 'release';
   const kind = labels[`annotationCategory.${category}`];
 
@@ -702,7 +730,12 @@ function buildAnnotationTrigger(svg, annotation, dates, step, width, labels, con
 
   button.addEventListener('click', (event) => {
     event.stopPropagation();
-    openDayDetail(button, annotation.date, context);
+    // The day under the pointer, not the day the band starts on. A twenty
+    // day campaign is one trigger stretched across twenty days, and the
+    // value tooltip forwarded below already names the day being pointed at:
+    // opening the panel on the first day instead would have the two
+    // disagreeing about the same pixel.
+    openDayDetail(button, dayAtPointer(button, dates, fromIndex, lastIndex, event), context);
   });
 
   // The button covers the plot at exactly the x the value tooltip is most
@@ -1467,16 +1500,22 @@ async function loadTiles(container, period, includeSubpages) {
 }
 
 document.addEventListener('click', (event) => {
+  // Not every click carries an Element: a synthetic one dispatched on
+  // document or window, which backend modules do, has a target with no
+  // closest(). Throwing here would take the listener down for the life of
+  // the page and leave every popover stuck open.
+  const target = event.target instanceof Element ? event.target : null;
+
   // The day panel lives on <body>, outside both the tile and its popover, so
   // an unguarded click in it would close the popover the marker button that
   // opened the panel sits in - and focus would have nowhere to return to.
-  if (event.target.closest('.pagemetrics-day-backdrop')) {
+  if (target?.closest('.pagemetrics-day-backdrop')) {
     return;
   }
 
   openTiles.forEach((tile) => {
-    const insideTile = tile.element.contains(event.target);
-    const insidePopover = tile.popover && tile.popover.contains(event.target);
+    const insideTile = null !== target && tile.element.contains(target);
+    const insidePopover = null !== target && tile.popover && tile.popover.contains(target);
     if (!insideTile && !insidePopover) {
       tile.closePopover();
     }

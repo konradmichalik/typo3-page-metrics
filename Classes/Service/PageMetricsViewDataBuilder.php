@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit, TrafficChannel};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricDefinition, MetricTile, MetricTrend, PageMetricsViewData, RateMetricDefinition, SiteBenchmarkResult, TileBenchmark};
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
@@ -32,6 +32,8 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
 
 use function in_array;
 use function sprintf;
+use function strlen;
+use function substr;
 
 /**
  * PageMetricsViewDataBuilder.
@@ -424,12 +426,61 @@ final readonly class PageMetricsViewDataBuilder
             $externalLink,
             null !== $deltaPercent ? $this->valueFormatter->format($previousValue, $definition->unit) : '',
             $definition->polarity,
-            // No breakdown: a tile that stands for one metric has nothing to
-            // break down. Only the machine-traffic summary does.
-            [],
+            // Where this metric's traffic came from, on the one metric per
+            // provider that has an answer, and empty on every other, which
+            // leaves their popovers exactly as they were.
+            $this->channelBreakdown($pageUids, $languageId, $definition, $tileRange),
             $this->tileBenchmark($benchmark, $definition->unit),
             $previousPeriodCovered,
         );
+    }
+
+    /**
+     * The tile's number split by where it came from, as the parts its
+     * popover lists.
+     *
+     * Read from the dimension column of the very metric the tile shows, so
+     * the parts are parts of the number above them and not of a neighbouring
+     * one. Empty, and therefore invisible, wherever the provider wrote no
+     * split: an analytics source without referrer data must leave the
+     * popover as it found it.
+     *
+     * The parts are not expected to add up to the headline and must not be
+     * made to. A provider attributes what it can attribute, and the
+     * difference is traffic it could not place, which is a fact about the
+     * source rather than a rounding error to hide.
+     *
+     * @param list<int> $pageUids
+     *
+     * @return list<array{label: string, formattedValue: string}>
+     */
+    private function channelBreakdown(array $pageUids, int $languageId, MetricDefinition $definition, DateRange $tileRange): array
+    {
+        $sums = $this->dailyMetricsRepository->sumsByDimensionPrefix($pageUids, $languageId, $definition->identifier, $tileRange, TrafficChannel::DIMENSION_PREFIX);
+
+        // array_merge keeps the left operand's key order and the right
+        // operand's values, so the nulls below are purely positional: a
+        // known channel takes the place TrafficChannel's case order gave it,
+        // one this version has never heard of lands after them under its own
+        // name, and a channel with no rows is filtered back out. Shown rather
+        // than dropped, because a split that silently loses traffic is worse
+        // than one carrying a label nobody recognises. Reading the split by
+        // prefix rather than by the declared cases is what makes that
+        // possible at all.
+        $positions = array_fill_keys(array_map(static fn (TrafficChannel $channel): string => $channel->dimension(), TrafficChannel::cases()), null);
+        $ordered = array_filter(array_merge($positions, $sums), static fn (?int $value): bool => null !== $value);
+
+        $breakdown = [];
+
+        foreach ($ordered as $dimension => $value) {
+            $channel = TrafficChannel::fromDimension($dimension);
+            $breakdown[] = [
+                'label' => $channel?->label() ?? substr($dimension, strlen(TrafficChannel::DIMENSION_PREFIX)),
+                'formattedValue' => $this->valueFormatter->format($value, $definition->unit),
+            ];
+        }
+
+        return $breakdown;
     }
 
     /**

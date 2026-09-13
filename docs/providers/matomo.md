@@ -73,3 +73,41 @@ own label if it matters ("Orders revenue (EUR)").
 A goal id is copied verbatim into the metric identifier, which is why it is
 restricted to letters, digits, `_`, `.` and `-`. Renaming an id later is a
 data migration, the same as for any other metric identifier.
+
+## Traffic channels
+
+Every import also splits a page's visits by where they came from, shown as a
+breakdown in the visits tile's popover (see
+[Where visitors came from](../page-tiles.md#where-visitors-came-from)).
+Nothing has to be configured for it.
+
+Matomo's `referrerType` values map onto the shared channel vocabulary like
+this:
+
+| Matomo | Channel |
+| --- | --- |
+| `direct` | Direct |
+| `search` | Search |
+| `social` | Social |
+| `website` | Referral |
+| `campaign` | Campaign |
+
+Matomo types every visit, so it never produces the `Other` channel that GA4
+can. The one place the two providers can genuinely disagree is an untagged
+paid search click: Matomo types it as plain `search`, while GA4 reports it as
+Paid Search, which this extension counts as `Campaign`. That is a property of
+Matomo's own referrer detection and not something a mapping can repair, so tag
+your ad traffic with campaign parameters if the distinction matters to you.
+
+The obvious way to ask this question, `Referrers.getReferrerType` with
+`segment=pageUrl==<url>`, costs one request per page per day. The importer
+turns the segment around instead and asks `Actions.getPageUrls` with
+`segment=referrerType==<type>`, which returns the same figures transposed at
+one request per channel, and sends those five as a single
+`API.getBulkRequest`. The split therefore costs one extra HTTP request per
+day, whatever the size of the site.
+
+Because each channel travels in its own sub-request, a Matomo without the
+Referrers plugin, or a token not allowed to use segments, fails only that
+sub-request. The page views and visits arrive as they always did and the tile
+simply carries no breakdown.

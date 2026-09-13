@@ -32,6 +32,12 @@ use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, WidgetConfigurationInte
  * subpages into its number instead of leaving them out - see
  * SiteMetricsOverviewBuilder::buildTopPagesForSite().
  *
+ * The goal setting adds one of the site's own configured goals as a second
+ * column, because the busiest page is not necessarily the one that earns
+ * anything. The ranking stays on traffic: a widget headed "most viewed
+ * pages" that sorted by conversions would answer a different question than
+ * its title asks.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class TopPagesWidget implements WidgetRendererInterface, AdditionalCssInterface
@@ -50,7 +56,7 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
      */
     public function getSettingsDefinitions(): array
     {
-        return [
+        $definitions = [
             new SettingDefinition(
                 'level',
                 'string',
@@ -73,6 +79,28 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
                 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.setting.includeSubpages.description',
             ),
         ];
+
+        $goalMetrics = $this->overviewBuilder->availableGoalMetrics($this->siteFinder->getAllSites());
+
+        // No setting at all rather than one whose only entry is "none": an
+        // installation that declared no goals has nothing to pick here, and
+        // an empty dropdown is a promise of a feature it does not have.
+        if ([] !== $goalMetrics) {
+            $definitions[] = new SettingDefinition(
+                'goalMetric',
+                'string',
+                '',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.setting.goalMetric.label',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.setting.goalMetric.description',
+                false,
+                [
+                    '' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.topPages.setting.goalMetric.none',
+                    ...$goalMetrics,
+                ],
+            );
+        }
+
+        return $definitions;
     }
 
     public function renderWidget(WidgetContext $context): WidgetResult
@@ -80,8 +108,12 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
         $level = (string) $context->settings->get('level');
         $level = '' !== $level ? (int) $level : null;
         $includeSubpages = (bool) $context->settings->get('includeSubpages');
+        // has() first: the goal setting is only defined where an
+        // installation has goals (see getSettingsDefinitions()), and
+        // SettingsInterface::get() throws for a key that was never declared.
+        $goalMetric = $context->settings->has('goalMetric') ? (string) $context->settings->get('goalMetric') : '';
 
-        $sites = $this->collectTopPages($level, $includeSubpages);
+        $sites = $this->collectTopPages($level, $includeSubpages, $goalMetric);
 
         $view = $this->backendViewFactory->create($context->request, ['konradmichalik/typo3-page-metrics', 'typo3/cms-dashboard']);
         $view->assignMultiple([
@@ -131,20 +163,31 @@ final readonly class TopPagesWidget implements WidgetRendererInterface, Addition
     }
 
     /**
-     * @return list<array{site: Site, topPages: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\TopPage>, dataFreshness: ?\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DataFreshness}>
+     * $goalLabel is what the second column is headed with, and null is what
+     * tells the template there is no second column: the site declared no
+     * such goal, or none was picked. Resolved per site rather than once for
+     * the widget, because the label is the operator's own and belongs to the
+     * site that declared it.
+     *
+     * @return list<array{site: Site, topPages: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\TopPage>, dataFreshness: ?\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DataFreshness, goalLabel: ?string}>
      */
-    private function collectTopPages(?int $level, bool $includeSubpages): array
+    private function collectTopPages(?int $level, bool $includeSubpages, string $goalMetric): array
     {
         $result = [];
 
         foreach ($this->siteFinder->getAllSites() as $site) {
-            $topPages = $this->overviewBuilder->buildTopPagesForSite($site, 0, self::PERIOD_DAYS, $level, $includeSubpages);
+            $topPages = $this->overviewBuilder->buildTopPagesForSite($site, 0, self::PERIOD_DAYS, $level, $includeSubpages, $goalMetric);
 
             if (null === $topPages) {
                 continue;
             }
 
-            $result[] = ['site' => $site, 'topPages' => $topPages, 'dataFreshness' => $this->overviewBuilder->dataFreshnessFor($site)];
+            $result[] = [
+                'site' => $site,
+                'topPages' => $topPages,
+                'dataFreshness' => $this->overviewBuilder->dataFreshnessFor($site),
+                'goalLabel' => $this->overviewBuilder->goalMetricsFor($site)[$goalMetric] ?? null,
+            ];
         }
 
         return $result;

@@ -17,7 +17,7 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, MetricUnit, TrendSentiment, UnresolvedReason};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, DataFreshness, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
-use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface};
+use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface, SiteAwareMetricProviderInterface};
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 use function in_array;
@@ -158,9 +158,15 @@ final readonly class SiteMetricsOverviewBuilder
      * of its own subpages' - without a level, every individual page is
      * already its own row, so there is nothing to roll up into.
      *
+     * $goalMetricIdentifier adds one of this site's own goal metrics (see
+     * goalMetricsFor()) as a second value on every row, beside the traffic
+     * the list is ranked by. The ranking axis stays the traffic either way:
+     * a list titled "most viewed pages" that sorted by conversions would be
+     * answering a different question under the same heading.
+     *
      * @return ?list<TopPage> null when no provider supports $site
      */
-    public function buildTopPagesForSite(Site $site, int $languageId, int $periodDays, ?int $level = null, bool $includeSubpages = false): ?array
+    public function buildTopPagesForSite(Site $site, int $languageId, int $periodDays, ?int $level = null, bool $includeSubpages = false, ?string $goalMetricIdentifier = null): ?array
     {
         $provider = $this->resolveProvider($site);
 
@@ -169,6 +175,7 @@ final readonly class SiteMetricsOverviewBuilder
         }
 
         $primary = $this->primaryDefinition($provider, $site);
+        $goalMetric = $this->resolveGoalMetric($site, $goalMetricIdentifier);
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $previousPeriodCovered = $this->previousPeriodCovered($provider, $site, $previousRange);
 
@@ -178,14 +185,47 @@ final readonly class SiteMetricsOverviewBuilder
                 $pageUidsByAnchor[$anchorUid] = $this->pageUidRepository->descendantsOf($anchorUid);
             }
 
-            return $this->trendCalculator->rankedByValueGrouped($pageUidsByAnchor, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT, $previousPeriodCovered);
+            return $this->trendCalculator->rankedByValueGrouped($pageUidsByAnchor, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT, $previousPeriodCovered, $goalMetric);
         }
 
         $pageUids = null !== $level
             ? $this->pageUidRepository->descendantsAtLevel($site->getRootPageId(), $level)
             : $this->pageUidRepository->descendantsOf($site->getRootPageId());
 
-        return $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT, $previousPeriodCovered);
+        return $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT, $previousPeriodCovered, $goalMetric);
+    }
+
+    /**
+     * The metrics one site has only because it declared goals for its
+     * provider (see SiteAwareMetricProviderInterface), as the identifier =>
+     * label map a widget setting is built from. Empty for a site with no
+     * goals, which is what keeps a goal setting from being offered at all
+     * where there is nothing to pick.
+     *
+     * @return array<string, string> metric identifier => the operator's own label for it
+     */
+    public function goalMetricsFor(Site $site): array
+    {
+        return array_map(static fn (MetricDefinition $definition): string => $definition->label, $this->goalDefinitionsFor($site));
+    }
+
+    /**
+     * Every goal metric across $sites, for a widget setting that is declared
+     * once and rendered against whichever sites the widget ends up covering.
+     * A label is per site, so two sites declaring the same goal id under
+     * different names collapse to one entry here - the column header itself
+     * uses the site's own label (see goalMetricsFor()).
+     *
+     * @param array<Site> $sites
+     *
+     * @return array<string, string>
+     */
+    public function availableGoalMetrics(array $sites): array
+    {
+        // array_values() before the spread: SiteFinder keys its sites by
+        // identifier, and spreading a string-keyed array into a call is
+        // PHP's syntax for named arguments rather than for a variadic list.
+        return array_merge([], ...array_values(array_map(fn (Site $site): array => $this->goalMetricsFor($site), $sites)));
     }
 
     /**
@@ -336,6 +376,35 @@ final readonly class SiteMetricsOverviewBuilder
         }
 
         return null;
+    }
+
+    /**
+     * Null for anything this site cannot speak for: no identifier asked
+     * about, or one belonging to another site's goals (a widget instance
+     * covers every site at once, and a goal is declared per site). Silently
+     * dropped rather than surfaced as an error, the same fallback
+     * resolveChartMetric() applies to a metric of another provider.
+     */
+    private function resolveGoalMetric(Site $site, ?string $identifier): ?MetricDefinition
+    {
+        return $this->goalDefinitionsFor($site)[$identifier ?? ''] ?? null;
+    }
+
+    /**
+     * Keyed by identifier, which is how both callers look a goal up.
+     *
+     * Only the definitions a site brought about itself, never the fixed ones
+     * every site of this provider has: a goal column offering "page views"
+     * beside page views is not a choice anybody wants.
+     *
+     * @return array<string, MetricDefinition>
+     */
+    private function goalDefinitionsFor(Site $site): array
+    {
+        $provider = $this->resolveProvider($site);
+        $definitions = $provider instanceof SiteAwareMetricProviderInterface ? $provider->getSiteMetricDefinitions($site) : [];
+
+        return array_combine(array_column($definitions, 'identifier'), $definitions);
     }
 
     /**

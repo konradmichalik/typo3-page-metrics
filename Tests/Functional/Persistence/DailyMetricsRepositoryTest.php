@@ -153,4 +153,50 @@ final class DailyMetricsRepositoryTest extends FunctionalTestCase
 
         self::assertSame([2 => 50], $sums);
     }
+
+    public function testSumsByDimensionPrefixAddsUpOnePrefixAcrossDaysAndPages(): void
+    {
+        $first = new DateTimeImmutable('2026-08-01');
+        $second = new DateTimeImmutable('2026-08-02');
+        $this->subject->upsert(2, 0, 'matomo', $first, 'matomo.visits', 6, 'channel:search');
+        $this->subject->upsert(2, 0, 'matomo', $second, 'matomo.visits', 4, 'channel:search');
+        $this->subject->upsert(3, 0, 'matomo', $first, 'matomo.visits', 5, 'channel:direct');
+
+        $sums = $this->subject->sumsByDimensionPrefix([2, 3], 0, 'matomo.visits', new DateRange($first, $second), 'channel:');
+
+        // Ordered by dimension so the caller gets the same array twice
+        // for the same data, whatever the platform's grouping does.
+        self::assertSame(['channel:direct' => 5, 'channel:search' => 10], $sums);
+    }
+
+    public function testSumsByDimensionPrefixIgnoresTheHeadlineAndOtherDimensions(): void
+    {
+        $date = new DateTimeImmutable('2026-08-01');
+        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.visits', 30);
+        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.visits', 20, 'via_redirect');
+        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.visits', 7, 'channel:search');
+
+        self::assertSame(
+            ['channel:search' => 7],
+            $this->subject->sumsByDimensionPrefix([2], 0, 'matomo.visits', new DateRange($date, $date), 'channel:'),
+        );
+    }
+
+    public function testSumsByDimensionPrefixShortCircuitsOnAnEmptyPageList(): void
+    {
+        $date = new DateTimeImmutable('2026-08-01');
+        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.visits', 7, 'channel:search');
+
+        self::assertSame([], $this->subject->sumsByDimensionPrefix([], 0, 'matomo.visits', new DateRange($date, $date), 'channel:'));
+    }
+
+    public function testSumsByDimensionPrefixTreatsAWildcardInThePrefixAsLiteralText(): void
+    {
+        // A prefix is a prefix, not a LIKE pattern: an underscore in one
+        // must not quietly match any character.
+        $date = new DateTimeImmutable('2026-08-01');
+        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.visits', 7, 'channelXsearch');
+
+        self::assertSame([], $this->subject->sumsByDimensionPrefix([2], 0, 'matomo.visits', new DateRange($date, $date), 'channel_'));
+    }
 }

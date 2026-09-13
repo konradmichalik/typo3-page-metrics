@@ -299,6 +299,94 @@ final class PageTrendCalculatorTest extends FunctionalTestCase
         self::assertSame(100, $ranked[0]->deltaPercent);
     }
 
+    public function testCarriesAGoalsConversionsBesideTheTrafficItRanksBy(): void
+    {
+        // Page 3 converts more than twice as often on a quarter of the
+        // traffic, which is the row the goal column exists to expose. It
+        // still ranks below page 2: a list called "most viewed" that sorts
+        // by anything other than views is a different list.
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 20);
+        $this->upsert(2, 'matomo.goal.3.conversions', '2026-08-10', 4);
+        $this->upsert(3, 'matomo.pageviews', '2026-08-10', 5);
+        $this->upsert(3, 'matomo.goal.3.conversions', '2026-08-10', 9);
+
+        $ranked = $this->subject->rankedByValue([2, 3], 0, $this->countMetric(), $this->current, $this->previous, 10, true, $this->goalMetric());
+
+        self::assertSame([2, 3], array_map(static fn ($page): int => $page->pageUid, $ranked));
+        self::assertSame('4', $ranked[0]->secondaryFormattedValue);
+        self::assertSame('9', $ranked[1]->secondaryFormattedValue);
+    }
+
+    public function testReportsAZeroForARankedPageThatConvertedNothing(): void
+    {
+        // Both importers drop the row for a page that converted nothing (see
+        // MatomoGoalMetrics::readValue()), so a missing row is the stored
+        // shape of "it did not happen", not of "nobody measured".
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 20);
+
+        $ranked = $this->subject->rankedByValue([2], 0, $this->countMetric(), $this->current, $this->previous, 10, true, $this->goalMetric());
+
+        self::assertSame('0', $ranked[0]->secondaryFormattedValue);
+    }
+
+    public function testCarriesNoSecondValueWithoutAConfiguredGoal(): void
+    {
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 20);
+        $this->upsert(2, 'matomo.goal.3.conversions', '2026-08-10', 4);
+
+        $ranked = $this->subject->rankedByValue([2], 0, $this->countMetric(), $this->current, $this->previous, 10);
+
+        self::assertNull($ranked[0]->secondaryFormattedValue);
+    }
+
+    public function testTheGoalColumnCountsTheRankedPeriodOnly(): void
+    {
+        // The column states one period's conversions and compares nothing,
+        // so no previous period enters its number, covered or not.
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 20);
+        $this->upsert(2, 'matomo.goal.3.conversions', '2026-08-10', 4);
+        $this->upsert(2, 'matomo.goal.3.conversions', '2026-08-03', 40);
+
+        $ranked = $this->subject->rankedByValue([2], 0, $this->countMetric(), $this->current, $this->previous, 10, false, $this->goalMetric());
+
+        self::assertSame('4', $ranked[0]->secondaryFormattedValue);
+        self::assertTrue($ranked[0]->hasNoComparison);
+    }
+
+    public function testRollsAGoalUpIntoTheAnchorOfAGroupedRanking(): void
+    {
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 20);
+        $this->upsert(2, 'matomo.goal.3.conversions', '2026-08-10', 4);
+        $this->upsert(3, 'matomo.goal.3.conversions', '2026-08-10', 2);
+
+        $ranked = $this->subject->rankedByValueGrouped([2 => [2, 3]], 0, $this->countMetric(), $this->current, $this->previous, 10, true, $this->goalMetric());
+
+        self::assertCount(1, $ranked);
+        self::assertSame('6', $ranked[0]->secondaryFormattedValue);
+    }
+
+    public function testTheGoalColumnFormatsInTheGoalsOwnUnit(): void
+    {
+        // A goal tracking revenue stores minor units, so the column has to
+        // read the goal's unit instead of assuming a count.
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 20);
+        $this->upsert(2, 'matomo.goal.3.revenue', '2026-08-10', 1250);
+
+        $ranked = $this->subject->rankedByValue([2], 0, $this->countMetric(), $this->current, $this->previous, 10, true, $this->revenueGoalMetric());
+
+        self::assertSame('12.50', $ranked[0]->secondaryFormattedValue);
+    }
+
+    private function goalMetric(): MetricDefinition
+    {
+        return new MetricDefinition('matomo.goal.3.conversions', 'Newsletter signup', 'Conversions', 'tabler-target', MetricUnit::Count, 100, '#1a7f37');
+    }
+
+    private function revenueGoalMetric(): MetricDefinition
+    {
+        return new MetricDefinition('matomo.goal.3.revenue', 'Newsletter signup revenue', 'Revenue', 'tabler-coin', MetricUnit::Currency, 105, '#bc4c00');
+    }
+
     private function flooredCountMetric(): MetricDefinition
     {
         return new MetricDefinition('matomo.pageviews', 'Page views', 'Views', 'actions-view', MetricUnit::Count, 10, '#0969da', MetricPolarity::HigherIsBetter, MetricGroup::Audience, new MetricSignificance(0.1, 10));

@@ -19,7 +19,7 @@ use KonradMichalik\Typo3PageMetrics\Analysis\Parser\CombinedLogParser;
 use KonradMichalik\Typo3PageMetrics\Analysis\Taxonomy\{AgentMatcher, BotTaxonomy};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, UrlMetric};
 use KonradMichalik\Typo3PageMetrics\Import\LogFileReader;
-use KonradMichalik\Typo3PageMetrics\Provider\AccessLog\{AccessLogConfiguration, AccessLogConfigurationResolver, AccessLogMetricProvider};
+use KonradMichalik\Typo3PageMetrics\Provider\AccessLog\{AccessLogConfiguration, AccessLogConfigurationResolver, AccessLogMetricProvider, LogFileSet};
 use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -71,7 +71,7 @@ final class AccessLogMetricProviderTest extends TestCase
             new BotTaxonomy(new AgentMatcher()),
             new PathHeuristicGuard(),
             $this->collector,
-            new LogFileReader(),
+            new LogFileSet(new LogFileReader(), new CombinedLogParser()),
         );
         $this->site = new Site('main', 1, ['base' => 'https://example.com/']);
     }
@@ -101,6 +101,16 @@ final class AccessLogMetricProviderTest extends TestCase
             ['accesslog.pageviews', 'accesslog.visits', 'bot.ai_chatbot', 'bot.ai_crawler', 'bot.search', 'bot.social', 'bot.tool'],
             $identifiers,
         );
+    }
+
+    public function testPageViewsDescribesTheNotModifiedResponsesItAlsoCounts(): void
+    {
+        // The description is the tooltip on the tile, and wasSuccessful()
+        // counts 304 alongside 2xx on purpose.
+        $definition = $this->subject->getMetricDefinitions()[0];
+
+        self::assertSame('accesslog.pageviews', $definition->identifier);
+        self::assertStringContainsString('304', $definition->description);
     }
 
     public function testGetRateMetricDefinitionsReturnsNoRateMetrics(): void
@@ -267,6 +277,36 @@ final class AccessLogMetricProviderTest extends TestCase
         $dates = array_map(static fn (UrlMetric $metric): string => $metric->date->format('Y-m-d'), $result);
 
         self::assertSame(['2026-10-10', '2026-10-10'], $dates);
+    }
+
+    public function testFetchDatesALineByTheOffsetItWasWrittenWith(): void
+    {
+        // The day a line belongs to is the date the log wrote, in the
+        // server's own offset, never one converted to anywhere else. The
+        // cheap pre-parse date check in aggregate() has to agree with the
+        // parser about that, or a whole timezone's worth of lines would be
+        // dropped before the parser ever saw them.
+        $file = $this->writeLogFile([
+            $this->logLine('10/Oct/2026:23:30:00 +0200', '203.0.113.1', 'GET', '/about', 200, 'BrowserA'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        self::assertSame(1, $metrics['accesslog.pageviews']['https://example.com/about'] ?? null);
+    }
+
+    public function testFetchIgnoresALineWhoseTimestampIsNotADate(): void
+    {
+        $file = $this->writeLogFile([
+            $this->logLine('99/Xxx/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'BrowserA'),
+            $this->logLine('10/Oct/2026:10:00:00 +0000', '203.0.113.2', 'GET', '/about', 200, 'BrowserA'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        self::assertSame(1, $metrics['accesslog.pageviews']['https://example.com/about'] ?? null);
     }
 
     public function testFetchSupportsAGzippedLogFile(): void
@@ -457,6 +497,86 @@ final class AccessLogMetricProviderTest extends TestCase
         }
     }
 
+    public function testFetchIgnoresLinesServedByAnotherVirtualHost(): void
+    {
+        // One combined log for several vhosts is the shared-hosting default.
+        // Without reading the %v token every configured site counted every
+        // other site's traffic as its own, silently.
+        $file = $this->writeLogFile([
+            $this->logLineWithHost('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'BrowserA', 'example.com'),
+            $this->logLineWithHost('10/Oct/2026:10:01:00 +0000', '203.0.113.2', 'GET', '/about', 200, 'BrowserB', 'other-site.example'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        self::assertSame(['https://example.com/about'], array_keys($metrics['accesslog.pageviews'] ?? []));
+        self::assertSame(1, $metrics['accesslog.pageviews']['https://example.com/about'] ?? null);
+        self::assertSame(1, $metrics['accesslog.visits']['https://example.com/about'] ?? null);
+    }
+
+    public function testFetchCountsLinesServedByAHostListedInAdditionalHosts(): void
+    {
+        $this->site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['resolution' => ['additionalHosts' => ['www.example.com']]],
+        ]);
+        $file = $this->writeLogFile([
+            $this->logLineWithHost('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'BrowserA', 'www.example.com'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        self::assertSame(1, $metrics['accesslog.pageviews']['https://www.example.com/about'] ?? null);
+    }
+
+    public function testFetchCountsLinesServedByALanguageDomainOfTheSite(): void
+    {
+        $this->site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'languages' => [
+                ['languageId' => 0, 'locale' => 'en_US.UTF-8', 'base' => 'https://example.com/'],
+                ['languageId' => 1, 'locale' => 'de_DE.UTF-8', 'base' => 'https://de.example.com/'],
+            ],
+        ]);
+        $file = $this->writeLogFile([
+            $this->logLineWithHost('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/ueber-uns', 200, 'BrowserA', 'de.example.com'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        // Carried under the host that served it, so the language a URL
+        // belongs to survives as far as the resolver.
+        self::assertSame(1, $metrics['accesslog.pageviews']['https://de.example.com/ueber-uns'] ?? null);
+    }
+
+    public function testFetchMatchesTheVirtualHostIgnoringCaseAndPort(): void
+    {
+        $file = $this->writeLogFile([
+            $this->logLineWithHost('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'BrowserA', 'EXAMPLE.COM:443'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        self::assertSame(1, $metrics['accesslog.pageviews']['https://example.com/about'] ?? null);
+    }
+
+    public function testFetchIgnoresABotHitServedByAnotherVirtualHost(): void
+    {
+        $file = $this->writeLogFile([
+            $this->logLineWithHost('10/Oct/2026:10:00:00 +0000', '203.0.113.1', 'GET', '/about', 200, 'GPTBot/1.0', 'other-site.example'),
+        ]);
+        $this->resolver->method('resolve')->willReturn(new AccessLogConfiguration($file));
+        $this->collector->expects(self::never())->method('add');
+
+        $metrics = $this->fetchByMetric($this->rangeCoveringOctober10th());
+
+        self::assertSame([], $metrics);
+    }
+
     public function testFetchYieldsABotBucketMetricForAClassifiedLineRegardlessOfStatus(): void
     {
         $file = $this->writeLogFile([
@@ -512,6 +632,15 @@ final class AccessLogMetricProviderTest extends TestCase
     private function logLine(string $timestamp, string $ip, string $method, string $path, int $status, string $userAgent): string
     {
         return sprintf('%s - - [%s] "%s %s HTTP/1.1" %d 512 "-" "%s"', $ip, $timestamp, $method, $path, $status, $userAgent);
+    }
+
+    /**
+     * The same line with the trailing vhost token an Apache `LogFormat`
+     * ending in `%v` writes.
+     */
+    private function logLineWithHost(string $timestamp, string $ip, string $method, string $path, int $status, string $userAgent, string $host): string
+    {
+        return $this->logLine($timestamp, $ip, $method, $path, $status, $userAgent).' '.$host;
     }
 
     /**

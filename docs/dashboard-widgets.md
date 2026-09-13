@@ -16,7 +16,7 @@ skipped entirely for sites without one.
 | Page metrics | `pageMetrics` | Each site's homepage tiles: page views, visits, avg. time on page, bounce rate | 7 days | — |
 | Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers and a key to the kinds drawn | — | Metric, period (7/30/90 days), marker category |
 | Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days), marker category |
-| Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level, include subpages |
+| Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level, include subpages, goal column |
 | Page metrics trend | `pageMetricsTrend` | Pages that improved or declined most against the previous period | 7/30/90 days | Metric, movement (declines/improvements), period |
 | Not found pages | `pageMetricsNotFoundPages` | URLs the daily import could not resolve to a page, with the reason | 30 days | — |
 | Page metrics annotations | `pageMetricsAnnotations` | Recent annotations with their kind and, for one that ran for a while, its last day | 90 days | — |
@@ -112,6 +112,38 @@ subpages**, each of those pages' own number becomes its own traffic plus
 everything under it rolled up into one total — useful for seeing which
 top-level section performs best as a whole, not just its own landing
 page. "Include subpages" only has an effect once a page level is set.
+
+## Most viewed pages: goal column
+
+A page at the top of "Most viewed pages" is the busiest one, which is not
+necessarily the one that earns anything. The **Goal column** setting adds a
+second column beside the traffic, carrying one of the site's own configured
+[goals](providers/matomo.md#goals) over the same period and for the same
+pages, so a page with a tenth of the traffic and ten times the conversion
+rate is visible as the more interesting row.
+
+The setting lists the goals declared under `pageMetrics.goals`, by the label
+the site gave them. A site that declared no goals is offered no setting at
+all and keeps the widget exactly as it was, and a goal another site declared
+is ignored for sites that did not: the column header is always the label of
+the site it stands above.
+
+The ranking stays on traffic. Ranking by conversions answers a different
+question than "most viewed" asks, and a widget whose title says one thing
+while its order says another is worse than two widgets. So the column
+reports, it does not sort.
+
+A page that converted nothing shows a zero rather than an empty cell. The
+import writes no row for a page with no conversions (see
+[Goals](providers/matomo.md#goals)), so the absence of a row is how "it did
+not happen" is stored, and it is the same zero the page's own goal tile
+shows in the page module. An empty cell would claim something else, namely
+that nobody measured.
+
+The column carries no percentage against the previous period. It states one
+period's conversions beside one period's traffic, which is also why it never
+has to withhold a comparison for a period the import did not cover, the way
+the traffic column does (see [Data age](page-tiles.md#data-age)).
 
 ## Dashboard preset
 

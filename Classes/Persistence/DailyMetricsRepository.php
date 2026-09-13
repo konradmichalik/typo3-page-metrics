@@ -164,6 +164,56 @@ class DailyMetricsRepository
     }
 
     /**
+     * Every dimension of one metric that starts with $dimensionPrefix,
+     * summed over the range and the pages, ordered by dimension so the same
+     * data always comes back in the same order.
+     *
+     * A prefix rather than a fixed list because a dimension namespace is
+     * open: the channel split writes channel:<name> and a provider may write
+     * a name this extension has never heard of. The headline row carries the
+     * empty dimension and can therefore never match a non-empty prefix,
+     * which is what keeps the parts out of the whole.
+     *
+     * @param list<int> $pageUids
+     *
+     * @return array<string, int> dimension => summed value, only for dimensions with at least one row
+     */
+    public function sumsByDimensionPrefix(array $pageUids, int $languageId, string $metric, DateRange $range, string $dimensionPrefix): array
+    {
+        if ([] === $pageUids) {
+            return [];
+        }
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $rows = $queryBuilder
+            ->select('dimension')
+            ->addSelectLiteral('SUM('.$queryBuilder->quoteIdentifier('value').') AS total')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->in('page_uid', $queryBuilder->createNamedParameter($pageUids, Connection::PARAM_INT_ARRAY)),
+                $queryBuilder->expr()->eq('sys_language_uid', $queryBuilder->createNamedParameter($languageId, ParameterType::INTEGER)),
+                $queryBuilder->expr()->eq('metric', $queryBuilder->createNamedParameter($metric)),
+                // Escaped, so a prefix is read as text and not as a LIKE
+                // pattern: an underscore in one would otherwise match any
+                // single character.
+                $queryBuilder->expr()->like('dimension', $queryBuilder->createNamedParameter($queryBuilder->escapeLikeWildcards($dimensionPrefix).'%')),
+                $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($range->from->format('Y-m-d'))),
+                $queryBuilder->expr()->lte('date', $queryBuilder->createNamedParameter($range->until->format('Y-m-d'))),
+            )
+            ->groupBy('dimension')
+            ->orderBy('dimension')
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        $sums = [];
+        foreach ($rows as $row) {
+            $sums[(string) $row['dimension']] = (int) $row['total'];
+        }
+
+        return $sums;
+    }
+
+    /**
      * @param list<int> $pageUids
      *
      * @return array<string, int> Y-m-d => value, only for days with at least one row

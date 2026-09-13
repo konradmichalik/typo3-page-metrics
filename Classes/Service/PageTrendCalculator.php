@@ -49,16 +49,20 @@ final readonly class PageTrendCalculator
      * The ranking itself stands either way - the current period's numbers
      * are real - and only the comparison beside each row is withheld.
      *
+     * $secondaryMetric is a second metric carried alongside each ranked row
+     * without taking part in the ranking (see secondaryValues()).
+     *
      * @param list<int> $pageUids
      *
      * @return list<TopPage>
      */
-    public function rankedByValue(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit, bool $previousPeriodCovered = true): array
+    public function rankedByValue(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit, bool $previousPeriodCovered = true, ?MetricDefinition $secondaryMetric = null): array
     {
         $trends = $this->computeTrends($pageUids, $languageId, $metric, $currentRange, $previousRange, $previousPeriodCovered);
         usort($trends, static fn (PageTrend $a, PageTrend $b): int => $b->value <=> $a->value);
+        $ranked = array_slice($trends, 0, $limit);
 
-        return $this->toTopPages(array_slice($trends, 0, $limit), $metric, $previousPeriodCovered);
+        return $this->toTopPages($ranked, $metric, $previousPeriodCovered, $secondaryMetric, $this->secondaryValues($ranked, $languageId, $currentRange, $secondaryMetric));
     }
 
     /**
@@ -126,12 +130,13 @@ final readonly class PageTrendCalculator
      *
      * @return list<TopPage>
      */
-    public function rankedByValueGrouped(array $pageUidsByAnchor, int $languageId, MetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit, bool $previousPeriodCovered = true): array
+    public function rankedByValueGrouped(array $pageUidsByAnchor, int $languageId, MetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit, bool $previousPeriodCovered = true, ?MetricDefinition $secondaryMetric = null): array
     {
         $trends = $this->computeGroupedTrends($pageUidsByAnchor, $languageId, $metric->identifier, $currentRange, $previousRange, $previousPeriodCovered);
         usort($trends, static fn (PageTrend $a, PageTrend $b): int => $b->value <=> $a->value);
+        $ranked = array_slice($trends, 0, $limit);
 
-        return $this->toTopPages(array_slice($trends, 0, $limit), $metric, $previousPeriodCovered);
+        return $this->toTopPages($ranked, $metric, $previousPeriodCovered, $secondaryMetric, $this->secondaryValuesGrouped($ranked, $pageUidsByAnchor, $languageId, $currentRange, $secondaryMetric));
     }
 
     /**
@@ -294,11 +299,18 @@ final readonly class PageTrendCalculator
     }
 
     /**
+     * A page missing from $secondaryValues is formatted as a zero rather
+     * than left out: the importers write no row for a page that converted
+     * nothing (see MatomoGoalMetrics::readValue()), so its absence is how
+     * "it did not happen" is stored, and the page's own goal tile says the
+     * same zero.
+     *
      * @param list<PageTrend> $trends
+     * @param array<int, int> $secondaryValues page uid => $secondaryMetric's summed value
      *
      * @return list<TopPage>
      */
-    private function toTopPages(array $trends, MetricDefinition|RateMetricDefinition $metric, bool $previousPeriodCovered): array
+    private function toTopPages(array $trends, MetricDefinition|RateMetricDefinition $metric, bool $previousPeriodCovered, ?MetricDefinition $secondaryMetric = null, array $secondaryValues = []): array
     {
         $titlesByUid = $this->pageUidRepository->titlesFor(array_map(static fn (PageTrend $trend): int => $trend->pageUid, $trends));
 
@@ -311,8 +323,69 @@ final readonly class PageTrendCalculator
                 $trend->direction,
                 $metric->polarity,
                 $previousPeriodCovered,
+                null !== $secondaryMetric ? $this->valueFormatter->format($secondaryValues[$trend->pageUid] ?? 0, $secondaryMetric->unit) : null,
             ),
             $trends,
         );
+    }
+
+    /**
+     * The second metric's sums for the rows that survived the ranking, which
+     * is what keeps the extra column at one query no matter how many pages
+     * the site has: the ranking is decided first, then the handful of rows
+     * left is asked about. sumsByPage() again rather than a query of its
+     * own, so the column costs no new SQL shape to maintain.
+     *
+     * Only the ranked period. The column states conversions and compares
+     * nothing, so it needs no second call for the previous one, and cannot
+     * claim a comparison against a period the import never covered.
+     *
+     * @param list<PageTrend> $trends
+     *
+     * @return array<int, int>
+     */
+    private function secondaryValues(array $trends, int $languageId, DateRange $currentRange, ?MetricDefinition $secondaryMetric): array
+    {
+        if (null === $secondaryMetric || [] === $trends) {
+            return [];
+        }
+
+        return $this->dailyMetricsRepository->sumsByPage(
+            array_map(static fn (PageTrend $trend): int => $trend->pageUid, $trends),
+            $languageId,
+            $secondaryMetric->identifier,
+            $currentRange,
+        );
+    }
+
+    /**
+     * The grouped counterpart of secondaryValues(): a ranked row is a whole
+     * subtree here, so the second metric rolls up into its anchor the same
+     * way the ranked one does.
+     *
+     * @param list<PageTrend>       $trends
+     * @param array<int, list<int>> $pageUidsByAnchor
+     *
+     * @return array<int, int>
+     */
+    private function secondaryValuesGrouped(array $trends, array $pageUidsByAnchor, int $languageId, DateRange $currentRange, ?MetricDefinition $secondaryMetric): array
+    {
+        if (null === $secondaryMetric || [] === $trends) {
+            return [];
+        }
+
+        $rankedByAnchor = [];
+        foreach ($trends as $trend) {
+            $rankedByAnchor[$trend->pageUid] = $pageUidsByAnchor[$trend->pageUid] ?? [];
+        }
+
+        $sums = $this->dailyMetricsRepository->sumsByPage($this->flattenAnchorPageUids($rankedByAnchor), $languageId, $secondaryMetric->identifier, $currentRange);
+
+        $values = [];
+        foreach ($rankedByAnchor as $anchorUid => $pageUids) {
+            $values[$anchorUid] = $this->sumForPages($pageUids, $sums);
+        }
+
+        return $values;
     }
 }

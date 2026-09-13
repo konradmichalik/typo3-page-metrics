@@ -65,6 +65,35 @@ final class AnalyzeCommandTest extends TestCase
     }
 
     #[Test]
+    public function executeBlamesTheDateFilterWhenEveryParsedLineFallsBeforeSince(): void
+    {
+        $exitCode = $this->tester->execute([
+            'paths' => [__DIR__.'/Fixtures/access.log'],
+            '--since' => '2026-11-01',
+        ]);
+        $display = $this->normalizedDisplay();
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringContainsString('No entries on or after 2026-11-01', $display);
+        self::assertStringNotContainsString('contained a parseable Combined Log Format line', $display);
+    }
+
+    #[Test]
+    public function executeNamesBothCausesWhenSomeLinesDoNotParseAndTheRestAreFiltered(): void
+    {
+        $exitCode = $this->tester->execute([
+            'paths' => [__DIR__.'/Fixtures/access.log', __DIR__.'/Fixtures/garbage.log'],
+            '--since' => '2026-11-01',
+        ]);
+        $display = $this->normalizedDisplay();
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringContainsString('No entries on or after 2026-11-01', $display);
+        self::assertStringContainsString('2 parsed line(s) fall before that date', $display);
+        self::assertStringContainsString('1 further line(s)', $display);
+    }
+
+    #[Test]
     public function executeRendersTheOverviewAndAgentTablesForAKnownBot(): void
     {
         $exitCode = $this->tester->execute(['paths' => [__DIR__.'/Fixtures/access.log']]);
@@ -100,5 +129,14 @@ final class AnalyzeCommandTest extends TestCase
 
         self::assertSame(Command::FAILURE, $exitCode);
         self::assertStringContainsString('--since expects YYYY-MM-DD.', $this->tester->getDisplay());
+    }
+
+    /**
+     * SymfonyStyle hard-wraps an error block at the terminal width, so a
+     * message long enough to span two lines cannot be asserted on verbatim.
+     */
+    private function normalizedDisplay(): string
+    {
+        return (string) preg_replace('/\s+/', ' ', $this->tester->getDisplay());
     }
 }

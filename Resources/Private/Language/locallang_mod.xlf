@@ -273,6 +273,15 @@
             <trans-unit id="widget.topPages.setting.includeSubpages.description" resname="widget.topPages.setting.includeSubpages.description">
                 <source>Roll up each page's own subpages into its number instead of listing them separately. Only takes effect when a page level above is selected.</source>
             </trans-unit>
+            <trans-unit id="widget.topPages.setting.goalMetric.label" resname="widget.topPages.setting.goalMetric.label">
+                <source>Goal column</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.setting.goalMetric.description" resname="widget.topPages.setting.goalMetric.description">
+                <source>Show one of the site's configured goals beside the traffic, so the busiest page and the one that converts can be told apart. The ranking stays on traffic.</source>
+            </trans-unit>
+            <trans-unit id="widget.topPages.setting.goalMetric.none" resname="widget.topPages.setting.goalMetric.none">
+                <source>No goal column</source>
+            </trans-unit>
             <trans-unit id="widget.trend.title" resname="widget.trend.title">
                 <source>Page metrics trend</source>
             </trans-unit>

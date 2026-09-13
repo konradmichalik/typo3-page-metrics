@@ -10,7 +10,11 @@ concurrency:
   # `head_ref || ref_name` is the branch name under both events, so the push and
   # the pull_request run for the same branch share one group and deduplicate.
   # `github.ref` would not: it is refs/pull/<n>/merge on a pull request.
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  #
+  # Keyed on the head repository as well, because a branch name is only unique
+  # within one: a fork PR from a branch this repository also has would
+  # otherwise share a group with it and cancel its run.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
   # Never cancel a run for the default branch, not even one started by a fork
   # pull request whose head branch happens to be named `main`.
   cancel-in-progress: ${{ (github.head_ref || github.ref_name) != 'main' }}

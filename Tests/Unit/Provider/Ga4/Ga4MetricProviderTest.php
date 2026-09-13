@@ -17,7 +17,7 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Configuration\{GoalConfigurationParser, SiteConfigurationReader};
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricPolarity;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
-use KonradMichalik\Typo3PageMetrics\Provider\Ga4\{Ga4ApiClient, Ga4Configuration, Ga4ConfigurationResolver, Ga4KeyEventMetrics, Ga4MetricProvider};
+use KonradMichalik\Typo3PageMetrics\Provider\Ga4\{Ga4ApiClient, Ga4ChannelMetrics, Ga4Configuration, Ga4ConfigurationResolver, Ga4KeyEventMetrics, Ga4MetricProvider};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -40,7 +40,7 @@ final class Ga4MetricProviderTest extends TestCase
     {
         $this->resolver = $this->createMock(Ga4ConfigurationResolver::class);
         $this->apiClient = $this->createMock(Ga4ApiClient::class);
-        $this->subject = new Ga4MetricProvider($this->resolver, $this->apiClient, new Ga4KeyEventMetrics(new SiteConfigurationReader(new GoalConfigurationParser())));
+        $this->subject = new Ga4MetricProvider($this->resolver, $this->apiClient, new Ga4KeyEventMetrics(new SiteConfigurationReader(new GoalConfigurationParser())), new Ga4ChannelMetrics());
         $this->site = new Site('main', 1, ['base' => 'https://example.com/']);
     }
 
@@ -154,9 +154,57 @@ final class Ga4MetricProviderTest extends TestCase
 
         iterator_to_array($this->subject->fetch($this->site, new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'))), false);
 
-        self::assertCount(2, $bodies);
-        self::assertArrayNotHasKey('dimensionFilter', $bodies[0]);
-        self::assertArrayNotHasKey('dimensionFilter', $bodies[1]);
+        // The page report, the landing report and the channel split. No
+        // fourth one, because this site configured no key events.
+        self::assertCount(3, $bodies);
+
+        foreach ($bodies as $body) {
+            self::assertArrayNotHasKey('dimensionFilter', $body);
+        }
+    }
+
+    public function testFetchSplitsSessionsByChannelInOneExtraReportForTheWholeRange(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+
+        $channelBodies = [];
+        $this->apiClient->method('runReport')->willReturnCallback(static function (Ga4Configuration $configuration, array $body) use (&$channelBodies): array {
+            if (['name' => 'sessionDefaultChannelGroup'] !== ($body['dimensions'][2] ?? null)) {
+                return ['rows' => []];
+            }
+
+            $channelBodies[] = $body;
+
+            return [
+                'rows' => [
+                    [
+                        'dimensionValues' => [['value' => '20260801'], ['value' => '/about'], ['value' => 'Organic Search']],
+                        'metricValues' => [['value' => '6']],
+                    ],
+                    [
+                        'dimensionValues' => [['value' => '20260802'], ['value' => '/about'], ['value' => 'Paid Social']],
+                        'metricValues' => [['value' => '2']],
+                    ],
+                ],
+            ];
+        });
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
+        $metrics = iterator_to_array($this->subject->fetch($this->site, $range), false);
+
+        // One report covers the whole range, because date is a dimension of
+        // it just as it is of the two reports already sent.
+        self::assertCount(1, $channelBodies);
+        self::assertSame([['startDate' => '2026-08-01', 'endDate' => '2026-08-02']], $channelBodies[0]['dateRanges']);
+
+        self::assertCount(2, $metrics);
+        self::assertSame('ga4.sessions', $metrics[0]->metric);
+        self::assertSame('channel:search', $metrics[0]->dimension);
+        self::assertSame(6, $metrics[0]->value);
+        self::assertSame('https://example.com/about', $metrics[0]->url);
+        self::assertSame('2026-08-01', $metrics[0]->date->format('Y-m-d'));
+        self::assertSame('channel:campaign', $metrics[1]->dimension);
+        self::assertSame('2026-08-02', $metrics[1]->date->format('Y-m-d'));
     }
 
     public function testFetchYieldsKeyEventsFromAReportOfTheirOwn(): void
@@ -244,7 +292,7 @@ final class Ga4MetricProviderTest extends TestCase
         $offsetsSeen = [];
 
         $this->apiClient->method('runReport')->willReturnCallback(static function (Ga4Configuration $configuration, array $body) use (&$offsetsSeen): array {
-            if (['name' => 'landingPage'] === ($body['dimensions'][1] ?? null)) {
+            if ([['name' => 'date'], ['name' => 'pagePath']] !== ($body['dimensions'] ?? null)) {
                 return ['rows' => []];
             }
 

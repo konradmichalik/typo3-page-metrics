@@ -19,14 +19,13 @@ use KonradMichalik\Typo3PageMetrics\Analysis\Parser\{CombinedLogParser, LogLine}
 use KonradMichalik\Typo3PageMetrics\Analysis\Taxonomy\BotTaxonomy;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, UrlMetric};
-use KonradMichalik\Typo3PageMetrics\Import\LogFileReader;
 use KonradMichalik\Typo3PageMetrics\Provider\MetricProviderInterface;
 use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
 use RuntimeException;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 use function explode;
-use function glob;
+use function hash;
 use function implode;
 use function in_array;
 use function pathinfo;
@@ -39,9 +38,10 @@ use function strtolower;
  * AccessLogMetricProvider.
  *
  * Reads the site's own Apache/Nginx "combined" access log(s) directly
- * (AccessLogConfiguration::$pathPattern, resolved via glob() so a rotated
- * set like "access.log", "access.log.1", "access.log-20261001.gz" is read
- * as one set) rather than calling an analytics API - no Matomo/GA4 needed,
+ * (AccessLogConfiguration::$pathPattern; LogFileSet turns that into the
+ * files to read and the order to read them in, so a rotated set like
+ * "access.log", "access.log.1", "access.log-20261001.gz" is read as one
+ * set) rather than calling an analytics API - no Matomo/GA4 needed,
  * at the cost of only ever offering page views and an approximated visit
  * count: a raw access log carries no session/client-side signal, so
  * "avg. time on page" and "bounce rate" (see MatomoMetricProvider,
@@ -77,9 +77,16 @@ use function strtolower;
  * line counts toward neither pageviews/visits nor any bot.<bucket> metric,
  * because there is no bucket for a bot nobody has a name for.
  *
+ * A log written by a LogFormat ending in %v carries the vhost that served
+ * each line, and only lines served by one of this site's own hosts are
+ * counted: shared hosting commonly writes one combined log for several
+ * vhosts, and without that check every configured site counts every other
+ * site's traffic as its own. SiteUrlMapper owns that decision and the URL
+ * a line is counted under.
+ *
  * Emission is incremental, one day at a time, rather than one aggregate
  * over the whole requested range: retentionDays defaults to 400, and
- * holding a distinct-visitor set per (day, path) for that long is millions
+ * holding a distinct-visitor set per (day, url) for that long is millions
  * of array entries on any real site. An out-of-memory error is not a
  * Throwable, so ImportCommand's per-provider catch cannot contain it and no
  * import state gets written - the next run then starts in the same place
@@ -100,12 +107,6 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
      * path; see the class docblock for why bot classification does not use
      * this filter.
      */
-    /**
-     * How many opening lines of a file may fail to parse before it is
-     * treated as undatable for ordering purposes.
-     */
-    private const ORDERING_PROBE_LINES = 10;
-
     private const STATIC_ASSET_EXTENSIONS = [
         'css', 'js', 'mjs', 'map', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp',
         'ico', 'woff', 'woff2', 'ttf', 'eot', 'otf', 'mp4', 'webm', 'pdf',
@@ -139,7 +140,7 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
         private BotTaxonomy $taxonomy,
         private PathHeuristicGuard $guard,
         private BotAgentDetailCollector $agentDetailCollector,
-        private LogFileReader $logFileReader,
+        private LogFileSet $logFileSet,
     ) {
         $this->genericBotPattern = sprintf('/%s/i', implode('|', self::GENERIC_BOT_SIGNATURES));
     }
@@ -165,7 +166,7 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
     public function getMetricDefinitions(): array
     {
         return [
-            new MetricDefinition('accesslog.pageviews', 'Page views', 'Successful (2xx) GET requests for this page in the selected period, parsed from the web server access log.', 'tabler-eye-search', MetricUnit::Count, 10, '#116329'),
+            new MetricDefinition('accesslog.pageviews', 'Page views', 'Successful (2xx) and not-modified (304) GET requests for this page in the selected period, parsed from the web server access log.', 'tabler-eye-search', MetricUnit::Count, 10, '#116329'),
             new MetricDefinition('accesslog.visits', 'Visits', 'Distinct IP address/user agent pairs that requested this page on the same day - an approximation, not a true session count.', 'tabler-chart-dots', MetricUnit::Count, 20, '#57606a'),
             new MetricDefinition('bot.ai_chatbot', 'AI chatbots', 'Requests from AI chatbots fetching this page live in response to a specific user request.', 'tabler-robot', MetricUnit::Count, 30, '#4c6ef5', MetricPolarity::Neutral, MetricGroup::Machine),
             new MetricDefinition('bot.ai_crawler', 'AI crawlers', 'Requests from AI crawlers collecting content for model training or an AI search index.', 'tabler-spider', MetricUnit::Count, 40, '#ae3ec9', MetricPolarity::Neutral, MetricGroup::Machine),
@@ -199,10 +200,7 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
             $allowedDates[$day->format('Y-m-d')] = true;
         }
 
-        $base = $site->getBase();
-        $baseUrl = $base->getScheme().'://'.$base->getAuthority();
-
-        yield from $this->aggregate($configuration->pathPattern, $allowedDates, $baseUrl);
+        yield from $this->aggregate($configuration->pathPattern, $allowedDates, SiteUrlMapper::forSite($site));
     }
 
     /**
@@ -215,11 +213,11 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
      *
      * @return iterable<UrlMetric>
      */
-    private function aggregate(string $pathPattern, array $allowedDates, string $baseUrl): iterable
+    private function aggregate(string $pathPattern, array $allowedDates, SiteUrlMapper $urlMapper): iterable
     {
         $buffer = new DailyAggregationBuffer();
 
-        foreach ($this->lines($pathPattern) as $rawLine) {
+        foreach ($this->logFileSet->linesInRange($pathPattern, $allowedDates) as $rawLine) {
             $line = $this->lineParser->parseLine($rawLine);
 
             if (null === $line) {
@@ -247,23 +245,30 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
             // read for an answer that cannot have changed.
             if ($buffer->advanceTo($date)) {
                 foreach ($buffer->finishedDates() as $finished) {
-                    yield from $this->yieldDay($finished, $buffer, $baseUrl);
+                    yield from $this->yieldDay($finished, $buffer);
                     $buffer->forget($finished);
                 }
             }
 
-            $this->record($buffer, $line, $date, $baseUrl);
+            $this->record($buffer, $line, $date, $urlMapper);
         }
 
         foreach ($buffer->bufferedDates() as $remaining) {
-            yield from $this->yieldDay($remaining, $buffer, $baseUrl);
+            yield from $this->yieldDay($remaining, $buffer);
         }
     }
 
-    private function record(DailyAggregationBuffer $buffer, LogLine $line, string $date, string $baseUrl): void
+    private function record(DailyAggregationBuffer $buffer, LogLine $line, string $date, SiteUrlMapper $urlMapper): void
     {
+        $url = $urlMapper->urlFor($line);
+
+        // Null means another virtual host served this line, so it is none
+        // of this site's traffic (see SiteUrlMapper).
+        if (null === $url) {
+            return;
+        }
+
         $classification = $this->taxonomy->classify($line);
-        $url = $baseUrl.$line->target;
 
         if (null !== $classification) {
             $buffer->addBotHit($date, $classification->bucket->value, $url);
@@ -276,20 +281,27 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
             return;
         }
 
-        $buffer->addPageview($date, $line->target, $line->ip.'|'.$line->userAgent);
+        // Hashed rather than kept as "ip|userAgent": the set holds one
+        // entry per distinct visitor per url per day and is by far the
+        // largest thing the buffer carries, and a user agent string alone
+        // is over a hundred bytes of it. Measured on a 300k-lines-a-day
+        // log, an 8-byte xxh3 digest cuts the set from 226 to 82 bytes an
+        // entry. Only ever compared for equality, never read back, so the
+        // digest is as good as the string it stands for; a 64-bit
+        // collision would have to be won against a set of some thousands.
+        $buffer->addPageview($date, $url, hash('xxh3', $line->ip.'|'.$line->userAgent, true));
     }
 
     /**
      * @return iterable<UrlMetric>
      */
-    private function yieldDay(string $date, DailyAggregationBuffer $buffer, string $baseUrl): iterable
+    private function yieldDay(string $date, DailyAggregationBuffer $buffer): iterable
     {
         $day = new DateTimeImmutable($date);
 
-        foreach ($buffer->pageviewsOn($date) as $path => $hits) {
-            $url = $baseUrl.$path;
+        foreach ($buffer->pageviewsOn($date) as $url => $hits) {
             yield new UrlMetric($url, $day, 'accesslog.pageviews', $hits);
-            yield new UrlMetric($url, $day, 'accesslog.visits', $buffer->visitorCountOn($date, $path));
+            yield new UrlMetric($url, $day, 'accesslog.visits', $buffer->visitorCountOn($date, $url));
         }
 
         foreach ($buffer->botHitsOn($date) as $bucketValue => $urls) {
@@ -351,96 +363,5 @@ final readonly class AccessLogMetricProvider implements MetricProviderInterface
         $extension = strtolower(pathinfo($path, \PATHINFO_EXTENSION));
 
         return '' === $extension || !in_array($extension, self::STATIC_ASSET_EXTENSIONS, true);
-    }
-
-    /**
-     * @return iterable<string>
-     */
-    private function lines(string $pathPattern): iterable
-    {
-        foreach ($this->orderedFiles($pathPattern) as $file) {
-            try {
-                yield from $this->logFileReader->readLines($file);
-            } catch (RuntimeException) {
-                // One unreadable file must not cost the site its whole
-                // import. A glob over a rotation directory routinely picks up
-                // a file the web user cannot read, and logrotate can delete
-                // or recompress one between the glob and the read of a long
-                // first run. The reader throws for both, and skipping keeps
-                // the behaviour the provider had before it used the reader.
-                continue;
-            }
-        }
-    }
-
-    /**
-     * Oldest file first, by the date of the first entry each one contains.
-     *
-     * The order is not a nicety. A day is emitted once the reader has moved
-     * two days past it (see DailyAggregationBuffer::finishedDates()), so
-     * reading an older file after a newer one produces a day that was
-     * already written, which the buffer refuses outright.
-     *
-     * By content rather than by modification time: mtime looks like the
-     * obvious key and is not one. A restore from backup, an rsync without
-     * -t or a plain cp rewrites every mtime to the same instant, and the
-     * order silently becomes the glob's. File names are no better, since
-     * rotation schemes disagree (access.log.1, access.log-20261001.gz) and
-     * several of them sort the wrong way round alphabetically.
-     *
-     * Reading one line per file to find out costs a single decompression
-     * block on the gzipped ones, against a full read of every file straight
-     * afterwards.
-     *
-     * @return list<string>
-     */
-    private function orderedFiles(string $pathPattern): array
-    {
-        $startDates = [];
-
-        foreach (glob($pathPattern) ?: [] as $file) {
-            if (!is_file($file)) {
-                continue;
-            }
-
-            $startDates[$file] = $this->firstEntryDate($file);
-        }
-
-        // A file whose opening lines will not parse keeps its glob position,
-        // behind everything that could be dated: it cannot be placed, and
-        // guessing would be worse than leaving it where it was.
-        uasort($startDates, static fn (?string $left, ?string $right): int => [null === $left, $left] <=> [null === $right, $right]);
-
-        return array_keys($startDates);
-    }
-
-    /**
-     * The date of the first entry this file contains, or null when none of
-     * its opening lines parse. A rotated log can begin with a truncated
-     * line, so this looks at a few before giving up.
-     */
-    private function firstEntryDate(string $file): ?string
-    {
-        $inspected = 0;
-
-        try {
-            foreach ($this->logFileReader->readLines($file) as $rawLine) {
-                $line = $this->lineParser->parseLine($rawLine);
-
-                if (null !== $line) {
-                    return $line->timestamp->format('Y-m-d');
-                }
-
-                if (++$inspected >= self::ORDERING_PROBE_LINES) {
-                    break;
-                }
-            }
-        } catch (RuntimeException) {
-            // Unreadable here means unreadable in lines() too, where it is
-            // skipped; there is nothing to place.
-            return null;
-        }
-
-        return null;
     }
 }

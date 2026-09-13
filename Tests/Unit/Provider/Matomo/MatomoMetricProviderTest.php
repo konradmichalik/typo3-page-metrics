@@ -17,7 +17,7 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Configuration\{GoalConfigurationParser, SiteConfigurationReader};
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
-use KonradMichalik\Typo3PageMetrics\Provider\Matomo\{MatomoApiClient, MatomoConfiguration, MatomoConfigurationResolver, MatomoGoalMetrics, MatomoMetricProvider};
+use KonradMichalik\Typo3PageMetrics\Provider\Matomo\{MatomoApiClient, MatomoChannelMetrics, MatomoConfiguration, MatomoConfigurationResolver, MatomoGoalMetrics, MatomoMetricProvider};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -40,7 +40,7 @@ final class MatomoMetricProviderTest extends TestCase
     {
         $this->resolver = $this->createMock(MatomoConfigurationResolver::class);
         $this->apiClient = $this->createMock(MatomoApiClient::class);
-        $this->subject = new MatomoMetricProvider($this->resolver, $this->apiClient, new MatomoGoalMetrics(new SiteConfigurationReader(new GoalConfigurationParser())));
+        $this->subject = new MatomoMetricProvider($this->resolver, $this->apiClient, new MatomoGoalMetrics(new SiteConfigurationReader(new GoalConfigurationParser())), new MatomoChannelMetrics());
         $this->site = new Site('main', 1, ['base' => 'https://example.com/']);
     }
 
@@ -208,8 +208,7 @@ final class MatomoMetricProviderTest extends TestCase
         $this->resolver->method('resolve')->willReturn($configuration);
 
         $calls = [];
-        $this->apiClient->expects(self::exactly(2))
-            ->method('request')
+        $this->apiClient->method('request')
             ->willReturnCallback(static function (MatomoConfiguration $passedConfiguration, array $parameters) use (&$calls, $configuration) {
                 self::assertSame($configuration, $passedConfiguration);
                 $calls[] = $parameters;
@@ -220,6 +219,7 @@ final class MatomoMetricProviderTest extends TestCase
         $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
         iterator_to_array($this->subject->fetch($this->site, $range));
 
+        $calls = $this->pageUrlCalls($calls);
         self::assertCount(2, $calls);
         self::assertSame('Actions.getPageUrls', $calls[0]['method']);
         self::assertSame('day', $calls[0]['period']);
@@ -245,12 +245,67 @@ final class MatomoMetricProviderTest extends TestCase
         $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
         iterator_to_array($this->subject->fetch($this->site, $range));
 
+        $calls = $this->pageUrlCalls($calls);
         self::assertCount(2, $calls);
 
         foreach ($calls as $call) {
             self::assertArrayHasKey('filter_limit', $call);
             self::assertSame(-1, $call['filter_limit']);
         }
+    }
+
+    public function testFetchAsksForTheChannelSplitOnceADayAlongsideThePageReport(): void
+    {
+        $configuration = new MatomoConfiguration('https://matomo.example.com/', 3, 'token');
+        $this->resolver->method('resolve')->willReturn($configuration);
+
+        $calls = [];
+        $this->apiClient->method('request')->willReturnCallback(static function (MatomoConfiguration $passedConfiguration, array $parameters) use (&$calls): array {
+            $calls[] = $parameters;
+
+            return [];
+        });
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
+        iterator_to_array($this->subject->fetch($this->site, $range));
+
+        // Two days, two page reports and two bulk requests. The split costs
+        // one request a day however many pages the site has, which is the
+        // whole reason the segment runs channel-first rather than page-first.
+        self::assertCount(4, $calls);
+
+        $bulkCalls = array_values(array_filter($calls, static fn (array $call): bool => 'API.getBulkRequest' === ($call['method'] ?? null)));
+        self::assertCount(2, $bulkCalls);
+        self::assertStringContainsString('date=2026-08-01', (string) $bulkCalls[0]['urls[0]']);
+        self::assertStringContainsString('date=2026-08-02', (string) $bulkCalls[1]['urls[0]']);
+    }
+
+    public function testFetchYieldsChannelDimensionsOnTheVisitsMetric(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new MatomoConfiguration('https://matomo.example.com/', 3, 'token'));
+        $this->apiClient->method('request')->willReturnCallback(static function (MatomoConfiguration $configuration, array $parameters): array {
+            if ('API.getBulkRequest' === ($parameters['method'] ?? null)) {
+                return [
+                    [['url' => 'https://example.com/foo', 'nb_visits' => 5]],
+                    [['url' => 'https://example.com/foo', 'nb_visits' => 2]],
+                ];
+            }
+
+            return [['label' => '/foo', 'url' => 'https://example.com/foo', 'nb_hits' => 10, 'nb_visits' => 7]];
+        });
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
+        $metrics = iterator_to_array($this->subject->fetch($this->site, $range), false);
+
+        $headline = array_values(array_filter($metrics, static fn ($metric): bool => 'matomo.visits' === $metric->metric && null === $metric->dimension));
+        $channels = array_values(array_filter($metrics, static fn ($metric): bool => null !== $metric->dimension));
+
+        // The headline row is the one the tile shows and is not touched by
+        // the split: 7 visits, of which 5 direct and 2 from search.
+        self::assertCount(1, $headline);
+        self::assertSame(7, $headline[0]->value);
+        self::assertSame([5, 2], array_map(static fn ($metric): int => $metric->value, $channels));
+        self::assertSame(['channel:direct', 'channel:search'], array_map(static fn ($metric): ?string => $metric->dimension, $channels));
     }
 
     public function testFetchAsksForGoalColumnsOnlyWhereGoalsAreConfigured(): void
@@ -267,13 +322,15 @@ final class MatomoMetricProviderTest extends TestCase
         $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
 
         iterator_to_array($this->subject->fetch($this->site, $range));
-        self::assertArrayNotHasKey('idGoal', $calls[0]);
-        self::assertArrayNotHasKey('filter_update_columns_when_show_all_goals', $calls[0]);
+        $pageUrlCalls = $this->pageUrlCalls($calls);
+        self::assertArrayNotHasKey('idGoal', $pageUrlCalls[0]);
+        self::assertArrayNotHasKey('filter_update_columns_when_show_all_goals', $pageUrlCalls[0]);
 
         iterator_to_array($this->subject->fetch($this->siteWithGoals(), $range));
-        self::assertSame(0, $calls[1]['idGoal']);
-        self::assertSame(1, $calls[1]['filter_update_columns_when_show_all_goals']);
-        self::assertSame('Actions.getPageUrls', $calls[1]['method']);
+        $pageUrlCalls = $this->pageUrlCalls($calls);
+        self::assertSame(0, $pageUrlCalls[1]['idGoal']);
+        self::assertSame(1, $pageUrlCalls[1]['filter_update_columns_when_show_all_goals']);
+        self::assertSame('Actions.getPageUrls', $pageUrlCalls[1]['method']);
     }
 
     public function testFetchYieldsGoalConversionsAndRevenueInMinorUnits(): void
@@ -342,6 +399,19 @@ final class MatomoMetricProviderTest extends TestCase
         }
 
         self::assertNotSame([], $metrics);
+    }
+
+    /**
+     * The page reports only. Every day also carries one bulk request for the
+     * channel split, which asks nothing about goals, page size or period.
+     *
+     * @param list<array<string, int|string>> $calls
+     *
+     * @return list<array<string, int|string>>
+     */
+    private function pageUrlCalls(array $calls): array
+    {
+        return array_values(array_filter($calls, static fn (array $call): bool => 'Actions.getPageUrls' === ($call['method'] ?? null)));
     }
 
     private function siteWithGoals(): Site

@@ -102,6 +102,46 @@ API request. Configuration is per provider:
 [Matomo goals](providers/matomo.md#goals),
 [GA4 key events](providers/ga4.md#key-events).
 
+## Where visitors came from
+
+A tile says how much, never where from, and without that there is no way to
+show that an SEO measure or a campaign worked. The popover of the visits tile
+(Matomo) or the sessions tile (GA4) therefore lists what its number was made
+of, under the same "Made up of" heading the bot tile uses.
+
+It is a breakdown inside the popover rather than a row of six more tiles. The
+tile row is already at the limit of what reads as one glance, and a channel
+is a follow-up question about a number, not a number of its own.
+
+Six channels, always in the same order, so a reader finds one in the same
+place every time:
+
+| Channel | What lands in it |
+| --- | --- |
+| `Direct` | No referrer at all: typed, bookmarked, or an app that sends none |
+| `Search` | A search engine's own results |
+| `Social` | A social network |
+| `Referral` | Another website linking here |
+| `Campaign` | Traffic carrying campaign tagging, which is everything paid |
+| `Other` | Traffic the provider could not place |
+
+Both providers fold their own vocabulary into that one, so switching a site
+from Matomo to GA4 does not silently rename its channels. The mapping and the
+one case where the two can genuinely disagree are documented per provider:
+[Matomo](providers/matomo.md#traffic-channels),
+[GA4](providers/ga4.md#traffic-channels).
+
+The parts are not expected to add up to the headline and are not made to. A
+provider attributes what it can attribute, and the difference is traffic it
+could not place, which is a fact about the analytics source rather than a
+rounding error to hide.
+
+A channel with no traffic in the period is not listed, and a provider that
+returns no referrer data at all leaves the popover exactly as it was, with no
+empty section in it. The split is stored as ordinary dimensions on the metric
+the tile already shows, so nothing about the schema, the tile row or the
+dashboard changes.
+
 ## Data age
 
 The toolbar above the tiles marks which day the numbers are from with a small ⓘ, and hovering it names the date. It is a mark rather than a line of text: on a healthy installation it says the same thing every day, across five surfaces at once, and what it is there for is the day it stops doing that. That day is the last one the import treats as complete, which is not today: a scheduled run may only catch part of today, so it always revisits it and marks the previous day instead. The tiles therefore trail the calendar by a day even when everything is working.

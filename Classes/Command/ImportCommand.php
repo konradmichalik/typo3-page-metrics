@@ -28,6 +28,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 
+use function count;
 use function sprintf;
 
 /**
@@ -228,25 +229,7 @@ final class ImportCommand extends Command
 
         foreach ($this->groupByDay($aggregated) as $rowsForDay) {
             $connection->transactional(function () use ($rowsForDay, $identifier, $site, $earliestWithData, $yesterday, $lastImported): void {
-                foreach ($rowsForDay as $row) {
-                    $this->dailyMetricsRepository->upsert($row['pageUid'], $row['languageUid'], $identifier, $row['date'], $row['metric'], $row['value'], $row['dimension']);
-                }
-
-                if (null === $earliestWithData) {
-                    return;
-                }
-
-                // Never past yesterday, for the same reason the final call
-                // below stops there: today is still being lived through, so
-                // it must stay re-fetchable however much of it is already
-                // written. A day absent from the aggregate needs no row and
-                // is still imported, the provider simply had nothing for it,
-                // which is why the day just committed stands for the whole
-                // range up to it.
-                $day = $rowsForDay[0]['date'];
-                $cursor = $day < $yesterday ? $day : $yesterday;
-
-                $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $cursor, new DateRange($earliestWithData, $day), null === $lastImported);
+                $this->commitDay($rowsForDay, $identifier, $site, $earliestWithData, $yesterday, $lastImported);
             });
         }
 
@@ -269,7 +252,12 @@ final class ImportCommand extends Command
         // is "which days may be drawn as a number".
         $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $yesterday, $covered, null === $lastImported);
 
-        $output->writeln(sprintf('Imported "%s" for site "%s" from %s to %s.', $identifier, $site->getIdentifier(), $from->format('Y-m-d'), $today->format('Y-m-d')));
+        // The count, not just the range. A provider that reads its source
+        // and attributes none of it (an access log whose %v vhost token
+        // names a host the site configuration does not list, say) otherwise
+        // reports the same sentence as a successful run, and the only
+        // difference is rows nobody looks at.
+        $output->writeln(sprintf('Imported %d fact(s) for "%s" on site "%s" from %s to %s.', count($aggregated), $identifier, $site->getIdentifier(), $from->format('Y-m-d'), $today->format('Y-m-d')));
     }
 
     /**
@@ -301,6 +289,14 @@ final class ImportCommand extends Command
 
             $result = $this->resolver->resolve($urlMetric->url, $configuration->dropQueryString, $configuration->keepQueryParams);
 
+            // A provider may send the same fact twice: once as the total,
+            // and once more carrying a dimension that names a part of it
+            // (the channel split does exactly that). The dimensionless one
+            // is the only one that stands for the whole, and everything
+            // below that derives a second row or a diagnostic row from a
+            // fact is derived from the whole, never from a part.
+            $isHeadline = null === $urlMetric->dimension || '' === $urlMetric->dimension;
+
             if (!$result instanceof ResolvedUrl) {
                 // Written here, outside every transaction the write phase
                 // opens, on purpose. These rows are diagnostic, not fact
@@ -310,15 +306,26 @@ final class ImportCommand extends Command
                 // keeping, and record() is idempotent on
                 // (provider, date, url_hash, metric), so the next run
                 // replaces the row rather than duplicating it and the cap
-                // still holds.
-                $this->unresolvedUrlRepository->record($identifier, $urlMetric->date, $urlMetric->url, $urlMetric->metric, $result->reason, $urlMetric->value, self::UNRESOLVED_CAP_PER_DAY);
+                // still holds. That same idempotency is why a dimensioned
+                // fact is not recorded at all: it shares all four key
+                // columns with its headline and would replace the total
+                // already written with a fraction of it.
+                if ($isHeadline) {
+                    $this->unresolvedUrlRepository->record($identifier, $urlMetric->date, $urlMetric->url, $urlMetric->metric, $result->reason, $urlMetric->value, self::UNRESOLVED_CAP_PER_DAY);
+                }
 
                 continue;
             }
 
             $aggregated = $this->accumulate($aggregated, $result->pageUid, $result->languageUid, $urlMetric->date, $urlMetric->metric, $urlMetric->dimension ?? '', $urlMetric->value);
 
-            if ($result->viaRedirect) {
+            // The key above carries the dimension, which is what keeps a
+            // part out of its own total: a channel row and the headline it
+            // belongs to differ in exactly that field and can never collide.
+            // via_redirect is a share of the headline, so it is derived from
+            // the headline alone. Taking it from the parts as well would add
+            // the same visits a second time and let the share pass 100%.
+            if ($result->viaRedirect && $isHeadline) {
                 $aggregated = $this->accumulate($aggregated, $result->pageUid, $result->languageUid, $urlMetric->date, $urlMetric->metric, self::VIA_REDIRECT_DIMENSION, $urlMetric->value);
             }
         }
@@ -345,6 +352,50 @@ final class ImportCommand extends Command
         ksort($byDay);
 
         return array_values($byDay);
+    }
+
+    /**
+     * One day's rows plus the state that describes them, inside one
+     * transaction so the state can never claim a day whose rows are not
+     * there.
+     *
+     * @param list<array{pageUid: int, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}> $rowsForDay
+     */
+    private function commitDay(array $rowsForDay, string $identifier, Site $site, ?DateTimeImmutable $earliestWithData, DateTimeImmutable $yesterday, ?DateTimeImmutable $lastImported): void
+    {
+        foreach ($rowsForDay as $row) {
+            $this->dailyMetricsRepository->upsert($row['pageUid'], $row['languageUid'], $identifier, $row['date'], $row['metric'], $row['value'], $row['dimension']);
+        }
+
+        if (null === $earliestWithData) {
+            return;
+        }
+
+        // Never past yesterday, for the same reason the final call stops
+        // there: today is still being lived through, so it must stay
+        // re-fetchable however much of it is already written. A day absent
+        // from the aggregate needs no row and is still imported, the provider
+        // simply had nothing for it, which is why the day just committed
+        // stands for the whole range up to it.
+        $day = $rowsForDay[0]['date'];
+        $cursor = $day < $yesterday ? $day : $yesterday;
+
+        $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $this->neverBackwards($cursor, $identifier, $site), new DateRange($earliestWithData, $day), null === $lastImported);
+    }
+
+    /**
+     * Under --force the range starts a whole retention window in the past, so
+     * the oldest day commits first and would otherwise park the cursor 400
+     * days back; a run that then aborts leaves every following scheduled run
+     * re-fetching the entire window from the provider's API until one
+     * completes. The stored cursor is read here rather than reused from the
+     * caller's, which --force nulls.
+     */
+    private function neverBackwards(DateTimeImmutable $cursor, string $identifier, Site $site): DateTimeImmutable
+    {
+        $stored = $this->importStateRepository->getLastImportedDate($identifier, $site->getIdentifier());
+
+        return null !== $stored && $stored > $cursor ? $stored : $cursor;
     }
 
     /**

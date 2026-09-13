@@ -232,6 +232,69 @@ final class ImportCommandTest extends FunctionalTestCase
         self::assertSame([$today->format('Y-m-d') => 0], $viaRedirect);
     }
 
+    public function testADimensionedMetricIsNeverCountedIntoTheHeadlineTotal(): void
+    {
+        // The whole reason the channel split needs no schema change: the
+        // aggregate is keyed by dimension, so a row that names one lands
+        // beside the headline instead of in it. The headline stays the total
+        // the tile shows, and the parts stay parts.
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricProvider([
+            new UrlMetric('https://example.com/about', $today, 'stub.hits', 10),
+            new UrlMetric('https://example.com/about', $today, 'stub.hits', 6, 'channel:search'),
+            new UrlMetric('https://example.com/about', $today, 'stub.hits', 4, 'channel:direct'),
+        ]);
+
+        $this->runImport([$stub]);
+
+        $range = new DateRange($today, $today);
+        self::assertSame([$today->format('Y-m-d') => 10], $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', $range));
+        self::assertSame([$today->format('Y-m-d') => 6], $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', $range, 'channel:search'));
+        self::assertSame([$today->format('Y-m-d') => 4], $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', $range, 'channel:direct'));
+    }
+
+    public function testADimensionedMetricDoesNotInflateTheViaRedirectShare(): void
+    {
+        // via_redirect is a share of the headline, so it may only ever be
+        // fed by the headline. Deriving it from a dimensioned row as well
+        // would count the same visits twice and let the share exceed 100%.
+        $this->importCSVDataSet(__DIR__.'/Fixtures/sys_redirect.csv');
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricProvider([
+            new UrlMetric('https://example.com/old-about', $today, 'stub.hits', 15),
+            new UrlMetric('https://example.com/old-about', $today, 'stub.hits', 5, 'channel:search'),
+        ]);
+
+        $this->runImport([$stub]);
+
+        $range = new DateRange($today, $today);
+        self::assertSame([$today->format('Y-m-d') => 15], $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', $range, 'via_redirect'));
+    }
+
+    public function testAnUnresolvedUrlIsRecordedFromItsHeadlineRowOnly(): void
+    {
+        // record() is idempotent on (provider, date, url_hash, metric), and a
+        // dimensioned row carries the same four: it would overwrite the
+        // total the headline recorded with a part of it and say nothing new.
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricProvider([
+            new UrlMetric('https://example.com/gone-page', $today, 'stub.hits', 7),
+            new UrlMetric('https://example.com/gone-page', $today, 'stub.hits', 3, 'channel:search'),
+        ]);
+
+        $this->runImport([$stub]);
+
+        $rows = $this->get(ConnectionPool::class)
+            ->getQueryBuilderForTable('tx_typo3pagemetrics_unresolved')
+            ->select('value')
+            ->from('tx_typo3pagemetrics_unresolved')
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        self::assertCount(1, $rows);
+        self::assertSame(7, (int) $rows[0]['value']);
+    }
+
     public function testOneSitesProviderFailureDoesNotAbortImportForOtherSites(): void
     {
         $this->get(SiteWriter::class)->write('other', [
@@ -499,6 +562,28 @@ final class ImportCommandTest extends FunctionalTestCase
 
         self::assertSame(
             $today->modify('-3 days')->format('Y-m-d'),
+            $this->importStateRepository->getLastImportedDate('stub', 'main')?->format('Y-m-d'),
+        );
+    }
+
+    public function testAForcedRunNeverMovesTheCursorBackwards(): void
+    {
+        // --force re-fetches the whole retention window, so its oldest day
+        // commits first. Writing that day's date as the cursor would park it
+        // a retention window in the past, and a run that then aborts would
+        // leave every following scheduled run re-fetching everything from the
+        // provider's API until one completes.
+        $today = new DateTimeImmutable('today');
+        $this->importStateRepository->markImported('stub', 'main', $today->modify('-1 day'), null, true);
+        $stub = new StubMetricProvider([
+            new UrlMetric('https://example.com/about', $today->modify('-30 days'), 'stub.hits', 4),
+            new UrlMetric('https://example.com/about', $today, 'stub.hits', 7),
+        ]);
+
+        $this->runImport([$stub], true, [], new FailingOnDateDailyMetricsRepository($this->get(ConnectionPool::class), $today));
+
+        self::assertSame(
+            $today->modify('-1 day')->format('Y-m-d'),
             $this->importStateRepository->getLastImportedDate('stub', 'main')?->format('Y-m-d'),
         );
     }

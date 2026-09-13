@@ -13,7 +13,24 @@ pageMetrics:
 
 `pathPattern` is passed to PHP's `glob()`, so a rotated set like `access.log`, `access.log.1`, `access.log-20261001.gz` is read as one set. Gzip is detected by the file's own content rather than its name, so hosts that rotate into extensionless or oddly suffixed compressed files are read correctly too.
 
-The matched files are read oldest first, by modification time rather than by name: rotation schemes disagree about naming and several of them sort the wrong way round alphabetically.
+## Logs shared by several virtual hosts
+
+A `LogFormat`/`log_format` ending in `%v` writes the virtual host that served each line, and shared hosting commonly puts several vhosts into one combined log. Where the token is present, a line is only counted for the site whose own host served it; a line for any other host is skipped. Without that check every site configured against such a log would count every other site's traffic as its own, with nothing in the numbers to show it.
+
+A site's own hosts are its `base`, the `base` of each of its languages (so a language on its own domain keeps its traffic and its language), and every entry in `pageMetrics.resolution.additionalHosts`. The comparison ignores capitalisation, a port, and a leading `www.`: Apache writes the vhost's canonical `ServerName` into `%v`, which is routinely the bare domain where the site `base` names the `www` one, and treating those as two hosts would drop every line a site has.
+
+```yaml
+pageMetrics:
+  resolution:
+    additionalHosts:
+      - www.example.com
+```
+
+If your log carries `%v` and the metrics come out empty, this is the first thing to check: a vhost whose `ServerName` is `shop.example.com` while the site `base` says `https://example.com/` matches nothing until `shop.example.com` is listed above. The import prints how many facts each run attributed, so a run that read the log and counted none of it says so rather than reporting the same sentence as a successful one.
+
+A log with no vhost token cannot say which host served a line, so every line counts for the site. That is the common single-vhost format and nothing about it has changed.
+
+Lines for another host are dropped rather than recorded as unresolved URLs. The URL resolver matches across every configured site, so a foreign host that is itself a site in this installation would resolve onto that site's pages and this import would write rows for them. The site a line belongs to counts it when its own import reads the same log.
 
 ## How much it reads at once
 
@@ -27,6 +44,8 @@ If a log set still revisits a day that has already been written, the import for 
 
 A file that cannot be read is skipped rather than failing the run, since a glob over a rotation directory routinely picks up one the web user has no access to.
 
+Every run still reads every file the pattern matches, since nothing records how far into a rotation set the last one got. What a run does not do is parse them: a line is rejected on the bracketed date alone unless it falls in the window being imported, which is a substring comparison rather than a regular expression, a date object and a bot classification. On a 1.44M-line archive spanning 120 days, reading and date-checking every line takes 1.7s where parsing them all takes 6.4s. Keep the pattern pointed at one site's rotation set all the same: the bytes are still read, and a nightly cron over years of archives eventually pays for them.
+
 Note that the bot **agent** detail (which specific crawler, see below) is still collected for the whole run before it is written, so a first import over a very long window with heavy crawler traffic can still be memory-hungry.
 
 ## What it can and cannot measure
@@ -35,7 +54,12 @@ Only the **combined** log format (Apache's and Nginx's shared default) is
 understood - a custom `LogFormat`/`log_format` is not. Since a log line
 carries no session or client-side signal, this provider only offers:
 
-- **Page views**: successful (2xx) `GET` requests for the page.
+- **Page views**: successful (2xx) and not-modified (304) `GET` requests
+  for the page. A conditional `GET` answered from the browser's own cache
+  still means the page was viewed, it just needed no fresh body; excluding
+  it would undercount every repeat visit on a site with normal
+  cache-revalidation headers. Every other 3xx is left out, since a
+  redirect's own eventual 200 on the target page is what should count.
 - **Visits**: distinct (IP address, user agent) pairs that requested the
   page on the same day - an approximation, not a true session count. Shared
   IPs (NAT, corporate proxies) undercount it; IP-rotating bots that slip
@@ -74,10 +98,11 @@ human metrics - there is no bucket for a bot nobody has a name for.
 All five are declared as machine metrics, so the page module folds them into a single **Bot traffic** tile that breaks itself down when opened, rather than putting five crawler counts beside the two numbers an editor came for. See [Bot traffic](../page-tiles.md#bot-traffic). The storage is untouched: each bucket keeps its own identifier and its own rows.
 
 These are counted differently from `accesslog.pageviews` on purpose:
-pageviews only count successful (2xx) `GET` requests, but a bot hit counts
-regardless of HTTP status or method. A bot hitting a dead link, a
-redirect, or a backend probe is exactly the traffic these metrics exist to
-surface, not traffic to discard before it can be measured. A similar (but not
+pageviews only count successful (2xx) and not-modified (304) `GET`
+requests, but a bot hit counts regardless of HTTP status or method. A bot
+hitting a dead link, a redirect, or a backend probe is exactly the traffic
+these metrics exist to surface, not traffic to discard before it can be
+measured. A similar (but not
 identical) static-asset exclusion to pageviews' still applies, so a bot's own
 CSS/JS/image requests are never counted toward any bucket - the two lists
 differ slightly (for example pageviews also excludes `.pdf`/`.xml`/`.json`/

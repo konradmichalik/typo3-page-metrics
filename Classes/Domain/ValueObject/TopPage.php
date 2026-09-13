@@ -53,6 +53,27 @@ final readonly class TopPage
      */
     public TrendSentiment $sentiment;
 
+    /**
+     * A second metric's value for the same page over the same period, which
+     * "most viewed pages" uses for a configured goal's conversions beside
+     * the traffic it ranks by. Null means the row has no second column at
+     * all, which is not the same as a row whose goal value is zero: the
+     * importers store no row for a page that converted nothing (see
+     * MatomoGoalMetrics::readValue()), so an absent row is the stored shape
+     * of "it did not happen" and is formatted as the zero it is, the same
+     * number the page's own goal tile shows.
+     *
+     * Already formatted rather than an int, because the goal decides its own
+     * unit: a revenue goal is stored in minor units and reads as money.
+     *
+     * It carries no comparison of its own. One period's conversions beside
+     * one period's traffic is what the column claims, so there is nothing
+     * for an uncovered previous period to be claimed about.
+     *
+     * Required rather than defaulted, like every other parameter here: this
+     * object is not `@api` and has one call site, so "no second column" is
+     * something that call site states rather than something it omits.
+     */
     public function __construct(
         public int $pageUid,
         public string $title,
@@ -61,6 +82,7 @@ final readonly class TopPage
         public TrendDirection $trend,
         public MetricPolarity $polarity,
         bool $previousPeriodCovered,
+        public ?string $secondaryFormattedValue,
     ) {
         // And not covered: a row the import cannot speak for is not a new
         // page, it is a page nobody asked about. The templates branch on

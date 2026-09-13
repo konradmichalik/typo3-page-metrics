@@ -44,6 +44,10 @@ use function sprintf;
  */
 final class AnalyzeCommand extends Command
 {
+    private const LINE_COUNTED = 'counted';
+    private const LINE_FILTERED = 'filtered';
+    private const LINE_UNPARSEABLE = 'unparseable';
+
     public function __construct(
         private readonly SourceLocator $sourceLocator,
         private readonly LogFileReader $logFileReader,
@@ -87,14 +91,22 @@ final class AnalyzeCommand extends Command
         }
 
         $aggregator = new Aggregator();
-        $linesParsed = 0;
+        $linesCounted = 0;
+        $linesFiltered = 0;
+        $linesUnparseable = 0;
 
         foreach ($files as $file) {
-            $linesParsed += $this->processFile($file, $since, $aggregator, $io);
+            $counts = $this->processFile($file, $since, $aggregator, $io);
+            $linesCounted += $counts[self::LINE_COUNTED];
+            $linesFiltered += $counts[self::LINE_FILTERED];
+            $linesUnparseable += $counts[self::LINE_UNPARSEABLE];
         }
 
-        if (0 === $linesParsed) {
-            $io->error(sprintf('None of the %d file(s) contained a parseable Combined Log Format line.', count($files)));
+        if (0 === $linesCounted) {
+            // An empty selection stays FAILURE even when every line parsed: the
+            // command renders nothing in that case, so the exit code is the only
+            // signal a scripted caller gets that a mistyped --since matched no input.
+            $io->error($this->emptySelectionMessage(count($files), $linesFiltered, $linesUnparseable, $since));
 
             return Command::FAILURE;
         }
@@ -112,50 +124,81 @@ final class AnalyzeCommand extends Command
      * happen after `SourceLocator`'s readability check (e.g. a file becomes
      * unreadable between the check and the actual read).
      *
-     * @return int number of lines that counted toward the parsed-lines total
+     * @return array{counted: int, filtered: int, unparseable: int} how the file's lines split across the three outcomes
      */
-    private function processFile(string $file, ?string $since, Aggregator $aggregator, SymfonyStyle $io): int
+    private function processFile(string $file, ?string $since, Aggregator $aggregator, SymfonyStyle $io): array
     {
-        $linesParsed = 0;
+        $counts = [self::LINE_COUNTED => 0, self::LINE_FILTERED => 0, self::LINE_UNPARSEABLE => 0];
 
         try {
             foreach ($this->logFileReader->readLines($file) as $line) {
-                if ($this->processLine($line, $since, $aggregator)) {
-                    ++$linesParsed;
-                }
+                ++$counts[$this->processLine($line, $since, $aggregator)];
             }
         } catch (RuntimeException $e) {
             $io->warning(sprintf('Skipping %s: %s', $file, $e->getMessage()));
         }
 
-        return $linesParsed;
+        return $counts;
     }
 
     /**
      * Parses, since-filters, classifies and aggregates a single log line.
      *
-     * @return bool whether the line counted toward the parsed-lines total
-     *              (i.e. it was a parseable line that passed the --since filter,
-     *              regardless of whether it matched a known bot classification)
+     * The filtered and unparseable outcomes are kept apart because they are the
+     * two reasons an analysis can end up with nothing to render, and they point
+     * the user at entirely different fixes.
+     *
+     * @return self::LINE_* the line's outcome: counted toward the analysis
+     *                      (parseable and on or after --since, whether or not it matched a
+     *                      known bot), dropped by --since, or not Combined Log Format at all
      */
-    private function processLine(string $line, ?string $since, Aggregator $aggregator): bool
+    private function processLine(string $line, ?string $since, Aggregator $aggregator): string
     {
         $logLine = $this->parser->parseLine($line);
         if (null === $logLine) {
-            return false;
+            return self::LINE_UNPARSEABLE;
         }
         if (null !== $since && $logLine->timestamp->format('Y-m-d') < $since) {
-            return false;
+            return self::LINE_FILTERED;
         }
 
         $classification = $this->taxonomy->classify($logLine);
         if (null === $classification) {
-            return true;
+            return self::LINE_COUNTED;
         }
 
         $aggregator->add($logLine, $classification, $this->guard->isSuspicious($logLine));
 
-        return true;
+        return self::LINE_COUNTED;
+    }
+
+    /**
+     * Names whichever of the two causes actually applies, and both when both do.
+     */
+    private function emptySelectionMessage(int $fileCount, int $linesFiltered, int $linesUnparseable, ?string $since): string
+    {
+        // A filtered line can only exist when --since was given; the null check
+        // is what makes that readable to the reader and to static analysis.
+        if ($linesFiltered > 0 && null !== $since) {
+            if ($linesUnparseable > 0) {
+                return sprintf(
+                    'No entries on or after %s: %d parsed line(s) fall before that date, and %d further line(s) across the %d file(s) are not Combined Log Format.',
+                    $since,
+                    $linesFiltered,
+                    $linesUnparseable,
+                    $fileCount,
+                );
+            }
+
+            return sprintf(
+                'No entries on or after %s: all %d parsed line(s) across the %d file(s) fall before that date.',
+                $since,
+                $linesFiltered,
+                $fileCount,
+            );
+        }
+
+        return sprintf('None of the %d file(s) contained a parseable Combined Log Format line.', $fileCount);
     }
 
     private function renderOverview(SymfonyStyle $io, Aggregator $aggregator): void

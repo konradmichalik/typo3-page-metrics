@@ -23,6 +23,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
+use function array_column;
 use function array_map;
 use function sprintf;
 
@@ -793,6 +794,80 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         );
 
         self::assertNotContains('machine.summary.accesslog', $identifiers);
+    }
+
+    public function testTheVisitsTileCarriesItsChannelSplitAsItsParts(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.visits', 100);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.visits', 40, 'channel:search');
+        $repository->upsert(2, 0, 'matomo', $today->modify('-1 day'), 'matomo.visits', 5, 'channel:search');
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.visits', 25, 'channel:direct');
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.visits');
+
+        // The headline is the stored total, never the sum of the parts: the
+        // parts are what the provider could attribute, and a provider that
+        // attributes none of it still has a correct tile.
+        self::assertSame(100, $tile->value);
+        self::assertSame(
+            [
+                ['label' => 'Direct', 'formattedValue' => '25'],
+                ['label' => 'Search', 'formattedValue' => '45'],
+            ],
+            $tile->breakdown,
+        );
+    }
+
+    public function testTheChannelSplitIsListedInAFixedOrderWithItsOwnLabels(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+
+        foreach (['other' => 1, 'campaign' => 2, 'referral' => 3, 'social' => 4, 'search' => 5, 'direct' => 6] as $channel => $value) {
+            $repository->upsert(2, 0, 'matomo', $today, 'matomo.visits', $value, 'channel:'.$channel);
+        }
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.visits');
+
+        // Always the same order, never the order the rows happen to arrive
+        // in, so a reader can find a channel in the same place every time.
+        self::assertSame(
+            ['Direct', 'Search', 'Social', 'Referral', 'Campaign', 'Other'],
+            array_column($tile->breakdown, 'label'),
+        );
+    }
+
+    public function testATileWithoutChannelRowsHasNoBreakdownAtAll(): void
+    {
+        // A provider that returns no referrer data leaves the popover
+        // exactly as it was, with no empty section in it.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.visits', 100);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.visits', 20, 'via_redirect');
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.visits');
+
+        self::assertSame([], $tile->breakdown);
+        // The redirect share is read from its own dimension and is not part
+        // of the split.
+        self::assertSame(20, $tile->redirectSharePercent);
+    }
+
+    public function testAChannelNameNobodyDeclaredIsShownRatherThanSwallowed(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.visits', 9, 'channel:carrier-pigeon');
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.visits');
+
+        self::assertSame([['label' => 'carrier-pigeon', 'formattedValue' => '9']], $tile->breakdown);
     }
 
     private function writeSiteConfigurationWithAccessLog(): void

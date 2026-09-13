@@ -62,6 +62,44 @@ recently imported days may be understated. Periodically re-run the import
 with `--force` (see the main [README](../../README.md#usage)) to pick up
 corrections to those days.
 
+## Traffic channels
+
+Every import also splits a page's sessions by where they came from, shown as
+a breakdown in the sessions tile's popover (see
+[Where visitors came from](../page-tiles.md#where-visitors-came-from)).
+Nothing has to be configured for it.
+
+It is one additional `runReport` per import, covering the whole range at once
+because `date` is a dimension of it just as it is of the two reports already
+sent. Scoped to `pagePath` rather than to `landingPage`: the split hangs
+under the sessions tile, which counts sessions that included the page, and a
+landing-page-scoped split would list parts that do not belong to the whole
+above them. It is also what keeps the two providers comparable, since
+Matomo's page segment is likewise about visits that touched the page.
+
+GA4's `sessionDefaultChannelGroup` values fold onto the shared channel
+vocabulary like this:
+
+| GA4 channel group | Channel |
+| --- | --- |
+| Direct | Direct |
+| Organic Search | Search |
+| Organic Social | Social |
+| Referral, Organic Video, Organic Shopping | Referral |
+| Every paid group, plus Display, Email, Affiliates, Audio, SMS, Mobile Push Notifications and Cross-network | Campaign |
+| Unassigned, and any group Google adds later | Other |
+
+GA4 separates paid from organic and Matomo, out of the box, does not: a
+tagged ad click is a campaign to Matomo whatever it was bought on. Every paid
+group therefore folds into `Campaign`, which is also the reading an editor
+wants ("this came from something we ran"). The one case where the two
+providers can genuinely disagree is described under
+[Matomo traffic channels](matomo.md#traffic-channels).
+
+A channel group this extension has never heard of is counted as `Other`
+rather than dropped, because Google adds groups over time and a split that
+silently loses traffic is worse than one admitting it cannot name it.
+
 <details>
 <summary><strong>Setting up GA4 access (click to expand)</strong></summary>
 

@@ -37,6 +37,9 @@ use function sprintf;
  * Site-aware because of goals: the fixed metrics below exist on every Matomo
  * site, a goal only where one was configured (see MatomoGoalMetrics).
  *
+ * Each day costs one further request for the channel split, which is one
+ * bulk request whatever the site's size (see MatomoChannelMetrics).
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class MatomoMetricProvider implements SiteAwareMetricProviderInterface
@@ -57,6 +60,7 @@ final readonly class MatomoMetricProvider implements SiteAwareMetricProviderInte
         private MatomoConfigurationResolver $configurationResolver,
         private MatomoApiClient $apiClient,
         private MatomoGoalMetrics $goalMetrics,
+        private MatomoChannelMetrics $channelMetrics,
     ) {}
 
     public function getIdentifier(): string
@@ -181,6 +185,16 @@ final readonly class MatomoMetricProvider implements SiteAwareMetricProviderInte
 
                 yield from $this->goalMetrics->metricsForRow($goals, $row['url'], $day, $row);
             }
+
+            // Where the visits above came from, as dimensions on the very
+            // metric just yielded without one. The two never mix: the
+            // importer keys its aggregate by dimension, so a channel row
+            // lands beside the headline rather than in it, and the headline
+            // stays the total it was before this existed.
+            yield from $this->channelMetrics->metricsFor(
+                $this->apiClient->request($configuration, $this->channelMetrics->bulkRequestParameters($configuration, $day)),
+                $day,
+            );
         }
     }
 }

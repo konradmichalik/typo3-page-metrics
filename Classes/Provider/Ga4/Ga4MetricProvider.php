@@ -31,15 +31,17 @@ use function str_starts_with;
  * Calls the GA4 Data API's runReport once for the whole requested range
  * (never once per day like MatomoMetricProvider): GA4 charges quota per API
  * call, so a per-day loop would be wasteful/rate-limit-risky over a large
- * retention window. Two reports are needed because bounce rate is scoped
- * to the landing page (session start), a different dimension than the
- * page-views/sessions report's pagePath.
+ * retention window. Three reports are needed. Bounce rate is scoped to the
+ * landing page (session start), a different dimension than the
+ * page-views/sessions report's pagePath, and the channel split needs a
+ * session-scoped dimension that would otherwise resplit every metric in the
+ * page report (see Ga4ChannelMetrics).
  *
  * "Avg. time on page" and "bounce rate" are GA4 approximations, not the
  * same definitions Matomo uses - see the descriptions on their
  * RateMetricDefinitions.
  *
- * A third report joins them where the site configured goals, and only then
+ * A fourth report joins them where the site configured goals, and only then
  * (see Ga4KeyEventMetrics).
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
@@ -62,6 +64,7 @@ final readonly class Ga4MetricProvider implements SiteAwareMetricProviderInterfa
         private Ga4ConfigurationResolver $configurationResolver,
         private Ga4ApiClient $apiClient,
         private Ga4KeyEventMetrics $keyEventMetrics,
+        private Ga4ChannelMetrics $channelMetrics,
     ) {}
 
     public function getIdentifier(): string
@@ -175,6 +178,13 @@ final readonly class Ga4MetricProvider implements SiteAwareMetricProviderInterfa
             // it behaves like every other raw rate component.
             yield new UrlMetric($url, $day, 'ga4.landing_bounces', (int) round($sessions * $bounceRate));
         }
+
+        // Where the sessions above came from, as dimensions on the very
+        // metric just yielded without one. The two never mix: the importer
+        // keys its aggregate by dimension, so a channel row lands beside the
+        // headline rather than in it, and the headline stays the total it
+        // was before this existed.
+        yield from $this->channelMetrics->metricsFor($baseUrl, $this->runReportAllPages($configuration, $this->channelMetrics->reportBody($dateRange)));
 
         $keyEventBody = $this->keyEventMetrics->reportBody($site, $dateRange);
 
