@@ -1,0 +1,271 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * This file is part of the "typo3_page_metrics" TYPO3 CMS extension.
+ *
+ * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace KonradMichalik\Typo3PageMetrics\Controller;
+
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, ModuleView};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\PageMetricsViewData;
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsAccessChecker, PageMetricsViewDataBuilder, SparklineLabelProvider};
+use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
+use TYPO3\CMS\Backend\Module\ModuleData;
+use TYPO3\CMS\Backend\Routing\UriBuilder;
+use TYPO3\CMS\Backend\Template\Components\ButtonBar;
+use TYPO3\CMS\Backend\Template\Components\Buttons\Action\ShortcutButton;
+use TYPO3\CMS\Backend\Template\Components\Menu\{Menu, MenuItem};
+use TYPO3\CMS\Backend\Template\{ModuleTemplate, ModuleTemplateFactory};
+use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Information\Typo3Version;
+use TYPO3\CMS\Core\Localization\LanguageService;
+use TYPO3\CMS\Core\Page\PageRenderer;
+use TYPO3\CMS\Core\Type\Bitmask\Permission;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
+
+use function in_array;
+use function is_array;
+
+/**
+ * PageMetricsModuleController.
+ *
+ * The frame the module's views render into: a page chosen in the page tree, a
+ * period, and which view is active. It owns no data of its own; every view
+ * reads through the same services the page-header tiles and the dashboard
+ * widgets already use (see PageMetricsViewDataBuilder), which is what made
+ * coming back to a module cheap.
+ *
+ * State lives in `moduleData`, the mechanism the info module uses for its own
+ * `depth` and `lang`, and identical in 13.4 and 14. PageMetricsUserPreferences
+ * stays out of it: that one holds a decision about the page module's tile
+ * row, which is a different surface and must not follow a reader in here.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+final readonly class PageMetricsModuleController
+{
+    /**
+     * The same three the page-header tiles offer. Named here rather than read
+     * from PageMetricsViewDataBuilder because the docheader has to render the
+     * choice before any view has been asked for data.
+     *
+     * @var list<int>
+     */
+    private const PERIOD_OPTIONS = [7, 30, 90];
+
+    private const DEFAULT_PERIOD = 30;
+
+    public function __construct(
+        private ModuleTemplateFactory $moduleTemplateFactory,
+        private PageMetricsAccessChecker $accessChecker,
+        private UriBuilder $uriBuilder,
+        private Typo3Version $typo3Version,
+        private PageMetricsViewDataBuilder $viewDataBuilder,
+        private SparklineLabelProvider $labelProvider,
+        private AnnotationPayloadBuilder $annotationPayloadBuilder,
+        private PageRenderer $pageRenderer,
+    ) {}
+
+    public function handleRequest(ServerRequestInterface $request): ResponseInterface
+    {
+        $view = $this->moduleTemplateFactory->create($request);
+        $view->setTitle($this->translate('module.mlang_tabs_tab'));
+
+        if (!$this->accessChecker->hasAccess()) {
+            // The same switch that hides the tiles, honoured on the route and
+            // not only in the menu: a module path is reachable by typing it.
+            // TYPO3 13.4 has no per-user hook for the module menu itself, so
+            // the menu entry is hidden with options.hideModules (see
+            // docs/security.md); this is the half that cannot be bypassed.
+            return $view->assign('reason', 'disabled')->renderResponse('Module/Denied');
+        }
+
+        $pageId = (int) ($request->getQueryParams()['id'] ?? 0);
+        $moduleData = $this->moduleData($request);
+        $period = $this->period($moduleData);
+        $activeView = $this->view($moduleData);
+
+        // Every docheader control is a plain link back into this route with
+        // the value in the query string. BackendModuleValidator merges a
+        // query parameter named like a moduleData key into the stored data
+        // and persists it before the request reaches here, so switching the
+        // period is one navigation and nothing in this class writes state.
+        $this->addPeriodMenu($view, $pageId, $period, $activeView);
+        // No view switch yet. The active view is already module state and
+        // already reaches the template, but a menu offering one entry is not
+        // a choice; it appears with the second view (see ModuleView).
+        $this->addShortcutButton($view, $pageId, $period, $activeView);
+
+        if ($pageId < 1) {
+            // No page chosen yet, which is the state the module opens in. A
+            // prompt rather than an error: nothing has gone wrong, the reader
+            // simply has not clicked the tree yet.
+            return $view->renderResponse('Module/NoPage');
+        }
+
+        if (false === BackendUtility::readPageAccess($pageId, $this->getBackendUser()->getPagePermsClause(Permission::PAGE_SHOW))) {
+            // The page uid arrives as a request parameter, so the permission
+            // check is what stands between a hand-built URL and another
+            // page's numbers. Same decision, same reason as
+            // PageMetricsViewDataBuilder::build().
+            return $view->assign('reason', 'page')->renderResponse('Module/Denied');
+        }
+
+        $includeSubpages = (bool) $moduleData?->get('includeSubpages');
+        // Language 0, the same as the page module's own tiles: every surface
+        // of this extension is single-language today and a module that
+        // quietly picked another would disagree with the tiles about the
+        // same page. The docheader language switch is an open question in
+        // the spec, not an omission here.
+        $viewData = $this->viewDataBuilder->build($pageId, 0, $period, $includeSubpages);
+
+        // The same CSS and the same chart renderer the page module and the
+        // widgets use. initializeStaticCharts() in sparkline.js picks up any
+        // .pagemetrics-widget-chart on the page, so the module's chart needs
+        // no code of its own.
+        $this->pageRenderer->addCssFile('EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css');
+        $this->pageRenderer->loadJavaScriptModule('@konradmichalik/page-metrics/sparkline.js');
+
+        $view->assignMultiple([
+            'pageId' => $pageId,
+            'period' => $period,
+            'activeView' => $activeView,
+            'includeSubpages' => $includeSubpages,
+            'viewData' => $viewData,
+            'chartSeries' => self::chartSeriesOf($viewData),
+            'sparklineLabels' => $this->labelProvider->all(),
+            'annotations' => $this->annotationPayloadBuilder->build($viewData->annotations),
+        ]);
+
+        return $view->renderResponse('Module/Index');
+    }
+
+    /**
+     * The chart draws the site's primary metric, which is the first count
+     * tile, and nothing else. Every metric is in the table below it, and
+     * overlaying five series in a view whose whole point is being readable
+     * would undo the reason for building the view.
+     *
+     * The payload is the shape sparkline.js already reads for the dashboard
+     * chart widget (see PageMetricsChartWidget), so no chart code is written
+     * twice.
+     *
+     * @return list<array{label: string, color: string, unit: string, values: array<string, int|null>}>
+     */
+    private static function chartSeriesOf(PageMetricsViewData $viewData): array
+    {
+        foreach ($viewData->tiles as $tile) {
+            if (MetricUnit::Count === $tile->unit && [] !== $tile->sparkline) {
+                return [['label' => $tile->label, 'color' => $tile->color, 'unit' => $tile->unit->value, 'values' => $tile->sparkline]];
+            }
+        }
+
+        return [];
+    }
+
+    private function moduleData(ServerRequestInterface $request): ?ModuleData
+    {
+        $moduleData = $request->getAttribute('moduleData');
+
+        return $moduleData instanceof ModuleData ? $moduleData : null;
+    }
+
+    private function period(?ModuleData $moduleData): int
+    {
+        $period = (int) ($moduleData?->get('period') ?? self::DEFAULT_PERIOD);
+
+        return in_array($period, self::PERIOD_OPTIONS, true) ? $period : self::DEFAULT_PERIOD;
+    }
+
+    private function view(?ModuleData $moduleData): ModuleView
+    {
+        $view = $moduleData?->get('view');
+
+        return ModuleView::tryFrom(is_array($view) ? '' : (string) $view) ?? ModuleView::default();
+    }
+
+    private function addPeriodMenu(ModuleTemplate $view, int $pageId, int $period, ModuleView $activeView): void
+    {
+        // makeInstance rather than the registry's makeMenu(): that one is
+        // deprecated in v14 and does exactly this in 13.4, so calling it
+        // directly is the one spelling both versions accept without a notice.
+        $menu = GeneralUtility::makeInstance(Menu::class);
+        $menu->setIdentifier('pagemetrics_period');
+        $menu->setLabel($this->translate('period.label'));
+
+        foreach (self::PERIOD_OPTIONS as $option) {
+            $menu->addMenuItem(
+                GeneralUtility::makeInstance(MenuItem::class)
+                    ->setTitle($option.' '.$this->translate('period.days'))
+                    ->setHref($this->moduleUri($pageId, $option, $activeView))
+                    ->setActive($option === $period),
+            );
+        }
+
+        $view->getDocHeaderComponent()->getMenuRegistry()->addMenu($menu);
+    }
+
+    private function moduleUri(int $pageId, int $period, ModuleView $view): string
+    {
+        return (string) $this->uriBuilder->buildUriFromRoute('web_pagemetrics', [
+            'id' => $pageId,
+            'period' => $period,
+            'view' => $view->value,
+        ]);
+    }
+
+    /**
+     * The bookmark carries the page, the period and the view, because a
+     * bookmark that reopens the module on a different question is not one.
+     *
+     * Two spellings for two versions. TYPO3 14 deprecated adding the button
+     * by hand in favour of setShortcutContext(), which 13.4 does not have.
+     * Branched on the major version rather than on method_exists(), which
+     * static analysis resolves against whichever core is installed and then
+     * calls always true.
+     */
+    private function addShortcutButton(ModuleTemplate $view, int $pageId, int $period, ModuleView $activeView): void
+    {
+        $docHeader = $view->getDocHeaderComponent();
+        $arguments = ['id' => $pageId, 'period' => $period, 'view' => $activeView->value];
+        $displayName = $this->translate('module.mlang_tabs_tab');
+
+        if ($this->typo3Version->getMajorVersion() >= 14) {
+            $docHeader->setShortcutContext('web_pagemetrics', $displayName, $arguments);
+
+            return;
+        }
+
+        $buttonBar = $docHeader->getButtonBar();
+        $buttonBar->addButton(
+            GeneralUtility::makeInstance(ShortcutButton::class)
+                ->setRouteIdentifier('web_pagemetrics')
+                ->setDisplayName($displayName)
+                ->setArguments($arguments),
+            ButtonBar::BUTTON_POSITION_RIGHT,
+        );
+    }
+
+    private function translate(string $key): string
+    {
+        return $this->getLanguageService()->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:'.$key);
+    }
+
+    private function getLanguageService(): LanguageService
+    {
+        return $GLOBALS['LANG'];
+    }
+
+    private function getBackendUser(): BackendUserAuthentication
+    {
+        return $GLOBALS['BE_USER'];
+    }
+}

@@ -210,3 +210,9 @@ services:
     # Public for the same reason as the tiles controller above.
     KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsDayController:
         public: true
+
+    # Public so the functional test can call handleRequest() directly with a
+    # built request, rather than booting the whole backend routing stack to
+    # reach one controller.
+    KonradMichalik\Typo3PageMetrics\Controller\PageMetricsModuleController:
+        public: true

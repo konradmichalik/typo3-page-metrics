@@ -393,6 +393,78 @@
             <trans-unit id="day.comparison.insufficient" resname="day.comparison.insufficient">
                 <source>Not enough data yet: %1$s of %2$s days before and %3$s of %2$s days after this marker are imported.</source>
             </trans-unit>
+            <trans-unit id="module.mlang_tabs_tab" resname="module.mlang_tabs_tab">
+                <source>Page metrics</source>
+            </trans-unit>
+            <trans-unit id="module.mlang_labels_tablabel" resname="module.mlang_labels_tablabel">
+                <source>Page metrics</source>
+            </trans-unit>
+            <trans-unit id="module.mlang_labels_tabdescr" resname="module.mlang_labels_tabdescr">
+                <source>How the pages of this site are doing, over a period you choose.</source>
+            </trans-unit>
+            <trans-unit id="module.view.label" resname="module.view.label">
+                <source>View</source>
+            </trans-unit>
+            <trans-unit id="module.view.page" resname="module.view.page">
+                <source>Page</source>
+            </trans-unit>
+            <trans-unit id="module.noPage" resname="module.noPage">
+                <source>Select a page in the page tree to see how it is doing.</source>
+            </trans-unit>
+            <trans-unit id="module.denied.disabled" resname="module.denied.disabled">
+                <source>Page metrics are switched off for your user account.</source>
+            </trans-unit>
+            <trans-unit id="module.denied.page" resname="module.denied.page">
+                <source>You do not have permission to see this page.</source>
+            </trans-unit>
+            <trans-unit id="module.empty.body" resname="module.empty.body">
+                <source>The views of this module are being built. The page metrics for this page are already available as tiles at the top of Web &gt; Page.</source>
+            </trans-unit>
+            <trans-unit id="module.empty.link" resname="module.empty.link">
+                <source>Open this page in the page module</source>
+            </trans-unit>
+            <trans-unit id="module.page.intro" resname="module.page.intro">
+                <source>Everything below covers %1$s. Where a figure is compared, it is compared against the period of the same length before it, %2$s.</source>
+            </trans-unit>
+            <trans-unit id="module.page.metrics" resname="module.page.metrics">
+                <source>Metrics</source>
+            </trans-unit>
+            <trans-unit id="module.page.metric" resname="module.page.metric">
+                <source>Metric</source>
+            </trans-unit>
+            <trans-unit id="module.page.thisPeriod" resname="module.page.thisPeriod">
+                <source>This period</source>
+            </trans-unit>
+            <trans-unit id="module.page.previousPeriod" resname="module.page.previousPeriod">
+                <source>Previous period</source>
+            </trans-unit>
+            <trans-unit id="module.page.change" resname="module.page.change">
+                <source>Change</source>
+            </trans-unit>
+            <trans-unit id="module.page.notImported" resname="module.page.notImported">
+                <source>The previous period was never imported, so there is nothing to compare against.</source>
+            </trans-unit>
+            <trans-unit id="module.page.markers" resname="module.page.markers">
+                <source>Markers in this period</source>
+            </trans-unit>
+            <trans-unit id="module.page.markers.intro" resname="module.page.markers.intro">
+                <source>What happened on or around this page while the figures above were being collected.</source>
+            </trans-unit>
+            <trans-unit id="module.page.markers.empty" resname="module.page.markers.empty">
+                <source>Nothing was marked in this period.</source>
+            </trans-unit>
+            <trans-unit id="module.page.marker.date" resname="module.page.marker.date">
+                <source>Date</source>
+            </trans-unit>
+            <trans-unit id="module.page.marker.category" resname="module.page.marker.category">
+                <source>Kind</source>
+            </trans-unit>
+            <trans-unit id="module.page.marker.text" resname="module.page.marker.text">
+                <source>What happened</source>
+            </trans-unit>
+            <trans-unit id="module.page.noProvider" resname="module.page.noProvider">
+                <source>No metric provider is configured for this site, so there is nothing to show here yet.</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

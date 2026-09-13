@@ -413,6 +413,12 @@ function install_demo() {
             ;;
         bootstrap)
             composer req bk2k/bootstrap-package:'*' --no-progress -n -d "$BASE_PATH"
+            # Same as the introduction profile above: requiring the package
+            # only puts it on disk. Without extension:setup its tables are
+            # never created, and the demo import that follows fails on a
+            # missing tx_bootstrappackage_* table rather than on anything to
+            # do with the content being imported.
+            $TYPO3_BIN extension:setup --extension=bootstrap_package
             ;;
         custom) ;;
         *)

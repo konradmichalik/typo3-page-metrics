@@ -1426,3 +1426,58 @@
 .pagemetrics-day-comparison-insufficient {
     color: var(--typo3-text-color-variant, #6a7085);
 }
+
+/* ==========================================================================
+   Backend module: the page view
+   ========================================================================== */
+
+/* The module has the width the popover never had, which is the whole reason
+   it exists. Capped anyway: a metric table stretched across an ultrawide
+   display puts its label and its figure so far apart that the eye loses the
+   row it is on. */
+.pagemetrics-module {
+    max-width: 72rem;
+}
+
+.pagemetrics-module-intro {
+    max-width: 60ch;
+    color: var(--typo3-text-color-variant, #515151);
+}
+
+/* Taller than the sparkline in a tile popover, because this one is read
+   rather than glanced at. The chart itself is drawn by the same
+   initializeStaticCharts() the dashboard widgets use. */
+.pagemetrics-module-chart {
+    margin-block: 1.5rem;
+}
+
+.pagemetrics-module-chart .pagemetrics-sparkline {
+    height: 180px;
+}
+
+.pagemetrics-module-metric {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+}
+
+.pagemetrics-module-metric-icon {
+    display: inline-flex;
+    color: var(--pm-accent, currentColor);
+}
+
+/* The provider's own description, on its own line under the label: this is
+   the text the tile popover hides behind a hover, and putting it back behind
+   one here would be the same mistake in a new place. */
+.pagemetrics-module-metric-description {
+    display: block;
+    margin-block-start: 0.125rem;
+    font-weight: 400;
+    font-size: 0.8125rem;
+    color: var(--typo3-text-color-variant, #515151);
+}
+
+.pagemetrics-module-table th[scope="row"] {
+    max-width: 32rem;
+}

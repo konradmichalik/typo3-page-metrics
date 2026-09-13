@@ -107,7 +107,8 @@ widgets.
 | [Access log provider](docs/providers/accesslog.md) | Site configuration, what it can and cannot measure, bot/asset filtering |
 | [Dashboard widgets](docs/dashboard-widgets.md) | The full EXT:dashboard widget catalog, their settings and the bundled preset |
 | [Page module tiles](docs/page-tiles.md) | The period switch, the subpages toggle, sparkline popovers and annotations |
-| [Security](docs/security.md) | Restricting tile visibility per backend user group |
+| [Backend module](docs/backend-module.md) | The extension's own module under **Web**, its period and its access rules |
+| [Security](docs/security.md) | Restricting tile and module visibility per backend user group |
 | [Registering custom tiles](docs/extending.md) | Contributing an additional tile via `ModifyMetricTilesEvent`, without implementing `MetricProviderInterface` |
 
 ## 🧭 Related extensions
