@@ -16,6 +16,8 @@ namespace KonradMichalik\Typo3PageMetrics\Persistence;
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\{Connection, ConnectionPool};
 use TYPO3\CMS\Core\Database\Query\QueryHelper;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 use function array_filter;
 use function array_flip;
@@ -23,6 +25,7 @@ use function array_map;
 use function array_push;
 use function array_values;
 use function in_array;
+use function max;
 use function trim;
 
 /**
@@ -40,6 +43,12 @@ use function trim;
 final readonly class SitePageUidRepository
 {
     private const TABLE = 'pages';
+
+    /**
+     * Only lastChangedAt() reaches outside the page table, and only to ask
+     * when the page's own content last moved.
+     */
+    private const CONTENT_TABLE = 'tt_content';
 
     /**
      * A page tree deeper than this is a broken pid chain, not a site.
@@ -225,6 +234,70 @@ final readonly class SitePageUidRepository
     }
 
     /**
+     * When each of $pageUids was last edited, as a Unix timestamp: the later
+     * of the page record's own tstamp and the newest tstamp among the
+     * content elements sitting on it.
+     *
+     * The later of the two rather than pages.tstamp alone, and that is a
+     * decision about which mistake to make. pages.tstamp moves for changes a
+     * reader never sees (a sorting move, a nav_hide toggle), so it reads too
+     * fresh; tt_content alone misses a page whose text comes from a plugin
+     * or from records elsewhere, so it reads too stale. Taking the later
+     * only ever makes a page look fresher, and looking fresher removes it
+     * from the decay list. The opposite error is the one worth avoiding:
+     * sending an editor to rewrite a page somebody rewrote last week is how
+     * a list of "pages needing attention" loses its reader.
+     *
+     * Two queries for the whole set, never one per page: the caller asks
+     * this about every page of a site at once, so a per-page lookup is an
+     * N+1 over exactly the surface that grows.
+     *
+     * @param list<int> $pageUids
+     *
+     * @return array<int, int> page uid => Unix timestamp, only for UIDs that still exist
+     */
+    public function lastChangedAt(array $pageUids): array
+    {
+        if ([] === $pageUids) {
+            return [];
+        }
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        // Only the deleted restriction, not the default set. A QueryBuilder
+        // arrives with DefaultRestrictionContainer, which is deleted plus
+        // hidden plus starttime plus endtime, and the age of a page is not a
+        // question about whether it is currently visible: a page taken
+        // offline today was edited today. The explicit deleted = 0 below is
+        // then the only filter, which is what it was written to be.
+        $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+        $rows = $queryBuilder
+            ->select('uid', 'tstamp')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->in('uid', $queryBuilder->createNamedParameter($pageUids, Connection::PARAM_INT_ARRAY)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
+            )
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        $changed = [];
+        foreach ($rows as $row) {
+            $changed[(int) $row['uid']] = (int) $row['tstamp'];
+        }
+
+        foreach ($this->contentChangedAt($pageUids) as $pageUid => $timestamp) {
+            // Keyed off the page rows rather than merged in, so content left
+            // behind on a deleted page cannot put that page back into the
+            // answer.
+            if (isset($changed[$pageUid])) {
+                $changed[$pageUid] = max($changed[$pageUid], $timestamp);
+            }
+        }
+
+        return $changed;
+    }
+
+    /**
      * @param list<int> $pageUids
      *
      * @return array<int, string> page_uid => title, only for UIDs that still exist
@@ -252,5 +325,42 @@ final readonly class SitePageUidRepository
         }
 
         return $titles;
+    }
+
+    /**
+     * @param list<int> $pageUids
+     *
+     * @return array<int, int> page uid => the newest tstamp among its content elements
+     */
+    private function contentChangedAt(array $pageUids): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::CONTENT_TABLE);
+        // Same reason as lastChangedAt(): the default restrictions would drop
+        // hidden and time-restricted elements, and the comment below says
+        // hidden ones must count. Without this the one edit that matters
+        // most, an editor hiding the last element on a page, is the one edit
+        // the age never sees, and the page keeps reporting a nine hundred day
+        // silence it does not have.
+        $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+        $rows = $queryBuilder
+            ->select('pid')
+            ->addSelectLiteral('MAX('.$queryBuilder->quoteIdentifier('tstamp').') AS last_changed')
+            ->from(self::CONTENT_TABLE)
+            ->where(
+                $queryBuilder->expr()->in('pid', $queryBuilder->createNamedParameter($pageUids, Connection::PARAM_INT_ARRAY)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
+            )
+            // Hidden elements count. Hiding one is an edit, and a page whose
+            // content was taken down is the opposite of neglected.
+            ->groupBy('pid')
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        $changed = [];
+        foreach ($rows as $row) {
+            $changed[(int) $row['pid']] = (int) $row['last_changed'];
+        }
+
+        return $changed;
     }
 }

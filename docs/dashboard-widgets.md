@@ -32,6 +32,42 @@ kind, for a dashboard that only wants to line releases up against the curve.
 Left empty it shows all of them. Under the chart, a key names the categories
 actually drawn rather than every category that exists.
 
+## What changed
+
+The **What changed** widget states the period's significant movements as
+sentences rather than as figures, because the unit an editor acts on is a
+sentence:
+
+> Page views, 30 days: 1,655, up 29% against the previous period.
+> Biggest riser by page views: "Services", up 46% to 2,610.
+
+Four slots per site: the site's own movement on its primary metric, its most
+significant other metric, the page that rose most and the page that fell most.
+All sites' cards go into one ranked list and that list is cut to four, because
+four cards spread over six sites is not four cards. Each card names its site
+when the dashboard covers more than one.
+
+Ranking a whole site's views against one page's percentage points needs a
+number that means the same thing in both. It is how many times over its own
+[significance threshold](#what-counts-as-a-movement) a movement went, which is
+a bare multiple in every unit. Above that sits one rule: a site's own movement
+is always listed before any of its pages', because a page that rose 46% inside
+a site that rose 40% rose with the site, and a reader cannot tell that apart
+from a page that rose on its own until the site's line has been read.
+
+**An empty widget is a finding, not a fault.** Nothing significant moved, and a
+widget that always finds something to say is one nobody believes. It is
+deliberately harder to make this widget speak than the others: a site produces
+no cards at all unless both the whole previous period and the current period up
+to yesterday were imported. The other surfaces show a number and withhold a
+badge; this one states a conclusion, and a scheduler that stopped a week ago
+would otherwise have it publish a fall that never happened. A site with no
+provider configured says that instead, rather than claiming nothing moved in
+data nobody collected.
+
+Machine traffic is left out entirely. How often a crawler fetched a page is a
+true sentence and not one anybody opened a dashboard to read.
+
 ## Collapsed markers
 
 With [automatic markers](page-tiles.md#automatic-markers) on, an active
@@ -159,7 +195,8 @@ A ready-made **Page Metrics** dashboard preset bundles every widget above. It
 appears in the dashboard creation wizard once EXT:dashboard is installed, so
 a new dashboard covering every site's metrics is one click away.
 
-Below the tiles and the large chart, it places two compact charts (Visits,
+It opens with **What changed**, so the first thing on a new dashboard is a
+sentence rather than a figure. Below the tiles and the large chart, it places two compact charts (Visits,
 Bounce rate), then two trend widgets (Biggest improvements, Biggest
 declines), then Most viewed pages and Not found pages, with the annotations
 widget last.

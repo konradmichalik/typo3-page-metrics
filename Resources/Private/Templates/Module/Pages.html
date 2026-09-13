@@ -38,6 +38,26 @@
                     <p class="pagemetrics-module-intro">
                         <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.trendIntro" arguments="{0: pagesTable.trendLabel, 1: pagesTable.previousRangeLabel}" default="The trend column compares %1$s against the period of the same length before this one, %2$s. It follows whichever column the table is sorted by, so sorting by another metric compares that one instead." />
                     </p>
+                    <f:comment>
+                        "Decay" is a word this view invents, so it is the one
+                        the reader has to be told the meaning of. Spelled out
+                        beside the table rather than hidden behind a hover,
+                        and long on purpose: the column makes a claim about a
+                        page, and a claim nobody can check is worse than none.
+                    </f:comment>
+                    <p class="pagemetrics-module-intro">
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.decayIntro" arguments="{0: pagesTable.trendLabel}" default="A page is decaying when it lost %1$s by more than that metric's own threshold, and nobody changed the page or its content in the whole time the two compared periods cover. Sorting by the decay column puts those pages first, the longest untouched of them at the top. There is no age at which a page becomes stale here: the column says how many days ago each page last changed, so the line sits where your own site's editing rhythm puts it rather than at a number nobody measured." />
+                    </p>
+                    <p class="pagemetrics-module-intro">
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.decayScope" default="A page that never had any traffic is not decaying, it was never found, and it needs a different kind of attention: nothing fell, so nothing here marks it. The age counts the page record and the content elements on it, whichever changed last, because a page whose text was rewritten without the page record moving is not neglected." />
+                    </p>
+                    <f:if condition="{pagesTable.previousPeriodCovered}">
+                        <f:else>
+                            <p class="pagemetrics-module-intro">
+                                <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.decayNotImported" default="No page is marked as decaying for this period, because the period it would be compared against was never imported. The column still sorts by how long ago each page changed." />
+                            </p>
+                        </f:else>
+                    </f:if>
 
                     <f:if condition="{pagesTable.rows}">
                         <f:then>
@@ -78,6 +98,31 @@
                                                 </th>
                                             </f:for>
                                             <th scope="col" class="text-end"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.trend" arguments="{0: pagesTable.trendLabel}" default="Trend: %1$s" /></th>
+                                            <f:comment>
+                                                The decay column sits next to the trend because
+                                                the two are read together: the trend is the fall,
+                                                this is the neglect, and the verdict is only the
+                                                two at once. Sortable exactly like a metric
+                                                header, with the same aria-sort and the same real
+                                                link, because it is a column of this table and not
+                                                a mode the table is put into.
+                                            </f:comment>
+                                            <th scope="col" class="text-end" aria-sort="{pagesTable.decayColumn.ariaSort}">
+                                                <f:variable name="decayUri"><f:be.uri route="web_pagemetrics" parameters="{id: pageId, period: period, view: 'pages', sort: pagesTable.decayColumn.key, direction: pagesTable.decayColumn.nextDirection}" /></f:variable>
+                                                <a href="{decayUri}" class="pagemetrics-pages-sort{f:if(condition: pagesTable.decayColumn.isSorted, then: ' pagemetrics-pages-sort-active')}">
+                                                    <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.decay" default="Decay" />
+                                                    <f:if condition="{pagesTable.decayColumn.isSorted}">
+                                                        <f:then>
+                                                            <span aria-hidden="true"><f:if condition="{pagesTable.decayColumn.ariaSort} == 'ascending'"><f:then>&#9650;</f:then><f:else>&#9660;</f:else></f:if></span>
+                                                            <span class="pagemetrics-visually-hidden"><f:if condition="{pagesTable.decayColumn.ariaSort} == 'ascending'"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.sortedLeastDecayed" default="sorted least decayed first, activate to sort most decayed first" /></f:then><f:else><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.sortedMostDecayed" default="sorted most decayed first, activate to sort least decayed first" /></f:else></f:if></span>
+                                                        </f:then>
+                                                        <f:else>
+                                                            <span class="pagemetrics-visually-hidden"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.sortByDecay" default="sort by content decay" /></span>
+                                                        </f:else>
+                                                    </f:if>
+                                                </a>
+                                                <span class="pagemetrics-module-metric-description"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.decayDescription" default="Falling traffic on a page nobody has changed." /></span>
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -114,6 +159,29 @@
                                                         <f:else>
                                                             <f:variable name="deltaText"><f:if condition="{row.isNew}"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:then><f:else>{row.deltaPercent}%</f:else></f:if></f:variable>
                                                             <f:render partial="TrendBadge" arguments="{trend: row.trend, sentiment: row.sentiment, deltaText: deltaText, isNew: row.isNew}" />
+                                                        </f:else>
+                                                    </f:if>
+                                                </td>
+                                                <td class="text-end">
+                                                    <f:comment>
+                                                        The verdict is a word and the evidence is a
+                                                        number, so neither depends on a colour or on
+                                                        a shade of grey being told apart from
+                                                        another. hasAge rather than the day count
+                                                        itself: Fluid reads a page changed today and
+                                                        a page with no recorded change as the same
+                                                        falsy zero, and they are different answers.
+                                                    </f:comment>
+                                                    <f:if condition="{row.hasAge}">
+                                                        <f:then>
+                                                            <f:if condition="{row.isDecaying}">
+                                                                <f:then><span class="pagemetrics-verdict"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.decaying" default="Decaying" /></span><br /></f:then>
+                                                            </f:if>
+                                                            <span class="{f:if(condition: row.isDecaying, else: 'pagemetrics-quiet')}"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.unchangedFor" arguments="{0: row.daysSinceChange}" default="unchanged for %1$s days" /></span>
+                                                        </f:then>
+                                                        <f:else>
+                                                            <span class="text-body-secondary" aria-hidden="true">&#8212;</span>
+                                                            <span class="pagemetrics-visually-hidden"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.noAge" default="no record of when this page last changed" /></span>
                                                         </f:else>
                                                     </f:if>
                                                 </td>

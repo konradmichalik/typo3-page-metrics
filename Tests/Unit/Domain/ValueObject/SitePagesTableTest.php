@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, TrendDirection};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{SitePagesCell, SitePagesRow, SitePagesTable};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{SitePagesCell, SitePagesColumn, SitePagesRow, SitePagesTable};
 use PHPUnit\Framework\TestCase;
 
 use function array_map;
@@ -70,6 +70,10 @@ final class SitePagesTableTest extends TestCase
         self::assertSame([], $table->rows);
         self::assertSame(0, $table->totalRows);
         self::assertSame(1, $table->pageCount);
+        // Still a decay column, because a table with nothing to draw still
+        // has to hand the template an object rather than a null it would
+        // have to guard every access of.
+        self::assertSame(SitePagesTable::SORT_DECAY, $table->decayColumn->key);
     }
 
     private function table(int $totalRows, int $pageNumber, int $rowCount): SitePagesTable
@@ -83,10 +87,12 @@ final class SitePagesTableTest extends TestCase
                 TrendDirection::Flat,
                 MetricPolarity::HigherIsBetter,
                 true,
+                null,
+                false,
             ),
             0 === $rowCount ? [] : range(1, $rowCount),
         );
 
-        return new SitePagesTable(true, [], $rows, 'matomo.pageviews', SitePagesTable::DIRECTION_DESCENDING, 'Page views', 'a', 'b', $totalRows, $pageNumber, true);
+        return new SitePagesTable(true, [], $rows, 'matomo.pageviews', SitePagesTable::DIRECTION_DESCENDING, 'Page views', 'a', 'b', $totalRows, $pageNumber, true, SitePagesColumn::forDecay(false, SitePagesTable::DIRECTION_DESCENDING));
     }
 }

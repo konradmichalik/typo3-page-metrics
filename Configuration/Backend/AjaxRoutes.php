@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-use KonradMichalik\Typo3PageMetrics\Controller\Ajax\{PageMetricsDayController, PageMetricsPreferencesController, PageMetricsTilesController};
+use KonradMichalik\Typo3PageMetrics\Controller\Ajax\{PageMetricsDayController, PageMetricsExportController, PageMetricsPreferencesController, PageMetricsTilesController};
 
 // Registered so PageHeaderMetricsRenderer can inject a lightweight placeholder
 // into the page module's own synchronous render and defer all data-fetching
@@ -47,5 +47,23 @@ return [
         'methods' => ['POST'],
         'target' => PageMetricsPreferencesController::class.'::handleRequest',
         'inheritAccessFromModule' => 'web_layout',
+    ],
+
+    // One file per view of the backend module. Its own route rather than a
+    // mode on the module route, and that is not a preference:
+    // BackendModuleValidator merges a query parameter named like a moduleData
+    // key into the reader's stored module state before dispatch, so a
+    // download link carrying `period` and `view` would not describe one
+    // download, it would overwrite what that reader sees the next time they
+    // open the module.
+    //
+    // Access is inherited from the module rather than from web_layout like
+    // the three routes above, because this one belongs to the module and not
+    // to the page header.
+    'page_metrics_export' => [
+        'path' => '/page-metrics/export',
+        'methods' => ['GET'],
+        'target' => PageMetricsExportController::class.'::handleRequest',
+        'inheritAccessFromModule' => 'web_pagemetrics',
     ],
 ];

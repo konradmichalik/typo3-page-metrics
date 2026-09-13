@@ -24,6 +24,10 @@ whose `base` differs from production: the analytics provider (e.g. Matomo)
 always reports the production domain, so importing on an environment with a
 different `base` would otherwise resolve nothing.
 
+## Choosing which metrics it contributes
+
+The optional `metrics` key under a provider limits what it puts on the page. It defaults to everything the provider offers, so a site that does not name it keeps every tile it has today. It exists for the case where two providers are configured at once and both answer the same question, which would otherwise put two tiles of the same name and different numbers side by side. See [Running it alongside Matomo or GA4](accesslog.md#running-it-alongside-matomo-or-ga4) for the worked example.
+
 ## Goals
 
 Matomo knows dozens of goals; which of them an editor is meant to act on is a

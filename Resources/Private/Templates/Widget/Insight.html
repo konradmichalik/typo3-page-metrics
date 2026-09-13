@@ -1,0 +1,84 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:layout name="Widget/Widget" />
+<f:section name="main">
+    <f:comment>
+        Four whole sentences at most, and a list rather than a table: every
+        card is read end to end in its own order, and there is no column a
+        reader has to carry across from a header to make sense of it.
+
+        Each sentence is one translation key with its values substituted in,
+        never a frame with words dropped into it. The direction in
+        particular is part of the key and not an argument, which is why
+        there are two keys per shape: a verb that changes shape, position or
+        agreement with the direction cannot be assembled from outside the
+        sentence, and the direction is the one thing this widget must not
+        get wrong.
+    </f:comment>
+    <f:if condition="{insights}">
+        <f:then>
+            <ul class="pagemetrics-insight-list">
+                <f:for each="{insights}" as="insight">
+                    <li class="pagemetrics-insight-card pagemetrics-widget-trend-sentiment-{insight.sentiment.value}">
+                        <f:comment>
+                            Decoration only. The arrow repeats what the
+                            sentence already says in words, and so does the
+                            accent colour the card takes from the sentiment,
+                            so neither carries anything on its own.
+                        </f:comment>
+                        <span class="pagemetrics-insight-card-icon" aria-hidden="true">
+                            <f:switch expression="{insight.sentenceKey}">
+                                <f:case value="siteDown"><core:icon identifier="tabler-trending-down" size="small" alternativeMarkupIdentifier="inline" /></f:case>
+                                <f:case value="pageFall"><core:icon identifier="tabler-trending-down" size="small" alternativeMarkupIdentifier="inline" /></f:case>
+                                <f:defaultCase><core:icon identifier="tabler-trending-up" size="small" alternativeMarkupIdentifier="inline" /></f:defaultCase>
+                            </f:switch>
+                        </span>
+                        <span class="pagemetrics-insight-card-text">
+                            <f:switch expression="{insight.sentenceKey}">
+                                <f:case value="siteUp"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.insight.siteUp" arguments="{insight.sentenceArguments}" default="%1$s, %2$d days: %3$s, up %4$d%% against the previous period." /></f:case>
+                                <f:case value="siteDown"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.insight.siteDown" arguments="{insight.sentenceArguments}" default="%1$s, %2$d days: %3$s, down %4$d%% against the previous period." /></f:case>
+                                <f:case value="pageRise"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.insight.pageRise" arguments="{insight.sentenceArguments}" default="Biggest riser by %1$s: &quot;%2$s&quot;, up %3$d%% to %4$s." /></f:case>
+                                <f:case value="pageFall"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.insight.pageFall" arguments="{insight.sentenceArguments}" default="Biggest faller by %1$s: &quot;%2$s&quot;, down %3$d%% to %4$s." /></f:case>
+                            </f:switch>
+                        </span>
+                        <f:comment>
+                            Which site the sentence is about, drawn only
+                            where the dashboard covers more than one. The
+                            cards are one ranked list across every site, so
+                            this cannot be a heading above a group.
+                        </f:comment>
+                        <f:if condition="{showSite}">
+                            <span class="pagemetrics-insight-card-site">{insight.siteIdentifier}</span>
+                        </f:if>
+                    </li>
+                </f:for>
+            </ul>
+            <f:for each="{linkSites}" as="linkSite">
+                <f:render partial="WidgetModuleLink" arguments="{urls: moduleUrls, site: linkSite}" />
+            </f:for>
+        </f:then>
+        <f:else>
+            <div class="callout callout-info">
+                <div class="callout-icon">
+                    <span class="icon-emphasized"><core:icon identifier="{configuration.iconIdentifier}" /></span>
+                </div>
+                <div class="callout-content">
+                    <div class="callout-title">
+                        <f:comment>
+                            An empty widget is the correct answer to a quiet
+                            month, not a failure, so it says so plainly and
+                            invents nothing to fill itself with. The other
+                            branch is for an installation with no provider
+                            configured, where there is no month to call
+                            quiet.
+                        </f:comment>
+                        <f:if condition="{hasProvider}">
+                            <f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.insight.empty" default="Nothing moved significantly in this period." /></f:then>
+                            <f:else><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." /></f:else>
+                        </f:if>
+                    </div>
+                </div>
+            </div>
+        </f:else>
+    </f:if>
+</f:section>
+</html>

@@ -73,6 +73,11 @@ final readonly class SiteMetricsOverviewBuilder
         }
 
         $primary = $this->primaryDefinition($provider, $site);
+
+        if (null === $primary) {
+            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], [], null);
+        }
+
         $chartMetric = $this->resolveChartMetric($provider, $site, $preferredMetricIdentifier) ?? $primary;
 
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
@@ -140,6 +145,11 @@ final readonly class SiteMetricsOverviewBuilder
         }
 
         $primary = $this->primaryDefinition($provider, $site);
+
+        if (null === $primary) {
+            return null;
+        }
+
         $metric = $this->resolveChartMetric($provider, $site, $preferredMetricIdentifier) ?? $primary;
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
@@ -175,6 +185,11 @@ final readonly class SiteMetricsOverviewBuilder
         }
 
         $primary = $this->primaryDefinition($provider, $site);
+
+        if (null === $primary) {
+            return null;
+        }
+
         $goalMetric = $this->resolveGoalMetric($site, $goalMetricIdentifier);
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $previousPeriodCovered = $this->previousPeriodCovered($provider, $site, $previousRange);
@@ -336,12 +351,22 @@ final readonly class SiteMetricsOverviewBuilder
         return $this->metricDefinitionCollector->supporting($this->providers, $site)[0] ?? null;
     }
 
-    private function primaryDefinition(MetricProviderInterface $provider, Site $site): MetricDefinition
+    /**
+     * Null where the provider contributes no count metric to this site at
+     * all, which the per-provider `metrics` allow list made reachable: a
+     * list naming only rate metrics, or only identifiers no installed
+     * provider offers, is deliberately tolerated rather than refused (see
+     * docs/providers/accesslog.md), and supports() still says yes because a
+     * provider a site opted into supports it whatever its tiles come to.
+     * Treated exactly like a site with no provider, which is the same answer
+     * to the reader.
+     */
+    private function primaryDefinition(MetricProviderInterface $provider, Site $site): ?MetricDefinition
     {
         $definitions = $this->metricDefinitionCollector->forSite($provider, $site);
         usort($definitions, static fn (MetricDefinition $a, MetricDefinition $b): int => $a->sortOrder <=> $b->sortOrder);
 
-        return $definitions[0];
+        return $definitions[0] ?? null;
     }
 
     /**

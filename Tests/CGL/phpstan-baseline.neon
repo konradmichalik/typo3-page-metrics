@@ -56,7 +56,7 @@ parameters:
 			path: ../../Classes/Domain/ValueObject/RateMetricDefinition.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
-			count: 4
+			count: 5
 			path: ../../Classes/Domain/ValueObject/MetricTile.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue

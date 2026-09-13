@@ -41,6 +41,15 @@ final readonly class SitePagesTable
     public const DIRECTION_DESCENDING = 'desc';
 
     /**
+     * The one sort key that is not a metric identifier: content decay, which
+     * orders by two facts at once (is this page losing the metric it is
+     * judged on, and how long has nobody touched it) rather than by a column
+     * of figures. Spelled without a dot so it can never collide with a
+     * metric identifier, which is always "<source>.<name>".
+     */
+    public const SORT_DECAY = 'decay';
+
+    /**
      * Long enough that scrolling is the normal way through it and short
      * enough that a site with thousands of pages still renders. The pager
      * below the table is what makes the rest reachable.
@@ -77,6 +86,7 @@ final readonly class SitePagesTable
         public int $totalRows,
         public int $pageNumber,
         public bool $previousPeriodCovered,
+        public SitePagesColumn $decayColumn,
     ) {
         $this->pageCount = max(1, (int) ceil($totalRows / self::PAGE_SIZE));
         $this->firstRowNumber = 0 === $totalRows ? 0 : ($pageNumber - 1) * self::PAGE_SIZE + 1;
@@ -95,6 +105,6 @@ final readonly class SitePagesTable
      */
     public static function withoutProvider(): self
     {
-        return new self(false, [], [], '', self::DIRECTION_DESCENDING, '', '', '', 0, 1, true);
+        return new self(false, [], [], '', self::DIRECTION_DESCENDING, '', '', '', 0, 1, true, SitePagesColumn::forDecay(false, self::DIRECTION_DESCENDING));
     }
 }

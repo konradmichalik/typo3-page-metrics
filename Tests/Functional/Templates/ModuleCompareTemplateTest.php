@@ -77,7 +77,7 @@ final class ModuleCompareTemplateTest extends FunctionalTestCase
 
         self::assertStringContainsString('Within normal variation', $html);
         self::assertStringNotContainsString('Significant change', $html);
-        self::assertStringContainsString('pagemetrics-compare-quiet', $html);
+        self::assertStringContainsString('pagemetrics-quiet', $html);
     }
 
     public function testAPeriodNobodyImportedIsSaidInWordsRatherThanDrawnAsAChange(): void

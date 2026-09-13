@@ -238,3 +238,32 @@ services:
         arguments:
             $providers: !tagged_iterator page_metrics.metric_provider
         public: true
+
+    # Public for the same reason as the tiles controller above.
+    KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsExportController:
+        public: true
+
+    # The tagged iterator has to be named, like every other consumer of the
+    # metric providers. Public so functional tests can fetch it directly via
+    # $this->get() instead of going through the export route.
+    KonradMichalik\Typo3PageMetrics\Service\SiteMetricValueReader:
+        arguments:
+            $providers: !tagged_iterator page_metrics.metric_provider
+        public: true
+
+    # Public so functional tests can fetch it directly via $this->get()
+    # instead of dispatching a real AJAX route request.
+    KonradMichalik\Typo3PageMetrics\Service\CsvExportBuilder:
+        public: true
+
+    # Public for the same reason as the export builder above.
+    KonradMichalik\Typo3PageMetrics\Service\CsvStreamWriter:
+        public: true
+
+    # The tagged iterator has to be named, like every other consumer of the
+    # metric providers. Public so functional tests can fetch it directly via
+    # $this->get() instead of rendering the widget to reach it.
+    KonradMichalik\Typo3PageMetrics\Service\InsightBuilder:
+        arguments:
+            $providers: !tagged_iterator page_metrics.metric_provider
+        public: true

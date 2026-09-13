@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Domain\ValueObject;
 
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricUnit;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{SitePagesColumn, SitePagesTable};
 use PHPUnit\Framework\TestCase;
 
@@ -45,8 +46,24 @@ final class SitePagesColumnTest extends TestCase
         self::assertSame(SitePagesTable::DIRECTION_DESCENDING, $column->nextDirection);
     }
 
+    public function testTheDecayColumnSortsLikeAMetricColumnAndNamesItselfInTheView(): void
+    {
+        $sorted = SitePagesColumn::forDecay(true, SitePagesTable::DIRECTION_DESCENDING);
+        $unsorted = SitePagesColumn::forDecay(false, SitePagesTable::DIRECTION_DESCENDING);
+
+        self::assertSame(SitePagesTable::SORT_DECAY, $sorted->key);
+        self::assertSame('descending', $sorted->ariaSort);
+        self::assertSame(SitePagesTable::DIRECTION_ASCENDING, $sorted->nextDirection);
+        self::assertSame('none', $unsorted->ariaSort);
+        // Decay measures days rather than anything a provider defined, so
+        // there is no metric unit for an export to write beside it, and its
+        // label is the view's own word rather than a provider's.
+        self::assertNull($sorted->unit);
+        self::assertSame('', $sorted->label);
+    }
+
     private function column(bool $isSorted, string $sortDirection): SitePagesColumn
     {
-        return new SitePagesColumn('matomo.pageviews', 'Page views', 'How often the page was viewed.', $isSorted, $sortDirection);
+        return new SitePagesColumn('matomo.pageviews', 'Page views', 'How often the page was viewed.', $isSorted, $sortDirection, MetricUnit::Count);
     }
 }

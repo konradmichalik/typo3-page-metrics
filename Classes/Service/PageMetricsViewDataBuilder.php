@@ -444,6 +444,7 @@ final readonly class PageMetricsViewDataBuilder
             $this->channelBreakdown($channelSums, $definition, $value),
             $this->tileBenchmark($benchmark, $definition->unit),
             $previousPeriodCovered,
+            $previousValue,
         );
     }
 
@@ -583,9 +584,10 @@ final readonly class PageMetricsViewDataBuilder
             $breakdown,
             // No benchmark: the summary has no single metric to rank this
             // page against the rest of the site on. Spelled out only because
-            // the covered flag behind it has to be reached positionally.
+            // the two fields behind it have to be reached positionally.
             null,
             $previousPeriodCovered,
+            $previousValue,
         );
     }
 
@@ -672,6 +674,7 @@ final readonly class PageMetricsViewDataBuilder
             [],
             $this->tileBenchmark($benchmark, $definition->unit),
             $previousPeriodCovered,
+            $previousValue,
         );
     }
 

@@ -21,6 +21,9 @@ return [
         'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:dashboardPreset.description',
         'iconIdentifier' => 'tabler-eye-search',
         'defaultWidgets' => [
+            // First, because a sentence saying what changed is what a reader
+            // can act on before they have read a single chart.
+            'pageMetricsInsight',
             'pageMetrics',
             'pageMetricsChart',
             [

@@ -30,6 +30,9 @@ final readonly class PageMetricsSiteConfiguration
      *                                                                  (a page edited, a redirect created) are written
      *                                                                  during the import run
      * @param list<GoalConfiguration>             $goals
+     * @param array<string, list<string>>         $metricFilters        the metrics each provider is allowed to contribute,
+     *                                                                  keyed by provider identifier and holding only the
+     *                                                                  providers that named one
      */
     public function __construct(
         public bool $enabled,
@@ -41,6 +44,7 @@ final readonly class PageMetricsSiteConfiguration
         public ?int $annotationStoragePid,
         public bool $automaticAnnotations,
         public array $goals,
+        public array $metricFilters,
     ) {}
 
     /**
@@ -57,5 +61,20 @@ final readonly class PageMetricsSiteConfiguration
             $this->goals,
             static fn (GoalConfiguration $goal): bool => $goal->provider === $providerIdentifier,
         ));
+    }
+
+    /**
+     * Which metrics one provider may contribute here, or null where the site
+     * named none and the provider therefore contributes everything it offers.
+     *
+     * Null rather than the full list: only the provider knows what it offers,
+     * and it is asked for that at display time with the Site in hand, which
+     * this configuration is read long before.
+     *
+     * @return list<string>|null
+     */
+    public function metricFilterFor(string $providerIdentifier): ?array
+    {
+        return $this->metricFilters[$providerIdentifier] ?? null;
     }
 }

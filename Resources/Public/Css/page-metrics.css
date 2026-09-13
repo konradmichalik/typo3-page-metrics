@@ -1576,14 +1576,18 @@
 /* A movement that cleared the metric's threshold, named in words next to the
    badge that colours it: the colour is the second carrier of that fact and
    never the only one. */
-.pagemetrics-compare-verdict {
+/* Named for what it is, not for the view it appeared in first: a judgement
+   stated in words beside the badge that colours it. The compare view and the
+   pages table make the same kind of statement, and a class called "compare"
+   in a table of pages would send the next reader looking for a comparison. */
+.pagemetrics-verdict {
     font-weight: 600;
 }
 
 /* Everything that did not clear it, and the two states that could not be
    judged at all. Quiet on purpose: a percentage that reads as loudly as a
    significant one is the misreading this view exists to prevent. */
-.pagemetrics-compare-quiet {
+.pagemetrics-quiet {
     color: var(--typo3-text-color-variant, #515151);
 }
 
@@ -1656,3 +1660,45 @@
     color: var(--typo3-text-color-variant, #515151);
 }
 
+
+/* ==========================================================================
+   Insight widget: what changed, as sentences
+   ========================================================================== */
+
+.pagemetrics-insight-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* The accent comes from the sentiment modifier the card already carries, so
+   a card needs no colour of its own and the two surfaces cannot drift apart.
+   The border is the carrier, not the background: a background tint alone
+   disappears in a forced-colours mode, and the direction is in the words
+   anyway. */
+.pagemetrics-insight-card {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    border-left: 3px solid var(--pm-accent, currentColor);
+    border-radius: var(--typo3-component-border-radius, 4px);
+    background: color-mix(in srgb, var(--pm-accent, transparent) 10%, var(--typo3-component-bg, #fff));
+}
+
+.pagemetrics-insight-card-icon {
+    flex-shrink: 0;
+    color: var(--pm-accent, currentColor);
+}
+
+.pagemetrics-insight-card-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.pagemetrics-insight-card-site {
+    flex-shrink: 0;
+    font-size: 0.85em;
+    opacity: 0.7;
+}

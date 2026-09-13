@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Templates;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, ModuleView, TrendDirection};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit, ModuleView, TrendDirection};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{SitePagesCell, SitePagesColumn, SitePagesRow, SitePagesTable};
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
 use TYPO3\CMS\Core\Http\ServerRequest;
@@ -49,7 +49,43 @@ final class ModulePagesTemplateTest extends FunctionalTestCase
         $html = $this->render();
 
         self::assertSame(1, substr_count($html, 'aria-sort="descending"'));
-        self::assertSame(1, substr_count($html, 'aria-sort="none"'));
+        // The bounce rate column and the decay column, neither of which
+        // holds the order.
+        self::assertSame(2, substr_count($html, 'aria-sort="none"'));
+    }
+
+    public function testDecaySortsFromAHeaderLinkLikeEveryMetricColumn(): void
+    {
+        $html = $this->render();
+
+        self::assertStringContainsString('sort=decay&amp;direction=desc', $html);
+    }
+
+    public function testNamesTheDecayVerdictInWordsAndNotOnlyInColour(): void
+    {
+        $html = $this->render();
+
+        self::assertStringContainsString('Decaying', $html);
+        self::assertStringContainsString('unchanged for 412 days', $html);
+        // The page somebody edited last week carries the age without the
+        // word, so the verdict is readable as a word and not as a shade.
+        self::assertStringContainsString('unchanged for 3 days', $html);
+    }
+
+    public function testSaysInWordsWhenNobodyRecordedWhenAPageLastChanged(): void
+    {
+        $html = $this->render();
+
+        self::assertStringContainsString('no record of when this page last changed', $html);
+    }
+
+    public function testExplainsWhatDecayMeansInProseRatherThanInATooltip(): void
+    {
+        $html = $this->render();
+
+        self::assertStringContainsString('A page is decaying when it lost', $html);
+        self::assertStringContainsString('it was never found', $html);
+        self::assertStringNotContainsString('data-hint-title', $html);
     }
 
     public function testEverySortableColumnIsALinkCarryingTheOrderItWouldAskFor(): void
@@ -102,7 +138,7 @@ final class ModulePagesTemplateTest extends FunctionalTestCase
     {
         $html = $this->render();
 
-        self::assertStringContainsString('Showing 1 to 1 of 31 pages.', $html);
+        self::assertStringContainsString('Showing 1 to 3 of 31 pages.', $html);
         self::assertStringContainsString('tablePage=2', $html);
     }
 
@@ -152,8 +188,8 @@ final class ModulePagesTemplateTest extends FunctionalTestCase
     private function table(): SitePagesTable
     {
         $columns = [
-            new SitePagesColumn('matomo.pageviews', 'Page views', 'How often the page was viewed.', true, SitePagesTable::DIRECTION_DESCENDING),
-            new SitePagesColumn('matomo.bounce_rate', 'Bounce rate', 'The share of visits that left again.', false, SitePagesTable::DIRECTION_DESCENDING),
+            new SitePagesColumn('matomo.pageviews', 'Page views', 'How often the page was viewed.', true, SitePagesTable::DIRECTION_DESCENDING, MetricUnit::Count),
+            new SitePagesColumn('matomo.bounce_rate', 'Bounce rate', 'The share of visits that left again.', false, SitePagesTable::DIRECTION_DESCENDING, MetricUnit::Percent),
         ];
 
         $rows = [
@@ -165,6 +201,32 @@ final class ModulePagesTemplateTest extends FunctionalTestCase
                 TrendDirection::Up,
                 MetricPolarity::HigherIsBetter,
                 true,
+                412,
+                true,
+            ),
+            new SitePagesRow(
+                3,
+                'Contact',
+                [new SitePagesCell(true, '7'), new SitePagesCell(false, '')],
+                -4,
+                TrendDirection::Down,
+                MetricPolarity::HigherIsBetter,
+                true,
+                3,
+                false,
+            ),
+            // No record of when this one last changed, which is not an age of
+            // zero and has to read differently from one.
+            new SitePagesRow(
+                4,
+                'Imprint',
+                [new SitePagesCell(true, '1'), new SitePagesCell(false, '')],
+                0,
+                TrendDirection::Flat,
+                MetricPolarity::HigherIsBetter,
+                true,
+                null,
+                false,
             ),
         ];
 
@@ -180,6 +242,7 @@ final class ModulePagesTemplateTest extends FunctionalTestCase
             31,
             1,
             true,
+            SitePagesColumn::forDecay(false, SitePagesTable::DIRECTION_DESCENDING),
         );
     }
 }

@@ -22,11 +22,12 @@ use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Template\Components\Buttons\Action\ShortcutButton;
 use TYPO3\CMS\Backend\Template\Components\Buttons\DropDown\DropDownRadio;
-use TYPO3\CMS\Backend\Template\Components\Buttons\DropDownButton;
+use TYPO3\CMS\Backend\Template\Components\Buttons\{DropDownButton, LinkButton};
 use TYPO3\CMS\Backend\Template\Components\Menu\{Menu, MenuItem};
 use TYPO3\CMS\Backend\Template\{ModuleTemplate, ModuleTemplateFactory};
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Imaging\{IconFactory, IconSize};
 use TYPO3\CMS\Core\Information\Typo3Version;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Page\PageRenderer;
@@ -78,6 +79,7 @@ final readonly class PageMetricsModuleController
         private PageRenderer $pageRenderer,
         private PeriodComparisonBuilder $periodComparisonBuilder,
         private SitePagesTableBuilder $sitePagesTableBuilder,
+        private IconFactory $iconFactory,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
@@ -122,6 +124,13 @@ final readonly class PageMetricsModuleController
             // PageMetricsViewDataBuilder::build().
             return $view->assign('reason', 'page')->renderResponse('Module/Denied');
         }
+
+        // Only once both guards above have passed. The button is the one
+        // docheader control that goes somewhere, and offering a download on
+        // the module's opening state or on a page the reader may not see
+        // hands them a link that answers 400 or 403. The period and view
+        // controls are harmless there because they only come back here.
+        $this->addExportButton($view, $pageId, $period, $activeView, $moduleData);
 
         $includeSubpages = (bool) $moduleData?->get('includeSubpages');
         // NullSite where the uid resolves to no site, which the pages view
@@ -288,6 +297,41 @@ final readonly class PageMetricsModuleController
         }
 
         $view->getDocHeaderComponent()->getMenuRegistry()->addMenu($menu);
+    }
+
+    /**
+     * Built server side because an AJAX route URI is token-signed and a
+     * template cannot put back a token it cannot read. Its own route rather
+     * than a mode on this one, for the reason AjaxRoutes.php gives: a link
+     * carrying `period` and `view` through the module route would rewrite
+     * the reader's stored module state rather than describe a download.
+     *
+     * Every parameter the views read between them, not the ones this view
+     * happens to use: the sort is ignored by the page and compare views and
+     * decides the whole file for the pages one, and a download that came out
+     * in a different order from the table above it is not the export this
+     * button promises. The pager is deliberately absent, because the export
+     * is every row rather than the page of them on screen.
+     */
+    private function addExportButton(ModuleTemplate $view, int $pageId, int $period, ModuleView $activeView, ?ModuleData $moduleData): void
+    {
+        $buttonBar = $view->getDocHeaderComponent()->getButtonBar();
+        $buttonBar->addButton(
+            GeneralUtility::makeInstance(LinkButton::class)
+                ->setHref((string) $this->uriBuilder->buildUriFromRoute('ajax_page_metrics_export', [
+                    'id' => $pageId,
+                    'period' => $period,
+                    'view' => $activeView->value,
+                    'includeSubpages' => (bool) $moduleData?->get('includeSubpages') ? '1' : '0',
+                    'compareBaseline' => self::baselineKeyOf($moduleData) ?? '',
+                    'sort' => self::stringOf($moduleData, 'sort'),
+                    'direction' => self::stringOf($moduleData, 'direction'),
+                ]))
+                ->setTitle($this->translate('module.export'))
+                ->setShowLabelText(true)
+                ->setIcon($this->iconFactory->getIcon('actions-file-csv', IconSize::SMALL)),
+            ButtonBar::BUTTON_POSITION_RIGHT,
+        );
     }
 
     private function moduleUri(int $pageId, int $period, ModuleView $view): string

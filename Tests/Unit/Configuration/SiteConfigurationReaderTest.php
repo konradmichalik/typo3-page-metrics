@@ -391,6 +391,67 @@ final class SiteConfigurationReaderTest extends TestCase
         ]));
     }
 
+    public function testReadsThePerProviderMetricList(): void
+    {
+        $configuration = $this->subject->read($this->siteWithProviders([
+            'matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 3],
+            'accesslog' => ['pathPattern' => '/var/log/nginx/access.log*', 'metrics' => ['machine']],
+        ]));
+
+        self::assertNull($configuration->metricFilterFor('matomo'));
+        self::assertSame(['machine'], $configuration->metricFilterFor('accesslog'));
+    }
+
+    public function testHasNoMetricListForAProviderTheSiteDoesNotConfigureAtAll(): void
+    {
+        $configuration = $this->subject->read(new Site('main', 1, ['base' => 'https://example.com/']));
+
+        self::assertNull($configuration->metricFilterFor('accesslog'));
+    }
+
+    public function testThrowsWhenTheMetricListIsNotAList(): void
+    {
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionCode(1756000020);
+
+        $this->subject->read($this->siteWithProviders(['accesslog' => ['metrics' => ['first' => 'bot.search']]]));
+    }
+
+    public function testThrowsWhenTheMetricListIsEmpty(): void
+    {
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionCode(1756000020);
+
+        $this->subject->read($this->siteWithProviders(['accesslog' => ['metrics' => []]]));
+    }
+
+    public function testThrowsWhenAMetricListEntryIsNotANonEmptyString(): void
+    {
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionCode(1756000020);
+
+        $this->subject->read($this->siteWithProviders(['accesslog' => ['metrics' => ['bot.search', '']]]));
+    }
+
+    public function testNamesTheProviderWhoseMetricListIsMalformed(): void
+    {
+        $this->expectException(InvalidSiteConfigurationException::class);
+        $this->expectExceptionMessage('pageMetrics.providers.accesslog.metrics');
+
+        $this->subject->read($this->siteWithProviders(['accesslog' => ['metrics' => 'machine']]));
+    }
+
+    /**
+     * @param array<string, mixed> $providers
+     */
+    private function siteWithProviders(array $providers): Site
+    {
+        return new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'pageMetrics' => ['enabled' => true, 'providers' => $providers],
+        ]);
+    }
+
     /**
      * @param list<mixed> $goals
      */

@@ -36,6 +36,24 @@ per user in TYPO3's `moduleData`, the mechanism the info module uses for its own
 separate from the page module's own period: the two surfaces answer different
 questions and a reader changing one should not find the other moved.
 
+## Downloading a view
+
+Every view has a **Download CSV** button in the docheader that writes exactly
+what the view shows: the same rows, the same order, the same period. The pages
+view exports every row, not the page of them on screen.
+
+Two properties worth knowing before you open the file. It is semicolon
+separated with a UTF-8 byte order mark, because Excel splits on the list
+separator of the machine it runs on and a comma file opens as a single column
+on a German-locale installation. And the header names metric identifiers
+(`matomo.pageviews`) rather than labels, so two exports of one view taken in
+different backend languages are comparable; the readable name is in the module
+beside it.
+
+Values are raw and in their own unit. A time on page is `183` and not `3:03`,
+currency is in minor units, and an empty cell means the figure does not exist
+rather than being zero.
+
 ## Access
 
 The module is `access: user`, so it is not restricted to administrators. The

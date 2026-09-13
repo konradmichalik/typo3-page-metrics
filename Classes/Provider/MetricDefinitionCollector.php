@@ -13,8 +13,11 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Provider;
 
+use KonradMichalik\Typo3PageMetrics\Configuration\SiteConfigurationReader;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricDefinition;
 use TYPO3\CMS\Core\Site\Entity\Site;
+
+use function in_array;
 
 /**
  * MetricDefinitionCollector.
@@ -30,10 +33,19 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  * of them were written independently in the same afternoon because there was
  * nothing to reuse.
  *
+ * It is also where a site's own "metrics" list is applied, for the third
+ * time for the same reason: a consumer asks what this site has and gets an
+ * answer that already accounts for what the site asked for. None of the five
+ * knows the option exists.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class MetricDefinitionCollector
 {
+    public function __construct(
+        private SiteConfigurationReader $siteConfigurationReader,
+    ) {}
+
     /**
      * The providers configured for this site, in the order the container
      * tagged them. Empty where the site opted into none, which is a
@@ -62,10 +74,43 @@ final readonly class MetricDefinitionCollector
      */
     public function forSite(MetricProviderInterface $provider, Site $site): array
     {
-        if (!$provider instanceof SiteAwareMetricProviderInterface) {
-            return $provider->getMetricDefinitions();
+        $definitions = $provider instanceof SiteAwareMetricProviderInterface
+            ? [...$provider->getMetricDefinitions(), ...$provider->getSiteMetricDefinitions($site)]
+            : $provider->getMetricDefinitions();
+
+        return $this->allowed($definitions, $provider, $site);
+    }
+
+    /**
+     * A site naming no metrics for this provider gets all of them, which is
+     * every site configured before the option existed.
+     *
+     * An entry is matched against the identifier and against the group, so
+     * "machine" stands for every machine metric the provider offers, now and
+     * after it adds one. That turns the case this exists for (Matomo for the
+     * audience numbers, the access log only for the bots it can see and
+     * Matomo cannot) into a list of one entry that never goes stale, instead
+     * of five identifiers somebody has to keep up to date.
+     *
+     * Filtering the definitions rather than the stored values: the rows stay,
+     * so widening the list shows the history that was collected all along.
+     *
+     * @param list<MetricDefinition> $definitions
+     *
+     * @return list<MetricDefinition>
+     */
+    private function allowed(array $definitions, MetricProviderInterface $provider, Site $site): array
+    {
+        $allowed = $this->siteConfigurationReader->read($site)->metricFilterFor($provider->getIdentifier());
+
+        if (null === $allowed) {
+            return $definitions;
         }
 
-        return [...$provider->getMetricDefinitions(), ...$provider->getSiteMetricDefinitions($site)];
+        return array_values(array_filter(
+            $definitions,
+            static fn (MetricDefinition $definition): bool => in_array($definition->identifier, $allowed, true)
+                || in_array($definition->group->value, $allowed, true),
+        ));
     }
 }

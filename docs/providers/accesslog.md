@@ -13,6 +13,38 @@ pageMetrics:
 
 `pathPattern` is passed to PHP's `glob()`, so a rotated set like `access.log`, `access.log.1`, `access.log-20261001.gz` is read as one set. Gzip is detected by the file's own content rather than its name, so hosts that rotate into extensionless or oddly suffixed compressed files are read correctly too.
 
+## Running it alongside Matomo or GA4
+
+Two providers can be configured on one site and the import keeps them apart, because metric identifiers are namespaced per provider: `matomo.pageviews` and `accesslog.pageviews` are separate rows that never collide. The page module is where that stops being helpful. Left alone it renders both, and two tiles called "Page views" showing different numbers is the worst possible answer to the question of how many page views a page got.
+
+The `metrics` key says which of a provider's metrics this site wants from it. The pairing that motivates the option is Matomo for the audience numbers and the access log for the bot traffic only, which Matomo cannot see at all because bots do not run its JavaScript:
+
+```yaml
+pageMetrics:
+  enabled: true
+  providers:
+    matomo:
+      endpoint: 'https://matomo.example.com/'
+      siteId: 3
+      tokenAuth: '%env(MATOMO_TOKEN)%'
+    accesslog:
+      pathPattern: '/var/log/nginx/example.com-access.log*'
+      metrics:
+        - machine
+```
+
+Matomo keeps the page views and visits tiles, the access log contributes its bot buckets and nothing else.
+
+An entry is either a metric identifier such as `accesslog.visits`, or the name of a metric group: `audience` or `machine`. Prefer the group name. `machine` means every bot bucket the provider offers, including the ones it gains in a later release, where five identifiers written out by hand quietly stay five when a sixth bucket appears. [Bot traffic metrics](#bot-traffic-metrics) lists what is in the machine group today.
+
+The key works on every provider, not only this one, and defaults to everything the provider offers. A site that names no `metrics` key keeps every tile it has today.
+
+Three things worth knowing before using it:
+
+- It filters what is displayed, not what is imported. The rows keep being written for every metric the provider produces, so widening the list later shows the history back to the first import rather than only what arrived after the change. No re-import and no `--force` run is needed.
+- An entry naming a metric that no installed provider offers is ignored rather than refused. Whether an identifier is real depends on which provider extensions are installed, and a site configuration is read long before that is known. A malformed `metrics` key is still refused outright: it has to be a non-empty list of non-empty strings, and the site configuration fails to load otherwise.
+- Rate metrics are not covered yet. "Avg. time on page" and "Bounce rate" are derived at display time and are read straight from the provider rather than through the metric list, so pairing Matomo with GA4 still shows both of their "Avg. time on page" tiles. The access log offers no rate metrics, so the pairing above is unaffected.
+
 ## Logs shared by several virtual hosts
 
 A `LogFormat`/`log_format` ending in `%v` writes the virtual host that served each line, and shared hosting commonly puts several vhosts into one combined log. Where the token is present, a line is only counted for the site whose own host served it; a line for any other host is skipped. Without that check every site configured against such a log would count every other site's traffic as its own, with nothing in the numbers to show it.

@@ -37,7 +37,22 @@ final readonly class SitePagesRow
     public TrendSentiment $sentiment;
 
     /**
-     * @param list<SitePagesCell> $cells one per column of the table, in the table's own column order
+     * Carried as its own flag because the template has to tell "changed
+     * today" from "no record of when", and a Fluid condition on
+     * $daysSinceChange reads zero days and no age as the same thing.
+     */
+    public bool $hasAge;
+
+    /**
+     * @param list<SitePagesCell> $cells           one per column of the table, in the table's own column order
+     * @param int|null            $daysSinceChange whole days since the page or its content was last edited, null where the
+     *                                             record carries no timestamp at all: that is an unknown age rather than a
+     *                                             change in 1970, and it must not head a list ordered by age
+     * @param bool                $isDecaying      the page lost the metric this table judges on, by enough to clear that
+     *                                             metric's own MetricSignificance, and nobody has touched it since before
+     *                                             the two compared periods began. A page that never had the metric at all
+     *                                             is not decaying: MetricSignificance clears nothing against a previous
+     *                                             value of zero, so a page that was never found stays out of the verdict
      */
     public function __construct(
         public int $pageUid,
@@ -47,9 +62,12 @@ final readonly class SitePagesRow
         public TrendDirection $trend,
         public MetricPolarity $polarity,
         bool $previousPeriodCovered,
+        public ?int $daysSinceChange,
+        public bool $isDecaying,
     ) {
         $this->isNew = null === $deltaPercent && $previousPeriodCovered;
         $this->hasNoComparison = !$previousPeriodCovered;
         $this->sentiment = TrendSentiment::of($trend, $polarity);
+        $this->hasAge = null !== $daysSinceChange;
     }
 }

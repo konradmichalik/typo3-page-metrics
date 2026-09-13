@@ -124,21 +124,21 @@
                                                     <f:variable name="deltaText"><f:if condition="{row.isNew}"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:then><f:else>{row.deltaPercent}%</f:else></f:if></f:variable>
                                                     <f:if condition="{row.isSignificant}">
                                                         <f:then><f:render partial="TrendBadge" arguments="{trend: row.direction, sentiment: row.sentiment, deltaText: deltaText, isNew: row.isNew}" /></f:then>
-                                                        <f:else><span class="pagemetrics-compare-quiet">{deltaText}</span></f:else>
+                                                        <f:else><span class="pagemetrics-quiet">{deltaText}</span></f:else>
                                                     </f:if>
                                                 </f:else>
                                             </f:if>
                                         </td>
                                         <td>
                                             <f:if condition="{row.hasNoComparison}">
-                                                <f:then><span class="pagemetrics-compare-quiet"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.verdict.notComparable" default="Not comparable, the period was never imported" /></span></f:then>
+                                                <f:then><span class="pagemetrics-quiet"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.verdict.notComparable" default="Not comparable, the period was never imported" /></span></f:then>
                                                 <f:else>
                                                     <f:if condition="{row.isNew}">
-                                                        <f:then><span class="pagemetrics-compare-quiet"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.verdict.new" default="Nothing recorded in the earlier period" /></span></f:then>
+                                                        <f:then><span class="pagemetrics-quiet"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.verdict.new" default="Nothing recorded in the earlier period" /></span></f:then>
                                                         <f:else>
                                                             <f:if condition="{row.isSignificant}">
-                                                                <f:then><span class="pagemetrics-compare-verdict"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.verdict.significant" default="Significant change" /></span></f:then>
-                                                                <f:else><span class="pagemetrics-compare-quiet"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.verdict.insignificant" default="Within normal variation" /></span></f:else>
+                                                                <f:then><span class="pagemetrics-verdict"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.verdict.significant" default="Significant change" /></span></f:then>
+                                                                <f:else><span class="pagemetrics-quiet"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.verdict.insignificant" default="Within normal variation" /></span></f:else>
                                                             </f:if>
                                                         </f:else>
                                                     </f:if>

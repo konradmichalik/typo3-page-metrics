@@ -21,6 +21,10 @@ credentials) with read access to the GA4 property's Data API. "Avg. time
 on page" and "bounce rate" are GA4 approximations, not the same
 definitions Matomo's tiles use: see each tile's own description text.
 
+## Choosing which metrics it contributes
+
+The optional `metrics` key under a provider limits what it puts on the page. It defaults to everything the provider offers, so a site that does not name it keeps every tile it has today. It exists for the case where two providers are configured at once and both answer the same question, which would otherwise put two tiles of the same name and different numbers side by side. See [Running it alongside Matomo or GA4](accesslog.md#running-it-alongside-matomo-or-ga4) for the worked example.
+
 ## Key events
 
 GA4 calls a conversion a key event. Which key events matter is a business

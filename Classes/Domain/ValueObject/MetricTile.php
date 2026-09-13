@@ -70,6 +70,12 @@ final readonly class MetricTile
      * @param TileBenchmark|null                                 $benchmark              what the rest of this site did on the same metric over
      *                                                                                   the same period, null where the site has too few pages
      *                                                                                   with data for the comparison to say anything
+     * @param int                                                $previousValue          the previous period's own figure as a number rather than
+     *                                                                                   as the formatted string beside it, because the CSV export
+     *                                                                                   carries raw values in their own unit and a display string
+     *                                                                                   taken back apart is a reading aid used as a datum. Zero
+     *                                                                                   where there is nothing to compare against, which
+     *                                                                                   $isNew and $hasNoComparison already tell apart
      * @param bool                                               $previousPeriodCovered  whether the period compared against lies inside the
      *                                                                                   imported window, which is what makes the comparison
      *                                                                                   sayable at all (see ImportCoverage::covers()). Defaults
@@ -98,6 +104,7 @@ final readonly class MetricTile
         public array $breakdown = [],
         public ?TileBenchmark $benchmark = null,
         bool $previousPeriodCovered = true,
+        public int $previousValue = 0,
     ) {
         $this->sentiment = TrendSentiment::of($trend, $polarity);
         $this->hasNoComparison = !$previousPeriodCovered;

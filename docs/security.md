@@ -14,6 +14,13 @@ data by calling one of those routes directly either. The **Page metrics**
 backend module enforces it too: a user it is switched off for gets a notice
 instead of the module, whichever way they arrive at its path.
 
+The CSV export is one of those routes and not an exception to any of it. It
+checks the switch, and it checks `PAGE_SHOW` on every page it would write, so
+a site-wide file contains exactly the rows its reader can see in the module.
+A reader with rights to a few pages therefore gets a partial file, and the
+file does not say so: that is a deliberate trade, because nothing leaving the
+module may be invisible inside it.
+
 The module still appears in the menu, because TYPO3 13.4 has no per-user hook
 for building it. Pair the switch with TYPO3's own module setting to take the
 entry away as well:

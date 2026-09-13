@@ -14,13 +14,16 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricTrend, RateMetricDefinition, SitePagesCell, SitePagesColumn, SitePagesRow, SitePagesTable};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\TrendSentiment;
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricSignificance, MetricTrend, RateMetricDefinition, SitePagesCell, SitePagesColumn, SitePagesDataSet, SitePagesExportRow, SitePagesRow, SitePagesTable};
 use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, SitePageUidRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface};
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 
+use function array_chunk;
+use function array_filter;
 use function array_key_exists;
 use function array_keys;
 use function array_map;
@@ -67,11 +70,12 @@ final readonly class SitePagesTableBuilder
     ) {}
 
     /**
-     * $sortKey is a metric identifier; anything else, including the empty
-     * string a reader who has never sorted arrives with, falls back to the
-     * site's first metric. Only metric columns sort: ordering by page title
-     * would need every title of the site loaded to order by, where a metric
-     * column orders by figures that are in memory already.
+     * $sortKey is a metric identifier or SitePagesTable::SORT_DECAY; anything
+     * else, including the empty string a reader who has never sorted arrives
+     * with, falls back to the site's first metric. Nothing else sorts:
+     * ordering by page title would need every title of the site loaded to
+     * order by, where a metric column orders by figures that are in memory
+     * already.
      *
      * $pageNumber is one-based and clamped into range, so a stale bookmark
      * lands on the last page rather than on an empty table that reads as
@@ -79,13 +83,132 @@ final readonly class SitePagesTableBuilder
      */
     public function build(Site $site, int $languageId, int $periodDays, string $sortKey = '', string $sortDirection = '', int $pageNumber = 1): SitePagesTable
     {
+        $dataSet = $this->dataSetFor($site, $languageId, $periodDays, $sortKey, $sortDirection);
+
+        if (null === $dataSet) {
+            return SitePagesTable::withoutProvider();
+        }
+
+        $totalRows = count($dataSet->pageUids);
+        $pageNumber = max(1, min($pageNumber, (int) max(1, ceil($totalRows / SitePagesTable::PAGE_SIZE))));
+        $visiblePageUids = array_slice($dataSet->pageUids, ($pageNumber - 1) * SitePagesTable::PAGE_SIZE, SitePagesTable::PAGE_SIZE);
+
+        return new SitePagesTable(
+            true,
+            $this->columnsFor($dataSet->metrics, $dataSet->sortKey, $dataSet->sortDirection),
+            $this->rowsFor($visiblePageUids, $dataSet),
+            $dataSet->sortKey,
+            $dataSet->sortDirection,
+            $dataSet->sortMetric->label,
+            self::formatRangeLabel($dataSet->currentRange),
+            self::formatRangeLabel($dataSet->previousRange),
+            $totalRows,
+            $pageNumber,
+            $dataSet->previousPeriodCovered,
+            SitePagesColumn::forDecay(SitePagesTable::SORT_DECAY === $dataSet->sortKey, $dataSet->sortDirection),
+        );
+    }
+
+    /**
+     * The same rows build() would show, all of them, with the numbers rather
+     * than the words for them. This is what the CSV export writes.
+     *
+     * Same ordering, same period, same PAGE_SHOW filter, and all three
+     * because they come out of the same dataSetFor() call the view uses
+     * rather than from a second implementation that would be free to drift.
+     * An export is only "what the view shows" for as long as nobody gives it
+     * an opinion of its own.
+     *
+     * Yields in blocks rather than returning a list, because an export is
+     * the one surface of this extension with no upper bound on rows: a site
+     * with twenty thousand pages would otherwise hold twenty thousand row
+     * objects and every title of the site in memory at once, on top of the
+     * sums the ordering already needs. The block is the page size the table
+     * uses, so the title lookup stays one query per block exactly as it is
+     * for a rendered screen.
+     *
+     * The column keys of $values, and the unit each is counted in, are what
+     * columnsOf() returns.
+     *
+     * @return iterable<SitePagesExportRow>
+     */
+    public function stream(Site $site, int $languageId, int $periodDays, string $sortKey = '', string $sortDirection = ''): iterable
+    {
+        $dataSet = $this->dataSetFor($site, $languageId, $periodDays, $sortKey, $sortDirection);
+
+        if (null === $dataSet) {
+            return;
+        }
+
+        foreach (array_chunk($dataSet->pageUids, SitePagesTable::PAGE_SIZE) as $block) {
+            $titles = $this->pageUidRepository->titlesFor($block);
+
+            foreach ($block as $pageUid) {
+                yield $this->exportRowFor($pageUid, $titles[$pageUid] ?? sprintf('#%d', $pageUid), $dataSet);
+            }
+        }
+    }
+
+    /**
+     * The columns a row of stream() is keyed by, with the unit each raw
+     * value is counted in, and nothing about sorting: an export header names
+     * a column, it does not offer to reorder one.
+     *
+     * Cheap on purpose, so a file can be written without building a screen
+     * first: this resolves the site's provider and its metric definitions
+     * and asks the database nothing.
+     *
+     * @return list<SitePagesColumn>
+     */
+    public function columnsOf(Site $site): array
+    {
+        $provider = $this->resolveProvider($site);
+
+        return null !== $provider ? $this->columnsFor($this->metricsFor($provider, $site), '', SitePagesTable::DIRECTION_DESCENDING) : [];
+    }
+
+    private function exportRowFor(int $pageUid, string $title, SitePagesDataSet $dataSet): SitePagesExportRow
+    {
+        $values = [];
+        foreach ($dataSet->metrics as $metric) {
+            $values[$metric->identifier] = self::valueOf($metric, $dataSet->currentValues[$metric->identifier], $pageUid);
+        }
+
+        return new SitePagesExportRow(
+            $pageUid,
+            $title,
+            $values,
+            $this->trendFor($pageUid, $dataSet)->deltaPercent,
+            $dataSet->previousPeriodCovered,
+            $dataSet->ages[$pageUid] ?? null,
+            $dataSet->decaying[$pageUid] ?? false,
+        );
+    }
+
+    /**
+     * One pass over the site: which pages the reader may see, what each of
+     * them recorded, how long ago each was changed, which of them are
+     * decaying, and the single order all of that puts them in.
+     *
+     * Null where the site configured no metric provider at all, which is an
+     * answer about the site rather than an empty result.
+     */
+    private function dataSetFor(Site $site, int $languageId, int $periodDays, string $sortKey, string $sortDirection): ?SitePagesDataSet
+    {
         $provider = $this->resolveProvider($site);
         $metrics = null !== $provider ? $this->metricsFor($provider, $site) : [];
 
         if (null === $provider || [] === $metrics) {
-            return SitePagesTable::withoutProvider();
+            return null;
         }
 
+        // "decay" is not a metric, so resolveSortMetric() falls back to the
+        // site's first one, and that is exactly the metric a decay verdict
+        // has to be made on: the count every provider leads with. The trend
+        // column therefore keeps showing the fall the verdict was made from,
+        // which is half of what a reader needs to see why a row is where it
+        // is. The other half is the age, in its own column beside it.
+        $decaySort = SitePagesTable::SORT_DECAY === $sortKey;
         $sortMetric = $this->resolveSortMetric($metrics, $sortKey);
         $sortDirection = in_array($sortDirection, [SitePagesTable::DIRECTION_ASCENDING, SitePagesTable::DIRECTION_DESCENDING], true)
             ? $sortDirection
@@ -112,28 +235,164 @@ final readonly class SitePagesTableBuilder
             ? $this->valuesFor($sortMetric, $pageUids, $languageId, $previousRange)
             : [];
 
+        // Asked for the whole readable set and not only the visible page,
+        // because the age is one of the two things the decay order sorts by
+        // and a sort cannot be made from the rows it has already chosen. Two
+        // queries for the set, the same shape as the metric sums above.
+        $ages = $this->agesOf($this->pageUidRepository->lastChangedAt($pageUids), $currentRange->until);
+
         $sortValues = [];
+        $decaying = [];
         foreach ($this->rowPageUids($currentValues, $previousValues) as $rowPageUid) {
             $sortValues[$rowPageUid] = self::valueOf($sortMetric, $currentValues[$sortMetric->identifier], $rowPageUid);
+            // Withheld wholesale outside the imported window, for the same
+            // reason the trend is: a verdict built on a sum of days nobody
+            // fetched is a claim about the import, not about the page.
+            $decaying[$rowPageUid] = $previousPeriodCovered && self::isDecaying(
+                $sortMetric,
+                $sortValues[$rowPageUid] ?? 0,
+                self::valueOf($sortMetric, $previousValues, $rowPageUid) ?? 0,
+                $ages[$rowPageUid] ?? null,
+                $periodDays,
+            );
         }
 
-        $rowPageUids = $this->sorted(array_keys($sortValues), $sortValues, $sortDirection);
-        $totalRows = count($rowPageUids);
-        $pageNumber = max(1, min($pageNumber, (int) max(1, ceil($totalRows / SitePagesTable::PAGE_SIZE))));
-        $visiblePageUids = array_slice($rowPageUids, ($pageNumber - 1) * SitePagesTable::PAGE_SIZE, SitePagesTable::PAGE_SIZE);
-
-        return new SitePagesTable(
-            true,
-            $this->columnsFor($metrics, $sortMetric->identifier, $sortDirection),
-            $this->rowsFor($visiblePageUids, $metrics, $sortMetric, $currentValues, $previousValues, $previousPeriodCovered),
-            $sortMetric->identifier,
+        return new SitePagesDataSet(
+            $metrics,
+            $sortMetric,
+            $decaySort ? SitePagesTable::SORT_DECAY : $sortMetric->identifier,
             $sortDirection,
-            $sortMetric->label,
-            self::formatRangeLabel($currentRange),
-            self::formatRangeLabel($previousRange),
-            $totalRows,
-            $pageNumber,
+            $currentRange,
+            $previousRange,
             $previousPeriodCovered,
+            $currentValues,
+            $previousValues,
+            $ages,
+            $decaying,
+            $decaySort
+                ? $this->sortedByDecay(array_keys($sortValues), $decaying, $ages, $sortDirection)
+                : $this->sorted(array_keys($sortValues), $sortValues, $sortDirection),
+        );
+    }
+
+    /**
+     * How the sorted metric moved for this page, or nothing at all where the
+     * period before was never imported (see ImportCoverage::covers()).
+     */
+    private function trendFor(int $pageUid, SitePagesDataSet $dataSet): MetricTrend
+    {
+        if (!$dataSet->previousPeriodCovered) {
+            return MetricTrend::none();
+        }
+
+        return MetricTrend::between(
+            self::valueOf($dataSet->sortMetric, $dataSet->currentValues[$dataSet->sortMetric->identifier], $pageUid) ?? 0,
+            self::valueOf($dataSet->sortMetric, $dataSet->previousValues, $pageUid) ?? 0,
+        );
+    }
+
+    /**
+     * Whether this page is decaying: it lost the metric the table judges on,
+     * by enough to clear that metric's own MetricSignificance, and nobody
+     * has touched it since before the two compared periods began.
+     *
+     * There is no calendar threshold here, and that is the decision. §8.2 of
+     * the module spec proposes 180 days and says so is a proposal rather
+     * than a measurement; a sort does not need one at all. The list is
+     * ordered by age with the age written in its own column, so a reader
+     * draws the line where their own site's editing rhythm puts it instead
+     * of inheriting a number nobody measured. What is left is the only
+     * boundary the data itself supplies: a page edited inside the window the
+     * fall was measured in did not fade, it was changed, and a change with
+     * an effect is a different finding from neglect.
+     *
+     * Falling is expressed as TrendSentiment::Negative rather than as a
+     * downward direction, so a provider whose first metric is one where
+     * lower is better does not get its improvements filed as decay.
+     *
+     * A page that never had this metric is never decaying, and that falls
+     * out of the shared rule rather than being restated here:
+     * MetricSignificance::clears() refuses a previous value of zero, because
+     * there is no share of nothing. A page nobody ever found is not fading,
+     * and it needs a different kind of attention.
+     */
+    private static function isDecaying(MetricDefinition|RateMetricDefinition $metric, int $value, int $previousValue, ?int $daysSinceChange, int $periodDays): bool
+    {
+        if (null === $daysSinceChange || $daysSinceChange < 2 * $periodDays) {
+            return false;
+        }
+
+        $sentiment = TrendSentiment::of(MetricTrend::between($value, $previousValue)->direction, $metric->polarity);
+
+        return TrendSentiment::Negative === $sentiment
+            && ($metric->significance ?? MetricSignificance::default())->clears($value, $previousValue);
+    }
+
+    /**
+     * Decaying pages first, and the longest untouched first among them.
+     *
+     * Two keys rather than a score, which is what makes the order readable:
+     * every row above the first undecayed one is falling significantly, and
+     * within that block row 1 is above row 2 because nobody has touched it
+     * for longer. Both facts are in columns of the table, so the reason a
+     * row is where it is can be checked rather than trusted.
+     *
+     * Age leads over the size of the fall on purpose. The significance rule
+     * has already decided the fall is real, and beyond that a steeper fall
+     * is not more actionable than a shallower one, while a page nobody has
+     * opened in three years is a different proposition from one edited last
+     * quarter.
+     *
+     * @param list<int>        $pageUids
+     * @param array<int, bool> $decaying
+     * @param array<int, int>  $ages
+     *
+     * @return list<int>
+     */
+    private function sortedByDecay(array $pageUids, array $decaying, array $ages, string $sortDirection): array
+    {
+        usort($pageUids, static function (int $a, int $b) use ($decaying, $ages, $sortDirection): int {
+            $aAge = $ages[$a] ?? null;
+            $bAge = $ages[$b] ?? null;
+
+            if (null === $aAge || null === $bAge) {
+                // A page whose record carries no timestamp has no age, the
+                // same reading a metric that was never recorded gets, so it
+                // goes last whichever way the column points.
+                return [null === $aAge, $a] <=> [null === $bAge, $b];
+            }
+
+            // The page uid breaks every tie, so the order is total and a row
+            // cannot swap places between one page of the table and the next.
+            return SitePagesTable::DIRECTION_ASCENDING === $sortDirection
+                ? [$decaying[$a] ?? false, $aAge, $a] <=> [$decaying[$b] ?? false, $bAge, $b]
+                : [$decaying[$b] ?? false, $bAge, $a] <=> [$decaying[$a] ?? false, $aAge, $b];
+        });
+
+        return $pageUids;
+    }
+
+    /**
+     * @param array<int, int> $lastChanged page uid => Unix timestamp
+     *
+     * @return array<int, int> page uid => whole days since that change
+     */
+    private function agesOf(array $lastChanged, DateTimeImmutable $today): array
+    {
+        return array_map(
+            // Both sides flattened to midnight before the difference is
+            // taken, so a page changed late yesterday is one day old and not
+            // zero, and the timezone is the one the request runs in rather
+            // than the UTC a raw timestamp parses as.
+            static fn (int $timestamp): int => (new DateTimeImmutable('@'.$timestamp))
+                ->setTimezone($today->getTimezone())
+                ->setTime(0, 0)
+                ->diff($today)
+                ->days,
+            // A tstamp of zero is a record nobody wrote a time on, not a
+            // change made in 1970, and treating it as an age would put every
+            // such page at the head of a list ordered by age.
+            array_filter($lastChanged, static fn (int $timestamp): bool => $timestamp > 0),
         );
     }
 
@@ -236,20 +495,18 @@ final readonly class SitePagesTableBuilder
                 $metric->description,
                 $metric->identifier === $sortKey,
                 $sortDirection,
+                $metric->unit,
             ),
             $metrics,
         );
     }
 
     /**
-     * @param list<int>                                   $pageUids
-     * @param list<MetricDefinition|RateMetricDefinition> $metrics
-     * @param array<string, array<int, int>>              $currentValues
-     * @param array<int, int>                             $previousValues
+     * @param list<int> $pageUids
      *
      * @return list<SitePagesRow>
      */
-    private function rowsFor(array $pageUids, array $metrics, MetricDefinition|RateMetricDefinition $sortMetric, array $currentValues, array $previousValues, bool $previousPeriodCovered): array
+    private function rowsFor(array $pageUids, SitePagesDataSet $dataSet): array
     {
         // One title lookup for the rows actually on screen, after the sort
         // has decided which those are, the same order as
@@ -260,17 +517,12 @@ final readonly class SitePagesTableBuilder
 
         foreach ($pageUids as $pageUid) {
             $cells = [];
-            foreach ($metrics as $metric) {
-                $value = self::valueOf($metric, $currentValues[$metric->identifier], $pageUid);
+            foreach ($dataSet->metrics as $metric) {
+                $value = self::valueOf($metric, $dataSet->currentValues[$metric->identifier], $pageUid);
                 $cells[] = new SitePagesCell(null !== $value, null !== $value ? $this->valueFormatter->format($value, $metric->unit) : '');
             }
 
-            $trend = $previousPeriodCovered
-                ? MetricTrend::between(
-                    self::valueOf($sortMetric, $currentValues[$sortMetric->identifier], $pageUid) ?? 0,
-                    self::valueOf($sortMetric, $previousValues, $pageUid) ?? 0,
-                )
-                : MetricTrend::none();
+            $trend = $this->trendFor($pageUid, $dataSet);
 
             $rows[] = new SitePagesRow(
                 $pageUid,
@@ -278,8 +530,10 @@ final readonly class SitePagesTableBuilder
                 $cells,
                 $trend->deltaPercent,
                 $trend->direction,
-                $sortMetric->polarity,
-                $previousPeriodCovered,
+                $dataSet->sortMetric->polarity,
+                $dataSet->previousPeriodCovered,
+                $dataSet->ages[$pageUid] ?? null,
+                $dataSet->decaying[$pageUid] ?? false,
             );
         }
 

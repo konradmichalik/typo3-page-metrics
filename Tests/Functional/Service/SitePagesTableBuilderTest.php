@@ -14,11 +14,12 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\TrendDirection;
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, SitePagesRow, SitePagesTable};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, TrendDirection};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, SitePagesColumn, SitePagesExportRow, SitePagesRow, SitePagesTable};
 use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, ImportStateRepository};
 use KonradMichalik\Typo3PageMetrics\Service\SitePagesTableBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -233,6 +234,257 @@ final class SitePagesTableBuilderTest extends FunctionalTestCase
         self::assertSame('About', $this->build($this->site())->rows[0]->title);
     }
 
+    public function testRanksDecayingPagesFirstAndTheLongestUntouchedAmongThem(): void
+    {
+        $this->writeSiteConfiguration();
+        // All three lost the same share of the same metric. What separates
+        // them is only how long nobody has touched them, which is the whole
+        // claim the decay order makes.
+        $this->fell(1, 200, 40);
+        $this->touchPage(1, '-900 days');
+        $this->fell(2, 200, 40);
+        $this->touchPage(2, '-100 days');
+        $this->fell(3, 200, 40);
+        $this->touchPage(3, '-2 days');
+
+        $table = $this->build($this->site(), SitePagesTable::SORT_DECAY);
+
+        self::assertSame([1, 2, 3], $this->uidsOf($table));
+        self::assertTrue($this->rowFor($table, 1)->isDecaying);
+        self::assertTrue($this->rowFor($table, 2)->isDecaying);
+        // Edited two days ago, so the fall happened to content somebody is
+        // working on. That is a change with an effect, not neglect.
+        self::assertFalse($this->rowFor($table, 3)->isDecaying);
+    }
+
+    public function testReversesTheDecayOrderWhenAscendingIsAskedFor(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->fell(1, 200, 40);
+        $this->touchPage(1, '-900 days');
+        $this->fell(2, 200, 40);
+        $this->touchPage(2, '-2 days');
+
+        $table = $this->build($this->site(), SitePagesTable::SORT_DECAY, SitePagesTable::DIRECTION_ASCENDING);
+
+        self::assertSame([2, 1], $this->uidsOf($table));
+    }
+
+    public function testDoesNotCallAPageDecayingWhenItsFallIsTooSmallToBeSignificant(): void
+    {
+        $this->writeSiteConfiguration();
+        // Five views off two hundred, on a metric whose provider set a floor
+        // of ten. The same rule the trend widget and the compare view apply,
+        // so a page does not become a task because of noise.
+        $this->fell(1, 200, 195);
+        $this->touchPage(1, '-900 days');
+
+        self::assertFalse($this->build($this->site(), SitePagesTable::SORT_DECAY)->rows[0]->isDecaying);
+    }
+
+    public function testDoesNotCallAPageDecayingWhenItRose(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->fell(1, 40, 200);
+        $this->touchPage(1, '-900 days');
+
+        self::assertFalse($this->build($this->site(), SitePagesTable::SORT_DECAY)->rows[0]->isDecaying);
+    }
+
+    public function testAPageThatWasNeverFoundIsNotDecaying(): void
+    {
+        $this->writeSiteConfiguration();
+        // Listed because another metric was recorded for it, but the metric
+        // the verdict is made on has never been anything but zero. Nothing
+        // fell here; it was never found, which is a different job.
+        $this->upsert(2, 'matomo.visits', $this->today, 3);
+        $this->touchPage(2, '-900 days');
+        $this->fell(1, 200, 40);
+        $this->touchPage(1, '-100 days');
+
+        $table = $this->build($this->site(), SitePagesTable::SORT_DECAY);
+
+        self::assertFalse($this->rowFor($table, 2)->isDecaying);
+        // And it sorts below the page that really is decaying, even though
+        // it is the older of the two.
+        self::assertSame([1, 2], $this->uidsOf($table));
+    }
+
+    public function testMarksNoPageAsDecayingWhenThePreviousPeriodWasNeverImported(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->fell(1, 200, 40);
+        $this->touchPage(1, '-900 days');
+        $this->get(ImportStateRepository::class)->markImported(
+            'matomo',
+            'main',
+            $this->today,
+            new DateRange($this->today->modify('-6 days'), $this->today),
+            true,
+        );
+
+        $table = $this->build($this->site(), SitePagesTable::SORT_DECAY);
+
+        self::assertFalse($table->previousPeriodCovered);
+        self::assertFalse($table->rows[0]->isDecaying);
+    }
+
+    public function testStillLeavesOutPagesTheBackendUserMayNotSeeWhenSortingByDecay(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->fell(2, 200, 40);
+        $this->touchPage(2, '-100 days');
+        $this->fell(3, 200, 40);
+        $this->touchPage(3, '-900 days');
+
+        $this->setUpBackendUser(2);
+        $table = $this->build($this->site(), SitePagesTable::SORT_DECAY);
+
+        // Page 3 is the older and the more decayed of the two, which is
+        // exactly why leaving it in for a reader who cannot open it would
+        // put it at the top of their screen.
+        self::assertSame([2], $this->uidsOf($table));
+    }
+
+    public function testReportsHowLongAgoEachPageWasChanged(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->upsert(1, 'matomo.pageviews', $this->today, 5);
+        $this->touchPage(1, '-42 days');
+
+        self::assertSame(42, $this->build($this->site())->rows[0]->daysSinceChange);
+    }
+
+    public function testHasNoAgeForAPageWhoseRecordCarriesNoTimestamp(): void
+    {
+        $this->writeSiteConfiguration();
+        // The fixture leaves tstamp at zero, which is not "changed in 1970"
+        // but "nobody recorded when", and a page of unknown age must not
+        // head a list ordered by age.
+        $this->upsert(1, 'matomo.pageviews', $this->today, 5);
+
+        $row = $this->build($this->site())->rows[0];
+
+        self::assertNull($row->daysSinceChange);
+        self::assertFalse($row->isDecaying);
+    }
+
+    public function testKeepsTheTrendOnTheSitesPrimaryMetricWhileSortingByDecay(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->fell(1, 200, 40);
+        $this->touchPage(1, '-900 days');
+
+        $table = $this->build($this->site(), SitePagesTable::SORT_DECAY);
+
+        self::assertSame(SitePagesTable::SORT_DECAY, $table->sortKey);
+        self::assertSame('Page views', $table->trendLabel);
+        self::assertSame(-80, $table->rows[0]->deltaPercent);
+        // No metric column claims the order, because none of them holds it.
+        self::assertSame([false, false, false, false], array_map(static fn ($column): bool => $column->isSorted, $table->columns));
+    }
+
+    public function testStreamsEveryRowAndNotOnlyThePageTheTableShows(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->importCSVDataSet(__DIR__.'/Fixtures/many-pages.csv');
+
+        foreach (range(10, 40) as $uid) {
+            $this->upsert($uid, 'matomo.pageviews', $this->today, $uid);
+        }
+
+        self::assertCount(31, $this->stream($this->site()));
+    }
+
+    public function testStreamsRawValuesInTheirOwnUnitRatherThanTheStringTheTableDraws(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->upsert(1, 'matomo.pageviews', $this->today, 4);
+        $this->upsert(1, 'matomo.visits', $this->today, 2);
+        $this->upsert(1, 'matomo.time_spent_seconds', $this->today, 366);
+
+        $exported = $this->stream($this->site())[0];
+
+        // Three minutes and three seconds, which the table draws as "3:03"
+        // and the file has to carry as the number the recipient divides.
+        self::assertSame('3:03', $this->build($this->site())->rows[0]->cells[2]->formattedValue);
+        self::assertSame(183, $exported->values['matomo.avg_time_on_page']);
+        self::assertSame(4, $exported->values['matomo.pageviews']);
+        // A rate with nothing to divide is no value rather than a zero, the
+        // same reading the table's own cell makes of it.
+        self::assertNull($exported->values['matomo.bounce_rate']);
+    }
+
+    public function testStreamsTheRowsInTheSameOrderTheTableShowsThem(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->fell(1, 200, 40);
+        $this->touchPage(1, '-100 days');
+        $this->fell(2, 200, 40);
+        $this->touchPage(2, '-900 days');
+        $this->fell(3, 800, 780);
+        $this->touchPage(3, '-400 days');
+
+        $exported = $this->stream($this->site(), SitePagesTable::SORT_DECAY);
+
+        self::assertSame(
+            $this->uidsOf($this->build($this->site(), SitePagesTable::SORT_DECAY)),
+            array_map(static fn (SitePagesExportRow $row): int => $row->pageUid, $exported),
+        );
+    }
+
+    public function testStreamCarriesWhatPutADecaySortedRowWhereItIs(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->fell(1, 200, 40);
+        $this->touchPage(1, '-900 days');
+
+        $exported = $this->stream($this->site(), SitePagesTable::SORT_DECAY)[0];
+
+        self::assertTrue($exported->isDecaying);
+        self::assertSame(900, $exported->daysSinceChange);
+        self::assertSame(-80, $exported->deltaPercent);
+        self::assertTrue($exported->hasComparison);
+    }
+
+    public function testStreamsNothingForASiteThatConfiguredNoProvider(): void
+    {
+        $this->writeSiteConfigurationWithoutProvider();
+
+        self::assertSame([], $this->stream($this->site()));
+    }
+
+    public function testStreamLeavesOutPagesTheBackendUserMayNotSee(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->upsert(2, 'matomo.pageviews', $this->today, 5);
+        $this->upsert(3, 'matomo.pageviews', $this->today, 500);
+
+        $this->setUpBackendUser(2);
+
+        self::assertSame([2], array_map(static fn (SitePagesExportRow $row): int => $row->pageUid, $this->stream($this->site())));
+    }
+
+    public function testNamesTheUnitOfEveryExportedColumnSoTheFileNeedNotGuess(): void
+    {
+        $this->writeSiteConfiguration();
+
+        $columns = $this->get(SitePagesTableBuilder::class)->columnsOf($this->site());
+
+        self::assertSame(
+            [MetricUnit::Count, MetricUnit::Count, MetricUnit::Seconds, MetricUnit::Percent],
+            array_map(static fn (SitePagesColumn $column): ?MetricUnit => $column->unit, $columns),
+        );
+    }
+
+    /**
+     * @return list<SitePagesExportRow>
+     */
+    private function stream(Site $site, string $sortKey = '', string $direction = ''): array
+    {
+        return iterator_to_array($this->get(SitePagesTableBuilder::class)->stream($site, 0, 7, $sortKey, $direction), false);
+    }
+
     private function build(Site $site, string $sortKey = '', string $direction = '', int $pageNumber = 1): SitePagesTable
     {
         return $this->get(SitePagesTableBuilder::class)->build($site, 0, 7, $sortKey, $direction, $pageNumber);
@@ -265,6 +517,31 @@ final class SitePagesTableBuilderTest extends FunctionalTestCase
     private function upsert(int $pageUid, string $metric, DateTimeImmutable $date, int $value): void
     {
         $this->get(DailyMetricsRepository::class)->upsert($pageUid, 0, 'matomo', $date, $metric, $value);
+    }
+
+    /**
+     * The site's primary metric at $previousValue in the period before this
+     * one and at $value in it, which is the only shape a decay verdict can
+     * be made from.
+     */
+    private function fell(int $pageUid, int $previousValue, int $value): void
+    {
+        $this->upsert($pageUid, 'matomo.pageviews', $this->today->modify('-10 days'), $previousValue);
+        $this->upsert($pageUid, 'matomo.pageviews', $this->today, $value);
+    }
+
+    /**
+     * Written into the row rather than into the fixture, because an age only
+     * means something relative to the moment the test runs and the fixture
+     * is shared with the tests above.
+     */
+    private function touchPage(int $pageUid, string $modifier): void
+    {
+        $this->get(ConnectionPool::class)->getConnectionForTable('pages')->update(
+            'pages',
+            ['tstamp' => $this->today->modify($modifier)->getTimestamp()],
+            ['uid' => $pageUid],
+        );
     }
 
     private function writeSiteConfiguration(): void

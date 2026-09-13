@@ -582,6 +582,63 @@
             <trans-unit id="module.pages.noSite" resname="module.pages.noSite">
                 <source>This page does not belong to a configured site, so there is no site whose pages could be listed.</source>
             </trans-unit>
+            <trans-unit id="widget.insight.title" resname="widget.insight.title">
+                <source>What changed</source>
+            </trans-unit>
+            <trans-unit id="widget.insight.description" resname="widget.insight.description">
+                <source>States the significant movements of the last 30 days as sentences, at most four, and nothing at all when nothing moved significantly.</source>
+            </trans-unit>
+            <trans-unit id="widget.insight.empty" resname="widget.insight.empty">
+                <source>Nothing moved significantly in this period.</source>
+            </trans-unit>
+            <trans-unit id="widget.insight.siteUp" resname="widget.insight.siteUp">
+                <source>%1$s, %2$d days: %3$s, up %4$d%% against the previous period.</source>
+            </trans-unit>
+            <trans-unit id="widget.insight.siteDown" resname="widget.insight.siteDown">
+                <source>%1$s, %2$d days: %3$s, down %4$d%% against the previous period.</source>
+            </trans-unit>
+            <trans-unit id="widget.insight.pageRise" resname="widget.insight.pageRise">
+                <source>Biggest riser by %1$s: "%2$s", up %3$d%% to %4$s.</source>
+            </trans-unit>
+            <trans-unit id="widget.insight.pageFall" resname="widget.insight.pageFall">
+                <source>Biggest faller by %1$s: "%2$s", down %3$d%% to %4$s.</source>
+            </trans-unit>
+            <trans-unit id="module.export" resname="module.export">
+                <source>Download CSV</source>
+            </trans-unit>
+            <trans-unit id="module.pages.decay" resname="module.pages.decay">
+                <source>Decay</source>
+            </trans-unit>
+            <trans-unit id="module.pages.decayDescription" resname="module.pages.decayDescription">
+                <source>Falling traffic on a page nobody has changed.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.decaying" resname="module.pages.decaying">
+                <source>Decaying</source>
+            </trans-unit>
+            <trans-unit id="module.pages.unchangedFor" resname="module.pages.unchangedFor">
+                <source>unchanged for %1$s days</source>
+            </trans-unit>
+            <trans-unit id="module.pages.noAge" resname="module.pages.noAge">
+                <source>no record of when this page last changed</source>
+            </trans-unit>
+            <trans-unit id="module.pages.sortByDecay" resname="module.pages.sortByDecay">
+                <source>sort by content decay</source>
+            </trans-unit>
+            <trans-unit id="module.pages.sortedMostDecayed" resname="module.pages.sortedMostDecayed">
+                <source>sorted most decayed first, activate to sort least decayed first</source>
+            </trans-unit>
+            <trans-unit id="module.pages.sortedLeastDecayed" resname="module.pages.sortedLeastDecayed">
+                <source>sorted least decayed first, activate to sort most decayed first</source>
+            </trans-unit>
+            <trans-unit id="module.pages.decayIntro" resname="module.pages.decayIntro">
+                <source>A page is decaying when it lost %1$s by more than that metric's own threshold, and nobody changed the page or its content in the whole time the two compared periods cover. Sorting by the decay column puts those pages first, the longest untouched of them at the top. There is no age at which a page becomes stale here: the column says how many days ago each page last changed, so the line sits where your own site's editing rhythm puts it rather than at a number nobody measured.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.decayScope" resname="module.pages.decayScope">
+                <source>A page that never had any traffic is not decaying, it was never found, and it needs a different kind of attention: nothing fell, so nothing here marks it. The age counts the page record and the content elements on it, whichever changed last, because a page whose text was rewritten without the page record moving is not neglected.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.decayNotImported" resname="module.pages.decayNotImported">
+                <source>No page is marked as decaying for this period, because the period it would be compared against was never imported. The column still sorts by how long ago each page changed.</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

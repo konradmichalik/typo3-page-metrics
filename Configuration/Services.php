@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics;
 
-use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, ModuleLinkBuilder, PageMetricsViewDataBuilder, SiteMetricsOverviewBuilder, SparklineLabelProvider};
-use KonradMichalik\Typo3PageMetrics\Widgets\{AnnotationsWidget, NotFoundPagesWidget, PageMetricsChartWidget, PageMetricsWidget, TopPagesWidget, TrendWidget};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, InsightBuilder, ModuleLinkBuilder, PageMetricsViewDataBuilder, SiteMetricsOverviewBuilder, SparklineLabelProvider};
+use KonradMichalik\Typo3PageMetrics\Widgets\{AnnotationsWidget, InsightWidget, NotFoundPagesWidget, PageMetricsChartWidget, PageMetricsWidget, TopPagesWidget, TrendWidget};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Reference};
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
@@ -53,6 +53,25 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
     // is an access decision - the tiles switch, the module permission and
     // PAGE_SHOW on the site's root page - and a template is no place to make
     // one. Nothing here is autowired, so each widget names the argument.
+    // First in the preset and first here: it implements the plain widget
+    // interface with no settings, so unlike the ones below it needs no
+    // version gate at all.
+    $services->set('dashboard.widget.pageMetricsInsight')
+        ->class(InsightWidget::class)
+        ->arg('$insightBuilder', new Reference(InsightBuilder::class))
+        ->arg('$siteFinder', new Reference(SiteFinder::class))
+        ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
+        ->arg('$moduleLinkBuilder', new Reference(ModuleLinkBuilder::class))
+        ->tag('dashboard.widget', [
+            'identifier' => 'pageMetricsInsight',
+            'groupNames' => 'pageMetrics',
+            'title' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.insight.title',
+            'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.insight.description',
+            'iconIdentifier' => 'tabler-speakerphone',
+            'height' => 'medium',
+            'width' => 'medium',
+        ]);
+
     $services->set('dashboard.widget.pageMetrics')
         ->class(PageMetricsWidget::class)
         ->arg('$viewDataBuilder', new Reference(PageMetricsViewDataBuilder::class))
