@@ -92,6 +92,7 @@ final readonly class PageMetricsViewDataBuilder
         private ManualAnnotationRepository $manualAnnotationRepository,
         private SitePageUidRepository $pageUidRepository,
         private RateSeriesCalculator $rateSeriesCalculator,
+        private RateMetricReader $rateMetricReader,
         private ImportCoverage $importCoverage,
         private SiteBenchmark $siteBenchmark,
         private MetricValueFormatter $valueFormatter,
@@ -636,17 +637,21 @@ final readonly class PageMetricsViewDataBuilder
         $denominatorSparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->denominator, $tileRange);
         $sparkline = $this->importCoverage->mask($this->rateSeriesCalculator->series($numeratorSparkline, $denominatorSparkline, $definition->unit), $coverage);
 
+        // Summed off the two series already in hand rather than asked of
+        // RateMetricReader, which would repeat both queries: the tile needs
+        // the daily pair for its sparkline either way, and the period's
+        // figure is those same days added up. Nothing else on this path may
+        // cost a query the render does not already pay for.
         $value = $this->rateSeriesCalculator->ratio(
             array_sum($numeratorSparkline),
             array_sum($denominatorSparkline),
             $definition->unit,
         );
         $previousPeriodCovered = $this->importCoverage->covers($coverage, $previousRange);
-        $previousValue = $this->rateSeriesCalculator->ratio(
-            $this->previousSum($pageUids, $languageId, $definition->numerator, $previousRange, $previousPeriodCovered),
-            $this->previousSum($pageUids, $languageId, $definition->denominator, $previousRange, $previousPeriodCovered),
-            $definition->unit,
-        );
+        // The previous period has no sparkline to reuse, and it is not even
+        // asked for outside the imported window, for the reason
+        // previousSum() states.
+        $previousValue = $previousPeriodCovered ? $this->rateMetricReader->forSite($pageUids, $languageId, $definition, $previousRange)->ratio : 0;
 
         $metricTrend = $this->compare($value, $previousValue, $previousPeriodCovered);
         $deltaPercent = $metricTrend->deltaPercent;

@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\TrendSentiment;
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricSignificance, MetricTrend, RateMetricDefinition, SitePagesCell, SitePagesColumn, SitePagesDataSet, SitePagesExportRow, SitePagesRow, SitePagesTable};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricSignificance, MetricTrend, RateMetricDefinition, RateTotals, SitePagesCell, SitePagesColumn, SitePagesDataSet, SitePagesExportRow, SitePagesRow, SitePagesTable};
 use KonradMichalik\Typo3PageMetrics\Persistence\{DailyMetricsRepository, SitePageUidRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface};
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
@@ -62,7 +62,7 @@ final readonly class SitePagesTableBuilder
     public function __construct(
         private SitePageUidRepository $pageUidRepository,
         private DailyMetricsRepository $dailyMetricsRepository,
-        private RateSeriesCalculator $rateSeriesCalculator,
+        private RateMetricReader $rateMetricReader,
         private MetricValueFormatter $valueFormatter,
         private ImportCoverage $importCoverage,
         private MetricDefinitionCollector $metricDefinitionCollector,
@@ -572,16 +572,13 @@ final readonly class SitePagesTableBuilder
 
         // A rate is not summable across days, so it is sum(numerator) over
         // sum(denominator) for the whole period, exactly as
-        // PageTrendCalculator computes it for a ranked row.
-        $numerators = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->numerator, $range);
-        $denominators = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->denominator, $range);
-
-        $values = [];
-        foreach ($denominators as $pageUid => $denominator) {
-            $values[$pageUid] = $this->rateSeriesCalculator->ratio($numerators[$pageUid] ?? 0, $denominator, $metric->unit);
-        }
-
-        return $values;
+        // PageTrendCalculator computes it for a ranked row. Only the pages
+        // the denominator was recorded for come back, which is what
+        // valueOf() reads as "this page has a value at all".
+        return array_map(
+            static fn (RateTotals $totals): int => $totals->ratio,
+            $this->rateMetricReader->byPage($pageUids, $languageId, $metric, $range),
+        );
     }
 
     /**

@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Command;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Configuration\{PageMetricsSiteConfiguration, SiteConfigurationReader};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, ResolvedUrl};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, ResolvedUrl, UrlMetric};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\{AnnotationProviderInterface, MetricProviderInterface};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
@@ -40,6 +40,8 @@ final class ImportCommand extends Command
 {
     private const UNRESOLVED_CAP_PER_DAY = 100;
     private const VIA_REDIRECT_DIMENSION = 'via_redirect';
+
+    private const VIA_ROUTE_ENHANCER_DIMENSION = 'via_route_enhancer';
 
     /**
      * @param iterable<MetricProviderInterface>     $providers
@@ -103,10 +105,23 @@ final class ImportCommand extends Command
                     // instance) must never abort the whole run: report it and
                     // keep processing the remaining sites/providers.
                     //
-                    // Whatever the failed provider already handed the
-                    // collector before throwing was never flushed and never
-                    // will be - drop it, so the next provider's flush() does
-                    // not write it out under its own identifier.
+                    // Whatever the failed provider still had buffered when it
+                    // threw belongs to a day it never finished reading, so it
+                    // will never be flushed legitimately - drop it, so the
+                    // next provider's flush() does not write it out under its
+                    // own identifier.
+                    //
+                    // The finished days drained before the failure do stay
+                    // written, and that is not the symmetry it looks like: a
+                    // provider that throws inside fetch() has committed no
+                    // fact rows at all, because the write phase begins only
+                    // once collectMetrics() has returned. So such a run can
+                    // leave per-crawler detail for days whose own bot metrics
+                    // were never written. Accepted knowingly, because the
+                    // alternative is buffering the whole retention window
+                    // again, which measured 1.9 GB: the next successful run
+                    // writes the facts those rows belong to, and the agent
+                    // rows are diagnostic rather than a figure anything sums.
                     $this->botAgentDetailCollector->reset();
                     $hasFailures = true;
                     $output->writeln(sprintf(
@@ -233,6 +248,10 @@ final class ImportCommand extends Command
             });
         }
 
+        // The tail: whatever collectMetrics() could not yet call finished,
+        // which is the newest day the provider emitted plus anything a
+        // provider that emits out of order left behind.
+        //
         // Deliberately not wrapped in a transaction: flush() resolves every
         // URL it collected before writing it (slug lookups, redirect hops),
         // which is exactly the work that must not sit inside an open one. It
@@ -281,10 +300,35 @@ final class ImportCommand extends Command
         $identifier = $provider->getIdentifier();
         $aggregated = [];
         $earliestWithData = null;
+        $openDay = null;
 
         foreach ($provider->fetch($site, $range) as $urlMetric) {
             if (null === $earliestWithData || $urlMetric->date < $earliestWithData) {
                 $earliestWithData = $urlMetric->date;
+            }
+
+            // The agent detail a provider hands the collector is bounded by
+            // the run, not by the day, and an entry costs about a kilobyte:
+            // a 400-day first import of a heavily crawled site reaches two
+            // million of them and dies of memory exhaustion, which is not a
+            // Throwable, so the catch below cannot contain it and no import
+            // state is written. Draining here, as the day the provider emits
+            // moves on, bounds it at the days still being read.
+            //
+            // Outside every transaction on purpose, like the final flush
+            // below: flushDaysBefore() resolves each URL it writes (slug
+            // lookups, redirect hops), which is exactly the work that must
+            // not sit inside an open one. Nothing here needs a rollback
+            // either - the writes replace rather than add, and the cursor
+            // has not moved at all yet.
+            //
+            // Only ever forward, so a provider that emits days out of order
+            // can never have a day written and then added to: the second,
+            // smaller date leaves the boundary where it was, and everything
+            // still buffered goes out in the final flush.
+            if (null === $openDay || $urlMetric->date > $openDay) {
+                $openDay = $urlMetric->date;
+                $this->botAgentDetailCollector->flushDaysBefore($site->getIdentifier(), $configuration->dropQueryString, $configuration->keepQueryParams, $openDay);
             }
 
             $result = $this->resolver->resolve($urlMetric->url, $configuration->dropQueryString, $configuration->keepQueryParams);
@@ -319,18 +363,46 @@ final class ImportCommand extends Command
 
             $aggregated = $this->accumulate($aggregated, $result->pageUid, $result->languageUid, $urlMetric->date, $urlMetric->metric, $urlMetric->dimension ?? '', $urlMetric->value);
 
-            // The key above carries the dimension, which is what keeps a
-            // part out of its own total: a channel row and the headline it
-            // belongs to differ in exactly that field and can never collide.
-            // via_redirect is a share of the headline, so it is derived from
-            // the headline alone. Taking it from the parts as well would add
-            // the same visits a second time and let the share pass 100%.
-            if ($result->viaRedirect && $isHeadline) {
-                $aggregated = $this->accumulate($aggregated, $result->pageUid, $result->languageUid, $urlMetric->date, $urlMetric->metric, self::VIA_REDIRECT_DIMENSION, $urlMetric->value);
-            }
+            $aggregated = $this->accumulateShares($aggregated, $result, $urlMetric, $isHeadline);
         }
 
         return [$aggregated, $earliestWithData];
+    }
+
+    /**
+     * The shares of a headline figure that a flag on the resolution carries:
+     * how much arrived through a redirect, and how much arrived on a record
+     * below the page rather than on the page itself.
+     *
+     * Derived from the headline row alone. The aggregate's key carries the
+     * dimension, which is what keeps a part out of its own total, and taking
+     * a share from the parts as well would add the same visits a second time
+     * and let it pass 100%.
+     *
+     * via_route_enhancer is written from the first import that sees it even
+     * though nothing displays it yet (#85), because a dimension is not
+     * backfillable: waiting for the display would leave the display able to
+     * speak only for traffic imported after it landed.
+     *
+     * @param array<string, array{pageUid: int, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}> $aggregated
+     *
+     * @return array<string, array{pageUid: int, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}>
+     */
+    private function accumulateShares(array $aggregated, ResolvedUrl $result, UrlMetric $urlMetric, bool $isHeadline): array
+    {
+        if (!$isHeadline) {
+            return $aggregated;
+        }
+
+        if ($result->viaRedirect) {
+            $aggregated = $this->accumulate($aggregated, $result->pageUid, $result->languageUid, $urlMetric->date, $urlMetric->metric, self::VIA_REDIRECT_DIMENSION, $urlMetric->value);
+        }
+
+        if ($result->viaRouteEnhancer) {
+            $aggregated = $this->accumulate($aggregated, $result->pageUid, $result->languageUid, $urlMetric->date, $urlMetric->metric, self::VIA_ROUTE_ENHANCER_DIMENSION, $urlMetric->value);
+        }
+
+        return $aggregated;
     }
 
     /**

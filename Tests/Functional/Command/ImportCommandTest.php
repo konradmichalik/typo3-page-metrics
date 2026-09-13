@@ -22,7 +22,7 @@ use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetr
 use KonradMichalik\Typo3PageMetrics\Provider\{AnnotationProviderInterface, MetricProviderInterface};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
 use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
-use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{BotAwareFailingMetricProvider, BotAwareStubMetricProvider, FailingOnDateDailyMetricsRepository, PartiallyFailingAnnotationProvider, PartiallyFailingMetricProvider, StubAnnotationProvider, StubMetricProvider, UnsupportedAnnotationProvider, UnsupportedMetricProvider};
+use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{BotAwareFailingMetricProvider, BotAwareStubMetricProvider, DayOrderedBotAwareMetricProvider, FailingOnDateDailyMetricsRepository, PartiallyFailingAnnotationProvider, PartiallyFailingMetricProvider, StubAnnotationProvider, StubMetricProvider, UnsupportedAnnotationProvider, UnsupportedMetricProvider};
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -467,6 +467,47 @@ final class ImportCommandTest extends FunctionalTestCase
         // still land on 1, not 2, proving replace-not-add semantics for the
         // bot-agent-daily table too.
         self::assertSame(1, $hits);
+    }
+
+    public function testBotAgentDetailIsDrainedPerFinishedDayWhileTheProviderIsStillBeingRead(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $provider = new DayOrderedBotAwareMetricProvider(
+            [$today->modify('-2 days'), $today->modify('-1 day'), $today],
+            $this->get(BotAgentDetailCollector::class),
+            $this->get(ConnectionPool::class),
+            null,
+        );
+
+        $exitCode = $this->runImport([$provider]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        // Two rows per day (the site-wide rollup plus the page-scoped row).
+        // Nothing after the first day, then one finished day's worth after
+        // each following one: the buffer is emptied as the read proceeds,
+        // not once the read is over.
+        self::assertSame([0, 2, 4], $provider->rowsSeenPerDay);
+        self::assertSame(6, $this->countBotAgentRows());
+    }
+
+    public function testBotAgentDetailDrainedBeforeAFailureSurvivesIt(): void
+    {
+        // The counterpart to the per-day transaction on the fact table: a day
+        // the provider finished and handed over is written, and a run that
+        // then dies keeps it rather than discarding a complete day's work.
+        // Only what was still being read is dropped.
+        $today = new DateTimeImmutable('today');
+        $provider = new DayOrderedBotAwareMetricProvider(
+            [$today->modify('-2 days'), $today->modify('-1 day'), $today],
+            $this->get(BotAgentDetailCollector::class),
+            $this->get(ConnectionPool::class),
+            2,
+        );
+
+        $exitCode = $this->runImport([$provider]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertSame(2, $this->countBotAgentRows());
     }
 
     public function testAProviderThrowingMidFetchLeavesNoBotAgentDetailBehind(): void

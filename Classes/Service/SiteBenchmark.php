@@ -60,7 +60,7 @@ final class SiteBenchmark
     public function __construct(
         private readonly DailyMetricsRepository $dailyMetricsRepository,
         private readonly SitePageUidRepository $pageUidRepository,
-        private readonly RateSeriesCalculator $rateSeriesCalculator,
+        private readonly RateMetricReader $rateMetricReader,
     ) {}
 
     public function forCountMetric(Site $site, int $pageUid, int $languageId, MetricDefinition $metric, DateRange $range, int $pageValue): ?SiteBenchmarkResult
@@ -89,16 +89,19 @@ final class SiteBenchmark
     {
         return $this->compute($site, $pageUid, $pageValue, false, /** @param list<int> $pageUids */
             function (array $pageUids) use ($languageId, $metric, $range): array {
-                $numerators = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->numerator, $range);
-                $denominators = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->denominator, $range);
-
                 $ratios = [];
-                foreach ($denominators as $pageUid => $denominator) {
-                    if (0 === $denominator) {
+
+                // The denominator decides membership, not the ratio: a page
+                // nothing was recorded for has no rate to rank, while a page
+                // with a genuine zero percent does. Reading the pair rather
+                // than the quotient is what keeps that distinction available
+                // here (see RateMetricReader).
+                foreach ($this->rateMetricReader->byPage($pageUids, $languageId, $metric, $range) as $pageUid => $totals) {
+                    if (0 === $totals->denominator) {
                         continue;
                     }
 
-                    $ratios[$pageUid] = $this->rateSeriesCalculator->ratio($numerators[$pageUid] ?? 0, $denominator, $metric->unit);
+                    $ratios[$pageUid] = $totals->ratio;
                 }
 
                 return $ratios;

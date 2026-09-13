@@ -18,7 +18,7 @@ skipped entirely for sites without one.
 | Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days), marker category |
 | Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level, include subpages, goal column |
 | Page metrics trend | `pageMetricsTrend` | Pages that improved or declined most against the previous period | 7/30/90 days | Metric, movement (declines/improvements), period |
-| Not found pages | `pageMetricsNotFoundPages` | URLs the daily import could not resolve to a page, with the reason | 30 days | — |
+| Not found pages | `pageMetricsNotFoundPages` | URLs the daily import could not resolve to a page, with the reason. A record detail URL served by a route enhancer resolves to the page that renders it and does not appear here; one below the same page that no record matches still does | 30 days | — |
 | Page metrics annotations | `pageMetricsAnnotations` | Recent annotations with their kind and, for one that ran for a while, its last day | 90 days | — |
 
 Every widget except the site-homepage tiles reads from the same

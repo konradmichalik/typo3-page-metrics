@@ -17,16 +17,18 @@ use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{ResolvedUrl, UnresolvedUrl};
 use TYPO3\CMS\Core\Site\SiteFinder;
 
+use function explode;
 use function in_array;
 use function strlen;
+use function trim;
 
 /**
  * Resolver.
  *
  * Orchestrates Normalizer -> SiteMatcher -> LanguageMatcher -> SlugLookup ->
- * RedirectFollower -> PathClassifier. Resolution happens only at import
- * time; callers persist the result, this class never re-resolves live or
- * retroactively.
+ * RedirectFollower -> PathClassifier -> RouteMatcher. Resolution happens only
+ * at import time; callers persist the result, this class never re-resolves
+ * live or retroactively.
  *
  * @api
  *
@@ -47,6 +49,7 @@ final class Resolver
         private readonly SlugLookup $slugLookup,
         private readonly RedirectFollower $redirectFollower,
         private readonly PathClassifier $pathClassifier,
+        private readonly RouteMatcher $routeMatcher,
         private readonly SiteFinder $siteFinder,
     ) {}
 
@@ -104,7 +107,7 @@ final class Resolver
         $pageUid = $this->slugLookup->find($slug, $languageId);
 
         if (null !== $pageUid) {
-            return new ResolvedUrl($pageUid, $languageId, $viaRedirect);
+            return new ResolvedUrl($pageUid, $languageId, $viaRedirect, false);
         }
 
         $redirectTarget = $this->redirectFollower->findTarget($host, $path);
@@ -116,7 +119,47 @@ final class Resolver
             return $this->resolveNormalized($nextUrl, $originalUrl, $visited, $hopCount + 1, true);
         }
 
-        return new UnresolvedUrl($originalUrl, $this->pathClassifier->classify($path));
+        $reason = $this->pathClassifier->classify($path);
+
+        // The router is the most expensive step in the chain, so it runs last
+        // and only on what the cheap steps would otherwise have thrown away.
+        // A path the classifier already recognises as a file or a non-page is
+        // never a record URL, so it is not worth a routing attempt.
+        // And only where a page could plausibly be the one rendering it. The
+        // classifier calls everything it does not recognise Unknown, which on
+        // an access-log import is every bot probe a crawler ever invented:
+        // /wp-login.php, /.env, /admin/config.php, thousands of distinct
+        // paths a night on a busy site. Routing each costs slug candidates
+        // plus one persisted-mapper lookup per enhancer, on exactly the
+        // provider that feeds the most distinct URLs. A record URL always
+        // hangs below a real page, so requiring its first segment to name one
+        // keeps every genuine case and leaves the probes the cheap miss they
+        // were.
+        if (UnresolvedReason::Unknown === $reason && null !== $this->ancestorPage($slug, $languageId)) {
+            $pageUid = $this->routeMatcher->match($site, $language, $normalizedUrl, $slug);
+
+            if (null !== $pageUid) {
+                return new ResolvedUrl($pageUid, $languageId, $viaRedirect, true);
+            }
+        }
+
+        return new UnresolvedUrl($originalUrl, $reason);
+    }
+
+    /**
+     * The page whose slug is the first segment of this path, if there is one.
+     * Reuses the lookup the chain already depends on, so the question costs
+     * the one query it would have cost anyway rather than a routing attempt.
+     */
+    private function ancestorPage(string $path, int $languageId): ?int
+    {
+        $firstSegment = explode('/', trim($path, '/'), 2)[0];
+
+        if ('' === $firstSegment) {
+            return null;
+        }
+
+        return $this->slugLookup->find('/'.$firstSegment, $languageId);
     }
 
     private function stripBasePath(string $path, string $basePath): string

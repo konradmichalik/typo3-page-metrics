@@ -25,11 +25,13 @@ doing" without leaving the backend.
 
 ## ✨ Features
 
-- URL → page UID resolution at import time, through redirect chains and
-  multilingual slugs, so every number hangs off a page in the tree rather than
-  a URL string: tiles link straight into the page module, a section can roll
-  its whole subtree up into one figure, and URLs that resolve to no page are
-  reported as [Not found pages](docs/dashboard-widgets.md)
+- URL → page UID resolution at import time, through redirect chains,
+  multilingual slugs and route enhancers, so every number hangs off a page in
+  the tree rather than a URL string: a record detail URL such as
+  `/news/my-article` counts for the page that renders it, tiles link straight
+  into the page module, a section can roll its whole subtree up into one
+  figure, and URLs that resolve to no page are reported as
+  [Not found pages](docs/dashboard-widgets.md)
 - Metric tiles right in `Web > Page`, below the page title: page views,
   visits, avg. time on page, bounce rate, a period switch (7/30/90 days),
   and a sparkline popover per tile — see [Page module tiles](docs/page-tiles.md)

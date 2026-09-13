@@ -31,6 +31,13 @@ use function sprintf;
 final class LogFileReader
 {
     /**
+     * The byte offsets the private reader tracks are not exposed, because
+     * nothing resumes from one: a per-file resume was measured and rejected
+     * (#42), since on a rotated set the single plain file an offset applies
+     * to is 0.02s of a 2.35s re-read while the gzip archives it cannot help
+     * are 2.33s of it. The offsets stay because the reader needs them to walk
+     * the file; they are not API.
+     *
      * @return Generator<int, string>
      */
     public function readLines(string $path, int $fromOffset = 0): Generator
@@ -43,7 +50,7 @@ final class LogFileReader
     /**
      * @return Generator<int, array{0: string, 1: int}>
      */
-    public function readLinesWithOffset(string $path, int $fromOffset = 0): Generator
+    private function readLinesWithOffset(string $path, int $fromOffset = 0): Generator
     {
         $isGzip = $this->isGzip($path);
         $handle = $this->open($path, $isGzip);

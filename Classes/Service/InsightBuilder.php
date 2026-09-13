@@ -85,7 +85,7 @@ final readonly class InsightBuilder
     public function __construct(
         private SitePageUidRepository $pageUidRepository,
         private DailyMetricsRepository $dailyMetricsRepository,
-        private RateSeriesCalculator $rateSeriesCalculator,
+        private RateMetricReader $rateMetricReader,
         private ImportCoverage $importCoverage,
         private MetricDefinitionCollector $metricDefinitionCollector,
         private MetricValueFormatter $valueFormatter,
@@ -373,11 +373,7 @@ final readonly class InsightBuilder
 
         // A rate is not summable across pages any more than across days, so
         // it is the summed parts that divide, never the per-page ratios.
-        return $this->rateSeriesCalculator->ratio(
-            array_sum($this->dailyMetricsRepository->sumsByPage($pageUids, self::LANGUAGE_ID, $metric->numerator, $range)),
-            array_sum($this->dailyMetricsRepository->sumsByPage($pageUids, self::LANGUAGE_ID, $metric->denominator, $range)),
-            $metric->unit,
-        );
+        return $this->rateMetricReader->forSite($pageUids, self::LANGUAGE_ID, $metric, $range)->ratio;
     }
 
     /**

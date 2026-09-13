@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\MetricGroup;
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricTotal, RateMetricDefinition};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricTotal};
 use KonradMichalik\Typo3PageMetrics\Persistence\DailyMetricsRepository;
 use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface};
 use TYPO3\CMS\Core\Site\Entity\Site;
@@ -38,7 +38,7 @@ use function array_sum;
  *
  * The arithmetic is the one PeriodComparisonBuilder performs: a count is
  * summed over the period, a rate is sum(numerator) over sum(denominator)
- * for the whole period through RateSeriesCalculator, never an average of
+ * for the whole period through RateMetricReader, never an average of
  * daily ratios.
  *
  * Machine traffic is left out, as it is on every surface of this extension:
@@ -54,7 +54,7 @@ final readonly class SiteMetricValueReader
      */
     public function __construct(
         private DailyMetricsRepository $dailyMetricsRepository,
-        private RateSeriesCalculator $rateSeriesCalculator,
+        private RateMetricReader $rateMetricReader,
         private MetricDefinitionCollector $metricDefinitionCollector,
         private iterable $providers,
     ) {}
@@ -81,23 +81,11 @@ final readonly class SiteMetricValueReader
             }
 
             foreach ($provider->getRateMetricDefinitions() as $definition) {
-                $totals[$definition->identifier] = new MetricTotal($definition->unit, $this->ratio($definition, $pageUids, $languageId, $range));
+                $totals[$definition->identifier] = new MetricTotal($definition->unit, $this->rateMetricReader->forSite($pageUids, $languageId, $definition, $range)->ratio);
             }
         }
 
         return $totals;
-    }
-
-    /**
-     * @param list<int> $pageUids
-     */
-    private function ratio(RateMetricDefinition $definition, array $pageUids, int $languageId, DateRange $range): int
-    {
-        return $this->rateSeriesCalculator->ratio(
-            $this->sum($pageUids, $languageId, $definition->numerator, $range),
-            $this->sum($pageUids, $languageId, $definition->denominator, $range),
-            $definition->unit,
-        );
     }
 
     /**

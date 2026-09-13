@@ -78,7 +78,11 @@ A file that cannot be read is skipped rather than failing the run, since a glob 
 
 Every run still reads every file the pattern matches, since nothing records how far into a rotation set the last one got. What a run does not do is parse them: a line is rejected on the bracketed date alone unless it falls in the window being imported, which is a substring comparison rather than a regular expression, a date object and a bot classification. On a 1.44M-line archive spanning 120 days, reading and date-checking every line takes 1.7s where parsing them all takes 6.4s. Keep the pattern pointed at one site's rotation set all the same: the bytes are still read, and a nightly cron over years of archives eventually pays for them.
 
-Note that the bot **agent** detail (which specific crawler, see below) is still collected for the whole run before it is written, so a first import over a very long window with heavy crawler traffic can still be memory-hungry.
+Where that cost sits is worth knowing if you are tempted to prune the archive. On the same 120-day set rotated the usual way, 119 gzipped files plus one live plain one, a full re-read with the date check costs 2.35s, and 2.33s of it is the gzipped files: decompression, not line scanning, is what a long archive charges for. The live log the server is still appending to is a rounding error next to it.
+
+The bot **agent** detail (which specific crawler, see below) follows the same day boundary: the import writes out and drops each day's agent rows as the reader finishes that day, rather than holding the whole run. That is what makes a first import over the full 400 days survivable on a heavily crawled site. Measured at 400 days, 500 URLs and 10 distinct crawlers, holding the run peaks at 1945 MB against 13 MB when each day is drained as it finishes.
+
+A run that dies partway keeps the agent detail for the days it had already finished, and discards only the day still being read. Note this is not symmetric with the metrics: the write phase starts once the whole range has been read, so a provider that fails while reading commits no metric rows at all, and can leave agent detail for days whose bot metrics were never written. The next successful run writes those metrics, and the agent rows are a diagnostic drill-down rather than a figure anything sums, which is why the memory this buys is worth it.
 
 ## What it can and cannot measure
 

@@ -25,10 +25,18 @@ final class ResolvedUrlTest extends TestCase
 {
     public function testConstructorAssignsAllProperties(): void
     {
-        $resolved = new ResolvedUrl(12, 1, true);
+        $resolved = new ResolvedUrl(12, 1, true, true);
 
         self::assertSame(12, $resolved->pageUid);
         self::assertSame(1, $resolved->languageUid);
         self::assertTrue($resolved->viaRedirect);
+        self::assertTrue($resolved->viaRouteEnhancer);
+    }
+
+    public function testAHitIsADirectOneUnlessSaidOtherwise(): void
+    {
+        $resolved = new ResolvedUrl(12, 0, false, false);
+
+        self::assertFalse($resolved->viaRouteEnhancer);
     }
 }

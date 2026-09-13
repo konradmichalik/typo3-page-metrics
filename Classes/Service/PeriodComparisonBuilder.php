@@ -61,7 +61,7 @@ final readonly class PeriodComparisonBuilder
         private SiteFinder $siteFinder,
         private DailyMetricsRepository $dailyMetricsRepository,
         private SitePageUidRepository $pageUidRepository,
-        private RateSeriesCalculator $rateSeriesCalculator,
+        private RateMetricReader $rateMetricReader,
         private ImportCoverage $importCoverage,
         private MetricValueFormatter $valueFormatter,
         private MetricDefinitionCollector $metricDefinitionCollector,
@@ -188,22 +188,17 @@ final readonly class PeriodComparisonBuilder
     /**
      * A rate is summed as numerator over denominator across the whole
      * period rather than averaged per day, the one arithmetic
-     * RateSeriesCalculator exists to keep identical everywhere.
+     * RateMetricReader exists to keep identical everywhere.
+     *
+     * The reference period is left unasked outside the imported window for
+     * the same reason countRow() leaves it unasked.
      *
      * @param list<int> $pageUids
      */
     private function rateRow(RateMetricDefinition $definition, array $pageUids, int $languageId, DateRange $current, DateRange $reference, bool $isComparable): PeriodComparisonRow
     {
-        $value = $this->rateSeriesCalculator->ratio(
-            $this->sum($pageUids, $languageId, $definition->numerator, $current),
-            $this->sum($pageUids, $languageId, $definition->denominator, $current),
-            $definition->unit,
-        );
-        $referenceValue = $isComparable ? $this->rateSeriesCalculator->ratio(
-            $this->sum($pageUids, $languageId, $definition->numerator, $reference),
-            $this->sum($pageUids, $languageId, $definition->denominator, $reference),
-            $definition->unit,
-        ) : 0;
+        $value = $this->rateMetricReader->forSite($pageUids, $languageId, $definition, $current)->ratio;
+        $referenceValue = $isComparable ? $this->rateMetricReader->forSite($pageUids, $languageId, $definition, $reference)->ratio : 0;
 
         return $this->row($definition, $value, $referenceValue, $isComparable);
     }

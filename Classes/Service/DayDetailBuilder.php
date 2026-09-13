@@ -191,6 +191,13 @@ final readonly class DayDetailBuilder
     }
 
     /**
+     * Deliberately not read through RateMetricReader, which every other view
+     * uses for a rate: both parts here go through ImportCoverage::mask(),
+     * which answers null for a day outside the imported window, and that
+     * null is what separates "never fetched" from "fetched and empty". A
+     * reader answering in sums cannot carry it, and folding it into a zero
+     * would have a single day speak for one that was never imported.
+     *
      * @param list<int> $pageUids
      */
     private function rateMetricValue(RateMetricDefinition $definition, array $pageUids, DateRange $range, ?DateRange $coverage): DayMetricValue

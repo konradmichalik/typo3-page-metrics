@@ -1439,8 +1439,12 @@
     max-width: 72rem;
 }
 
+/* Wide enough not to read as a broken column beside a full-width table, and
+   still capped: prose running the width of a 1800px display is unreadable in
+   the other direction. 60ch was right when the module was capped at 72rem and
+   wrong the moment the pages and compare views lifted that cap. */
 .pagemetrics-module-intro {
-    max-width: 60ch;
+    max-width: 90ch;
     color: var(--typo3-text-color-variant, #515151);
 }
 

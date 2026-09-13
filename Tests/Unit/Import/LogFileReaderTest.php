@@ -126,31 +126,30 @@ final class LogFileReaderTest extends TestCase
     }
 
     #[Test]
-    public function yieldsTheTrueStreamOffsetAfterEachLineForAPlainFile(): void
+    public function resumesAPlainFileFromAByteOffset(): void
     {
+        // Driven through readLines() rather than the offsets it tracks
+        // internally: the resume is the behaviour, and the byte positions are
+        // how it is reached rather than something a caller reads.
         $path = $this->tmpDir.'/access.log';
         file_put_contents($path, "line one\nline two\nline three\n");
 
-        $pairs = iterator_to_array($this->reader->readLinesWithOffset($path));
+        $lines = iterator_to_array($this->reader->readLines($path, strlen("line one\nline two\n")));
 
-        self::assertSame([
-            ['line one', strlen("line one\n")],
-            ['line two', strlen("line one\nline two\n")],
-            ['line three', strlen("line one\nline two\nline three\n")],
-        ], $pairs);
+        self::assertSame(['line three'], $lines);
     }
 
     #[Test]
-    public function yieldsTheDecompressedStreamOffsetAfterEachLineForAGzipFile(): void
+    public function resumesAGzipFileFromADecompressedOffset(): void
     {
+        // The offset counts decompressed bytes, not bytes of the file on
+        // disk, which is the only reading that survives the archive being
+        // recompressed at a different level.
         $path = $this->tmpDir.'/access.log-20260101';
         file_put_contents($path, gzencode("gzipped line one\ngzipped line two\n"));
 
-        $pairs = iterator_to_array($this->reader->readLinesWithOffset($path));
+        $lines = iterator_to_array($this->reader->readLines($path, strlen("gzipped line one\n")));
 
-        self::assertSame([
-            ['gzipped line one', strlen("gzipped line one\n")],
-            ['gzipped line two', strlen("gzipped line one\ngzipped line two\n")],
-        ], $pairs);
+        self::assertSame(['gzipped line two'], $lines);
     }
 }

@@ -66,8 +66,10 @@ use function strtolower;
  * bucket), so no separate path filter is needed on this side either.
  * Agent-level detail (which specific bot, and whether its path pattern
  * looked spoofed) does not fit UrlMetric's shape and is instead handed to
- * BotAgentDetailCollector, flushed by ImportCommand once this provider's
- * fetch() has been fully consumed.
+ * BotAgentDetailCollector, which ImportCommand drains day by day as it
+ * consumes fetch() and empties once fetch() is done. The day boundary it
+ * drains on is the one the emission below produces, so the same bound that
+ * keeps the buffer here to about two days keeps the collector to the same.
  *
  * BotTaxonomy is a curated allowlist of named agents, so an unnamed vendor
  * crawler, a generic curl/wget script or an empty user agent is never

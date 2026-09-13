@@ -128,6 +128,49 @@ final class BotAgentDetailCollectorTest extends FunctionalTestCase
         self::assertSame(1, $this->countRows('main', 2, 'ai_crawler', 'GPTBot'));
     }
 
+    public function testFlushDaysBeforeWritesTheDaysItCoversAndLeavesTheOpenOnesUnwritten(): void
+    {
+        // Hits carry the log line's own time of day while the boundary is a
+        // day at midnight, so the comparison has to be day against day: an
+        // instant comparison would leave every afternoon hit of the last
+        // written day behind and write it a second time later.
+        $this->subject->add(new DateTimeImmutable('2026-10-10 17:42:03'), 'https://example.com/about', Bucket::AiCrawler, 'GPTBot', false);
+        $this->subject->add(new DateTimeImmutable('2026-10-11 23:59:58'), 'https://example.com/about', Bucket::Search, 'Googlebot', false);
+        $this->subject->add(new DateTimeImmutable('2026-10-12 00:00:41'), 'https://example.com/about', Bucket::Tool, 'AhrefsBot', false);
+
+        $this->subject->flushDaysBefore('main', true, [], new DateTimeImmutable('2026-10-12'));
+
+        self::assertSame(1, $this->countRows('main', 2, 'ai_crawler', 'GPTBot'));
+        self::assertSame(1, $this->countRows('main', 2, 'search', 'Googlebot'));
+        self::assertSame(0, $this->countRows('main', 2, 'tool', 'AhrefsBot'));
+    }
+
+    public function testFlushDaysBeforeDropsWhatItWroteSoTheFinalFlushDoesNotCountItAgain(): void
+    {
+        $day = new DateTimeImmutable('2026-10-10');
+        $this->subject->add($day, 'https://example.com/about', Bucket::AiCrawler, 'GPTBot', true);
+        $this->subject->add($day, 'https://example.com/about', Bucket::AiCrawler, 'GPTBot', false);
+
+        $this->subject->flushDaysBefore('main', true, [], new DateTimeImmutable('2026-10-12'));
+        $this->subject->add(new DateTimeImmutable('2026-10-12'), 'https://example.com/about', Bucket::AiCrawler, 'GPTBot', false);
+        $this->subject->flush('main', true, []);
+
+        // Two hits for the drained day and one for the day that stayed open,
+        // never three for either: the drained day must be gone from the
+        // buffer, not merely written out of it.
+        self::assertSame(['hits' => 2, 'hits_suspicious' => 1], $this->fetchRowOn('2026-10-10', 'main', 2, 'ai_crawler', 'GPTBot'));
+        self::assertSame(['hits' => 1, 'hits_suspicious' => 0], $this->fetchRowOn('2026-10-12', 'main', 2, 'ai_crawler', 'GPTBot'));
+    }
+
+    public function testFlushDaysBeforeWritesNothingWhenEveryBufferedDayIsStillOpen(): void
+    {
+        $this->subject->add(new DateTimeImmutable('2026-10-12'), 'https://example.com/about', Bucket::AiCrawler, 'GPTBot', false);
+
+        $this->subject->flushDaysBefore('main', true, [], new DateTimeImmutable('2026-10-12'));
+
+        self::assertSame(0, $this->totalRows());
+    }
+
     public function testResetDiscardsEverythingAccumulatedSoFarSoAFollowingFlushWritesNothing(): void
     {
         $date = new DateTimeImmutable('2026-10-10');
@@ -192,6 +235,30 @@ final class BotAgentDetailCollectorTest extends FunctionalTestCase
             ->select('hits', 'hits_suspicious')
             ->from('tx_typo3pagemetrics_bot_agent_daily')
             ->where(
+                $queryBuilder->expr()->eq('site_identifier', $queryBuilder->createNamedParameter($siteIdentifier)),
+                $queryBuilder->expr()->eq('page_uid', $queryBuilder->createNamedParameter($pageUid)),
+                $queryBuilder->expr()->eq('bucket', $queryBuilder->createNamedParameter($bucket)),
+                $queryBuilder->expr()->eq('agent', $queryBuilder->createNamedParameter($agent)),
+            )
+            ->executeQuery()
+            ->fetchAssociative();
+
+        self::assertIsArray($row);
+
+        return ['hits' => (int) $row['hits'], 'hits_suspicious' => (int) $row['hits_suspicious']];
+    }
+
+    /**
+     * @return array{hits: int, hits_suspicious: int}
+     */
+    private function fetchRowOn(string $date, string $siteIdentifier, int $pageUid, string $bucket, string $agent): array
+    {
+        $queryBuilder = $this->get(ConnectionPool::class)->getQueryBuilderForTable('tx_typo3pagemetrics_bot_agent_daily');
+        $row = $queryBuilder
+            ->select('hits', 'hits_suspicious')
+            ->from('tx_typo3pagemetrics_bot_agent_daily')
+            ->where(
+                $queryBuilder->expr()->eq('date', $queryBuilder->createNamedParameter($date)),
                 $queryBuilder->expr()->eq('site_identifier', $queryBuilder->createNamedParameter($siteIdentifier)),
                 $queryBuilder->expr()->eq('page_uid', $queryBuilder->createNamedParameter($pageUid)),
                 $queryBuilder->expr()->eq('bucket', $queryBuilder->createNamedParameter($bucket)),

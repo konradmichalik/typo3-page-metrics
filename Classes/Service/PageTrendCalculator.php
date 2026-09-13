@@ -39,7 +39,7 @@ final readonly class PageTrendCalculator
     public function __construct(
         private DailyMetricsRepository $dailyMetricsRepository,
         private SitePageUidRepository $pageUidRepository,
-        private RateSeriesCalculator $rateSeriesCalculator,
+        private RateMetricReader $rateMetricReader,
         private MetricValueFormatter $valueFormatter,
     ) {}
 
@@ -271,22 +271,20 @@ final readonly class PageTrendCalculator
      */
     private function computePageTrendsForRate(array $pageUids, int $languageId, RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, bool $previousPeriodCovered): array
     {
-        $currentNumerator = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->numerator, $currentRange);
-        $currentDenominator = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->denominator, $currentRange);
-        $previousNumerator = $previousPeriodCovered ? $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->numerator, $previousRange) : [];
-        $previousDenominator = $previousPeriodCovered ? $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->denominator, $previousRange) : [];
+        $current = $this->rateMetricReader->byPage($pageUids, $languageId, $metric, $currentRange);
+        $previous = $previousPeriodCovered ? $this->rateMetricReader->byPage($pageUids, $languageId, $metric, $previousRange) : [];
 
         $trends = [];
-        foreach (array_unique([...array_keys($currentDenominator), ...array_keys($previousDenominator)]) as $pageUid) {
-            $denominator = $currentDenominator[$pageUid] ?? 0;
-            $previousDenominatorValue = $previousDenominator[$pageUid] ?? 0;
+        foreach (array_unique([...array_keys($current), ...array_keys($previous)]) as $pageUid) {
+            $denominator = $current[$pageUid]->denominator ?? 0;
+            $previousDenominatorValue = $previous[$pageUid]->denominator ?? 0;
 
             if (0 === $denominator && 0 === $previousDenominatorValue) {
                 continue;
             }
 
-            $value = $this->rateSeriesCalculator->ratio($currentNumerator[$pageUid] ?? 0, $denominator, $metric->unit);
-            $previousValue = $this->rateSeriesCalculator->ratio($previousNumerator[$pageUid] ?? 0, $previousDenominatorValue, $metric->unit);
+            $value = $current[$pageUid]->ratio ?? 0;
+            $previousValue = $previous[$pageUid]->ratio ?? 0;
 
             $metricTrend = $previousPeriodCovered ? MetricTrend::between($value, $previousValue) : MetricTrend::none();
             // The denominator, not the rate: a bounce rate is a share, and a
