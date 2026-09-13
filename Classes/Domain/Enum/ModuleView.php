@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Domain\Enum;
 
+use function ucfirst;
+
 /**
  * ModuleView.
  *
@@ -22,16 +24,21 @@ namespace KonradMichalik\Typo3PageMetrics\Domain\Enum;
  * one extension claiming five menu entries is pushy.
  *
  * Only the cases that have a view behind them are listed, so a half-built
- * view cannot reach the docheader by accident. While there is one, the
- * docheader shows no switch at all: a menu offering a single entry is not a
- * choice. The value is still module state, because it is the contract the
- * next view plugs into.
+ * view cannot reach the docheader by accident. The case order is the order
+ * the switch lists them in: the page a reader picked, then the two questions
+ * that need more than one page or more than one period.
+ *
+ * The template each case renders is derived from its own name rather than
+ * mapped in the controller, so adding a view is a case plus a template and
+ * nothing else to remember.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 enum ModuleView: string
 {
     case Page = 'page';
+    case Compare = 'compare';
+    case Pages = 'pages';
 
     /**
      * What the module opens on for a reader who has never chosen: the page
@@ -46,5 +53,10 @@ enum ModuleView: string
     public function labelKey(): string
     {
         return 'module.view.'.$this->value;
+    }
+
+    public function templateName(): string
+    {
+        return 'Module/'.ucfirst($this->value);
     }
 }

@@ -28,10 +28,13 @@ use function str_starts_with;
 /**
  * Ga4MetricProvider.
  *
- * Calls the GA4 Data API's runReport once for the whole requested range
- * (never once per day like MatomoMetricProvider): GA4 charges quota per API
- * call, so a per-day loop would be wasteful/rate-limit-risky over a large
- * retention window. Three reports are needed. Bounce rate is scoped to the
+ * Asks the GA4 Data API for the whole requested range in one report rather
+ * than one report per day like MatomoMetricProvider: GA4 charges quota per
+ * API call, so a per-day loop would be wasteful/rate-limit-risky over a
+ * large retention window. A report too large for one response is paged, and
+ * each page's rows are handed on before the next page is asked for, so what
+ * a report costs in memory is one page and not the whole retention window.
+ * Three reports are needed. Bounce rate is scoped to the
  * landing page (session start), a different dimension than the
  * page-views/sessions report's pagePath, and the channel split needs a
  * session-scoped dimension that would otherwise resplit every metric in the
@@ -59,6 +62,16 @@ final readonly class Ga4MetricProvider implements SiteAwareMetricProviderInterfa
      * that figure was calibrated on.
      */
     private const MOVEMENT_FLOOR_VIEWS = 10;
+
+    /**
+     * Rows per runReport response. GA4's own default, and well under the
+     * 250000 the API allows, because the page is what peak memory costs:
+     * a decoded GA4 row is around 2.7 KB of PHP arrays, so a full page is
+     * tens of megabytes and a larger one would be hundreds. The channel
+     * report of a large site runs to a multiple of that page count, and a
+     * request is cheap next to an import that dies before it commits a day.
+     */
+    private const REPORT_PAGE_SIZE = 10000;
 
     public function __construct(
         private Ga4ConfigurationResolver $configurationResolver,
@@ -151,7 +164,6 @@ final readonly class Ga4MetricProvider implements SiteAwareMetricProviderInterfa
             'dateRanges' => [$dateRange],
             'dimensions' => [['name' => 'date'], ['name' => 'pagePath']],
             'metrics' => [['name' => 'screenPageViews'], ['name' => 'sessions'], ['name' => 'userEngagementDuration']],
-            'limit' => 100000,
         ]);
 
         foreach ($this->rows($pageRows) as [$day, $path, $values]) {
@@ -165,7 +177,6 @@ final readonly class Ga4MetricProvider implements SiteAwareMetricProviderInterfa
             'dateRanges' => [$dateRange],
             'dimensions' => [['name' => 'date'], ['name' => 'landingPage']],
             'metrics' => [['name' => 'sessions'], ['name' => 'bounceRate']],
-            'limit' => 100000,
         ]);
 
         foreach ($this->rows($landingRows) as [$day, $path, $values]) {
@@ -194,7 +205,8 @@ final readonly class Ga4MetricProvider implements SiteAwareMetricProviderInterfa
     }
 
     /**
-     * Loops runReport() until all rows for the request have been fetched.
+     * Loops runReport() until all rows for the request have been fetched,
+     * handing each page's rows on before asking for the next one.
      *
      * GA4's Data API caps a single runReport response at the requested
      * 'limit' and reports the true total in the response's 'rowCount'
@@ -202,40 +214,51 @@ final readonly class Ga4MetricProvider implements SiteAwareMetricProviderInterfa
      * treated as "no more pages", matching the same defensive assumption
      * used for the rest of this API's response shape in this file.
      *
+     * Paging belongs to this method rather than to the report bodies, so
+     * 'limit' is set here alongside 'offset': there is one page size for
+     * every report instead of three copies of it that can drift apart.
+     *
      * @param array<string, mixed> $body
      *
-     * @return list<array<string, mixed>>
+     * @return iterable<array<string, mixed>>
      */
-    private function runReportAllPages(Ga4Configuration $configuration, array $body): array
+    private function runReportAllPages(Ga4Configuration $configuration, array $body): iterable
     {
-        $allRows = [];
+        $body['limit'] = self::REPORT_PAGE_SIZE;
         $offset = 0;
 
-        do {
+        while (true) {
             $body['offset'] = $offset;
             $report = $this->apiClient->runReport($configuration, $body);
             $rows = $report['rows'] ?? [];
             $rows = is_array($rows) ? $rows : [];
+            $rowCount = $report['rowCount'] ?? null;
+            $fetched = count($rows);
+            $offset += $fetched;
+            unset($report);
 
             foreach ($rows as $row) {
                 if (is_array($row)) {
-                    $allRows[] = $row;
+                    yield $row;
                 }
             }
 
-            $offset += count($rows);
-            $rowCount = $report['rowCount'] ?? null;
-        } while (is_int($rowCount) && $offset < $rowCount && [] !== $rows);
+            // Dropped before the next request is sent and not after it, so
+            // the decoded response of two pages is never alive at once.
+            unset($rows);
 
-        return $allRows;
+            if (!is_int($rowCount) || $offset >= $rowCount || 0 === $fetched) {
+                return;
+            }
+        }
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
+     * @param iterable<array<string, mixed>> $rows
      *
      * @return iterable<array{0: DateTimeImmutable, 1: string, 2: list<string>}>
      */
-    private function rows(array $rows): iterable
+    private function rows(iterable $rows): iterable
     {
         foreach ($rows as $row) {
             $parsedRow = $this->parseRow($row);

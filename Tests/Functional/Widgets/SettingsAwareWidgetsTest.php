@@ -494,6 +494,22 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertNull($result->label);
     }
 
+    public function testAllThreeWidgetsOfferTheWayIntoTheModuleInTheirFoot(): void
+    {
+        // One assertion per widget rather than one per template detail: the
+        // markup comes from a single partial, so what is worth proving here
+        // is that each of the three renders it at all.
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 42);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 7);
+
+        foreach ([$this->renderChartWidget([]), $this->renderTopPagesWidget([]), $this->renderTrendWidget([])] as $content) {
+            self::assertStringContainsString('module/web/pagemetrics', $content);
+            self::assertStringContainsString('Open full view', $content);
+        }
+    }
+
     public function testEachSettingsAwareWidgetDeclaresItsBackendAssets(): void
     {
         $css = ['EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css'];

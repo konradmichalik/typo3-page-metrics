@@ -20,6 +20,7 @@ use function array_filter;
 use function explode;
 use function is_array;
 use function is_string;
+use function preg_match;
 use function str_starts_with;
 use function strtolower;
 use function substr;
@@ -49,6 +50,14 @@ use function substr;
  * line is this site's. That is the single-vhost format, it is what these
  * files looked like before the token was read at all, and the behaviour is
  * unchanged for it.
+ *
+ * And a trailing token that is not a host is treated the same way, because
+ * the parser's last group captures whatever the format put there, not only
+ * %v. A LogFormat ending in %D writes a request duration, nginx's extended
+ * default writes "$http_x_forwarded_for": taking either for a virtual host
+ * would match no configured host and drop every single line of the file,
+ * turning a working install into one that reports zero facts and no error.
+ * Only a token that could be a host is allowed to exclude a line.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
@@ -117,7 +126,7 @@ final readonly class SiteUrlMapper
      */
     public function urlFor(LogLine $line): ?string
     {
-        if (null === $line->host) {
+        if (null === $line->host || !self::looksLikeHost($line->host)) {
             return $this->baseUrl.$line->target;
         }
 
@@ -146,6 +155,22 @@ final readonly class SiteUrlMapper
     private static function normalizeHost(string $host): string
     {
         return strtolower(explode(':', $host, 2)[0]);
+    }
+
+    /**
+     * Deliberately narrow: letters, digits, dots and hyphens, with at least
+     * one letter somewhere. That admits every real ServerName and rejects the
+     * two things that actually turn up in that position, a bare number and a
+     * quoted address. A dotted quad would be rejected too, which is the safe
+     * way round: a numeric vhost that matched nothing would otherwise drop
+     * the file, and counting its lines for this site is what the same log
+     * did before any of this existed.
+     */
+    private static function looksLikeHost(string $token): bool
+    {
+        $host = explode(':', $token, 2)[0];
+
+        return 1 === preg_match('/^[A-Za-z0-9.-]+$/', $host) && 1 === preg_match('/[A-Za-z]/', $host);
     }
 
     private static function withoutWww(string $host): string

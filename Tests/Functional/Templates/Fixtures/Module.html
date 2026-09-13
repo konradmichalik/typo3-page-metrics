@@ -1,0 +1,11 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:comment>
+    Stands in for the backend's own Module layout, which the module templates
+    declare and which ModuleTemplate supplies at runtime. Only the two
+    sections a view of this extension fills are drawn: the rest of that
+    layout is docheader chrome the controller builds, and reproducing its
+    variables here would test core rather than this view.
+</f:comment>
+<f:render section="Before" arguments="{_all}" optional="true" />
+<f:render section="Content" arguments="{_all}" optional="true" />
+</html>

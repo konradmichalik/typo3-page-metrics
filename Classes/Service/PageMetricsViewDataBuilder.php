@@ -244,13 +244,28 @@ final readonly class PageMetricsViewDataBuilder
         $pageUids = $includeSubpages ? $this->pageUidRepository->descendantsOf($pageId) : [$pageId];
         [$definitions, $rateDefinitions, $externalLinkByIdentifier, $coverageByIdentifier, $machineDefinitionsByProvider] = $this->collectDefinitions($site, $pageUrl, $tileRange);
 
+        // One query for every tile's traffic split rather than one each. The
+        // dimension LIKE cannot use the table's index prefix, so a row of
+        // eight metrics would otherwise be eight aggregate scans for a
+        // popover most readers never open. Which metrics carry a split is
+        // still not asked here: the answer is simply empty for the ones that
+        // do not, which is what lets a provider name a channel this class has
+        // never heard of.
+        $channelSums = $this->dailyMetricsRepository->sumsByMetricAndDimensionPrefix(
+            $pageUids,
+            $languageId,
+            array_map(static fn (MetricDefinition $definition): string => $definition->identifier, $definitions),
+            $tileRange,
+            TrafficChannel::DIMENSION_PREFIX,
+        );
+
         /** @var list<array{sortOrder: int, tile: MetricTile}> $ordered */
         $ordered = [];
 
         foreach ($definitions as $definition) {
             $ordered[] = [
                 'sortOrder' => $definition->sortOrder,
-                'tile' => $this->buildCountTile($definition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null, $coverageByIdentifier[$definition->identifier] ?? null, $includeSubpages, $withBenchmark),
+                'tile' => $this->buildCountTile($definition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null, $coverageByIdentifier[$definition->identifier] ?? null, $includeSubpages, $withBenchmark, $channelSums[$definition->identifier] ?? []),
             ];
         }
 
@@ -319,11 +334,7 @@ final readonly class PageMetricsViewDataBuilder
         /** @var array<string, non-empty-list<MetricDefinition>> $machineDefinitionsByProvider */
         $machineDefinitionsByProvider = [];
 
-        foreach ($this->providers as $provider) {
-            if (!$provider->supports($site)) {
-                continue;
-            }
-
+        foreach ($this->metricDefinitionCollector->supporting($this->providers, $site) as $provider) {
             $externalLink = null !== $pageUrl ? $provider->getExternalLink($site, $pageUrl, $tileRange) : null;
             $coverage = $this->importCoverage->forProvider($provider->getIdentifier(), $site->getIdentifier());
 
@@ -393,9 +404,10 @@ final readonly class PageMetricsViewDataBuilder
     }
 
     /**
-     * @param list<int> $pageUids
+     * @param list<int>          $pageUids
+     * @param array<string, int> $channelSums dimension => total for this metric, fetched once for the whole row
      */
-    private function buildCountTile(MetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, bool $includeSubpages, bool $withBenchmark): MetricTile
+    private function buildCountTile(MetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, bool $includeSubpages, bool $withBenchmark, array $channelSums): MetricTile
     {
         $series = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
         $sparkline = $this->importCoverage->mask($series, $coverage);
@@ -429,7 +441,7 @@ final readonly class PageMetricsViewDataBuilder
             // Where this metric's traffic came from, on the one metric per
             // provider that has an answer, and empty on every other, which
             // leaves their popovers exactly as they were.
-            $this->channelBreakdown($pageUids, $languageId, $definition, $tileRange),
+            $this->channelBreakdown($channelSums, $definition, $value),
             $this->tileBenchmark($benchmark, $definition->unit),
             $previousPeriodCovered,
         );
@@ -445,19 +457,20 @@ final readonly class PageMetricsViewDataBuilder
      * split: an analytics source without referrer data must leave the
      * popover as it found it.
      *
-     * The parts are not expected to add up to the headline and must not be
-     * made to. A provider attributes what it can attribute, and the
-     * difference is traffic it could not place, which is a fact about the
-     * source rather than a rounding error to hide.
+     * A provider attributes what it can attribute, so the named channels do
+     * not add up to the headline on their own. The remainder is carried as a
+     * part of its own rather than left implicit: the popover heads this list
+     * with "Made up of", which is a claim, and a list of 950 under a headline
+     * of 1,000 reads as a rendering fault instead of as traffic the source
+     * could not place. Naming it keeps the claim true and says the honest
+     * thing at the same time.
      *
-     * @param list<int> $pageUids
+     * @param array<string, int> $sums dimension => total, already fetched for every tile at once
      *
      * @return list<array{label: string, formattedValue: string}>
      */
-    private function channelBreakdown(array $pageUids, int $languageId, MetricDefinition $definition, DateRange $tileRange): array
+    private function channelBreakdown(array $sums, MetricDefinition $definition, int $value): array
     {
-        $sums = $this->dailyMetricsRepository->sumsByDimensionPrefix($pageUids, $languageId, $definition->identifier, $tileRange, TrafficChannel::DIMENSION_PREFIX);
-
         // array_merge keeps the left operand's key order and the right
         // operand's values, so the nulls below are purely positional: a
         // known channel takes the place TrafficChannel's case order gave it,
@@ -472,11 +485,25 @@ final readonly class PageMetricsViewDataBuilder
 
         $breakdown = [];
 
-        foreach ($ordered as $dimension => $value) {
+        foreach ($ordered as $dimension => $channelValue) {
             $channel = TrafficChannel::fromDimension($dimension);
             $breakdown[] = [
                 'label' => $channel?->label() ?? substr($dimension, strlen(TrafficChannel::DIMENSION_PREFIX)),
-                'formattedValue' => $this->valueFormatter->format($value, $definition->unit),
+                'formattedValue' => $this->valueFormatter->format($channelValue, $definition->unit),
+            ];
+        }
+
+        // Last, and only where there is one. A negative remainder is possible
+        // in principle, where a provider's segmented totals exceed its own
+        // unsegmented one, and printing "-12 unattributed" would be a claim
+        // about arithmetic nobody can act on; the parts are then simply shown
+        // as they came.
+        $unattributed = $value - array_sum($ordered);
+
+        if ([] !== $breakdown && $unattributed > 0) {
+            $breakdown[] = [
+                'label' => $this->getLanguageService()->sL(self::LL.'popover.breakdown.unattributed'),
+                'formattedValue' => $this->valueFormatter->format($unattributed, $definition->unit),
             ];
         }
 

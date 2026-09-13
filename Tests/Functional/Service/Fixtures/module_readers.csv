@@ -1,0 +1,10 @@
+"be_groups"
+,"uid","pid","title","groupMods"
+,20,0,"Module readers","web_pagemetrics"
+,21,0,"Editors without the module",""
+
+"be_users"
+,"uid","pid","username","password","admin","disable","deleted","usergroup","db_mountpoints","TSconfig"
+,20,0,"module-reader","$argon2i$v=19$m=65536,t=16,p=1$Y29pbmNvaW5jb2luY29pbg$dGhpc2lzYWZha2VoYXNoZm9ydGVzdHM",0,0,0,"20","1",
+,21,0,"no-module-editor","$argon2i$v=19$m=65536,t=16,p=1$Y29pbmNvaW5jb2luY29pbg$dGhpc2lzYWZha2VoYXNoZm9ydGVzdHM",0,0,0,"21","1",
+,22,0,"switched-off-reader","$argon2i$v=19$m=65536,t=16,p=1$Y29pbmNvaW5jb2luY29pbg$dGhpc2lzYWZha2VoYXNoZm9ydGVzdHM",0,0,0,"20","1","tx_typo3pagemetrics.disabled = 1"

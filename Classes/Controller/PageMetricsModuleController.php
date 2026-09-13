@@ -15,12 +15,14 @@ namespace KonradMichalik\Typo3PageMetrics\Controller;
 
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, ModuleView};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\PageMetricsViewData;
-use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsAccessChecker, PageMetricsViewDataBuilder, SparklineLabelProvider};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsAccessChecker, PageMetricsViewDataBuilder, PeriodComparisonBuilder, SitePagesTableBuilder, SparklineLabelProvider};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Backend\Module\ModuleData;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Template\Components\Buttons\Action\ShortcutButton;
+use TYPO3\CMS\Backend\Template\Components\Buttons\DropDown\DropDownRadio;
+use TYPO3\CMS\Backend\Template\Components\Buttons\DropDownButton;
 use TYPO3\CMS\Backend\Template\Components\Menu\{Menu, MenuItem};
 use TYPO3\CMS\Backend\Template\{ModuleTemplate, ModuleTemplateFactory};
 use TYPO3\CMS\Backend\Utility\BackendUtility;
@@ -28,11 +30,13 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Information\Typo3Version;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Page\PageRenderer;
+use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 use function in_array;
 use function is_array;
+use function is_string;
 
 /**
  * PageMetricsModuleController.
@@ -72,6 +76,8 @@ final readonly class PageMetricsModuleController
         private SparklineLabelProvider $labelProvider,
         private AnnotationPayloadBuilder $annotationPayloadBuilder,
         private PageRenderer $pageRenderer,
+        private PeriodComparisonBuilder $periodComparisonBuilder,
+        private SitePagesTableBuilder $sitePagesTableBuilder,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
@@ -98,10 +104,8 @@ final readonly class PageMetricsModuleController
         // query parameter named like a moduleData key into the stored data
         // and persists it before the request reaches here, so switching the
         // period is one navigation and nothing in this class writes state.
-        $this->addPeriodMenu($view, $pageId, $period, $activeView);
-        // No view switch yet. The active view is already module state and
-        // already reaches the template, but a menu offering one entry is not
-        // a choice; it appears with the second view (see ModuleView).
+        $this->addPeriodDropDown($view, $pageId, $period, $activeView);
+        $this->addViewMenu($view, $pageId, $period, $activeView);
         $this->addShortcutButton($view, $pageId, $period, $activeView);
 
         if ($pageId < 1) {
@@ -120,6 +124,9 @@ final readonly class PageMetricsModuleController
         }
 
         $includeSubpages = (bool) $moduleData?->get('includeSubpages');
+        // NullSite where the uid resolves to no site, which the pages view
+        // cannot answer for: a table of "the site's pages" needs a site.
+        $site = $request->getAttribute('site');
         // Language 0, the same as the page module's own tiles: every surface
         // of this extension is single-language today and a module that
         // quietly picked another would disagree with the tiles about the
@@ -143,9 +150,32 @@ final readonly class PageMetricsModuleController
             'chartSeries' => self::chartSeriesOf($viewData),
             'sparklineLabels' => $this->labelProvider->all(),
             'annotations' => $this->annotationPayloadBuilder->build($viewData->annotations),
+            // Only the view that reads it. The comparison is a second pass
+            // over the same repositories, and paying for it on the page view
+            // would put work behind a tab nobody opened.
+            //
+            // The raw moduleData value goes in, not a parsed one: which
+            // baselines exist is the builder's own vocabulary, and an unknown
+            // or missing key resolves there to the period immediately before,
+            // which is what every other surface already compares against.
+            'comparison' => ModuleView::Compare === $activeView
+                ? $this->periodComparisonBuilder->build($pageId, 0, $period, self::baselineKeyOf($moduleData), $includeSubpages)
+                : null,
+            // Same rule as the comparison above: only the view that reads it
+            // pays for it. The site comes off the request, where the backend
+            // site resolver already put it from the same page uid, rather
+            // than being looked up a second time.
+            'pagesTable' => ModuleView::Pages === $activeView && $site instanceof Site
+                ? $this->sitePagesTableBuilder->build($site, 0, $period, self::stringOf($moduleData, 'sort'), self::stringOf($moduleData, 'direction'), (int) ($request->getQueryParams()['tablePage'] ?? 1))
+                : null,
+            // Told apart from a table that is simply null, which the template
+            // otherwise reads as "not built yet". A page belonging to no
+            // configured site has an answer, and it is not that the feature
+            // is unfinished: a table of a site's pages needs a site.
+            'hasSite' => $site instanceof Site,
         ]);
 
-        return $view->renderResponse('Module/Index');
+        return $view->renderResponse($activeView->templateName());
     }
 
     /**
@@ -171,6 +201,26 @@ final readonly class PageMetricsModuleController
         return [];
     }
 
+    private static function baselineKeyOf(?ModuleData $moduleData): ?string
+    {
+        $baseline = $moduleData?->get('compareBaseline');
+
+        return is_string($baseline) ? $baseline : null;
+    }
+
+    /**
+     * moduleData holds whatever was last persisted for this user, which
+     * survives an upgrade and can be anything a query string once carried.
+     * Every reader of it validates its own keys; this only guarantees the
+     * type they validate.
+     */
+    private static function stringOf(?ModuleData $moduleData, string $key): string
+    {
+        $value = $moduleData?->get($key);
+
+        return is_string($value) ? $value : '';
+    }
+
     private function moduleData(ServerRequestInterface $request): ?ModuleData
     {
         $moduleData = $request->getAttribute('moduleData');
@@ -192,21 +242,48 @@ final readonly class PageMetricsModuleController
         return ModuleView::tryFrom(is_array($view) ? '' : (string) $view) ?? ModuleView::default();
     }
 
-    private function addPeriodMenu(ModuleTemplate $view, int $pageId, int $period, ModuleView $activeView): void
+    /**
+     * A dropdown button rather than a second docheader menu, which is not a
+     * style choice: 13.4 renders every menu the registry holds, 14 renders
+     * only the first and logs a warning about the rest. Two menus would have
+     * worked on one supported version and silently dropped the period switch
+     * on the other. A button bar holds as many dropdowns as it is given on
+     * both, and it is what v14's own warning points at.
+     */
+    private function addPeriodDropDown(ModuleTemplate $view, int $pageId, int $period, ModuleView $activeView): void
     {
-        // makeInstance rather than the registry's makeMenu(): that one is
-        // deprecated in v14 and does exactly this in 13.4, so calling it
-        // directly is the one spelling both versions accept without a notice.
-        $menu = GeneralUtility::makeInstance(Menu::class);
-        $menu->setIdentifier('pagemetrics_period');
-        $menu->setLabel($this->translate('period.label'));
+        $dropDown = GeneralUtility::makeInstance(DropDownButton::class);
+        $dropDown->setLabel($this->translate('period.label'));
+        // Without one of the two the button reports itself invalid and the
+        // button bar refuses it. The words, not an icon: "Period" is not a
+        // thing anyone recognises from a glyph, and the selected value has
+        // to be readable without opening the dropdown.
+        $dropDown->setShowLabelText(true);
 
         foreach (self::PERIOD_OPTIONS as $option) {
+            $dropDown->addItem(
+                GeneralUtility::makeInstance(DropDownRadio::class)
+                    ->setActive($option === $period)
+                    ->setHref($this->moduleUri($pageId, $option, $activeView))
+                    ->setLabel($option.' '.$this->translate('period.days')),
+            );
+        }
+
+        $view->getDocHeaderComponent()->getButtonBar()->addButton($dropDown, ButtonBar::BUTTON_POSITION_LEFT);
+    }
+
+    private function addViewMenu(ModuleTemplate $view, int $pageId, int $period, ModuleView $activeView): void
+    {
+        $menu = GeneralUtility::makeInstance(Menu::class);
+        $menu->setIdentifier('pagemetrics_view');
+        $menu->setLabel($this->translate('module.view.label'));
+
+        foreach (ModuleView::cases() as $option) {
             $menu->addMenuItem(
                 GeneralUtility::makeInstance(MenuItem::class)
-                    ->setTitle($option.' '.$this->translate('period.days'))
-                    ->setHref($this->moduleUri($pageId, $option, $activeView))
-                    ->setActive($option === $period),
+                    ->setTitle($this->translate($option->labelKey()))
+                    ->setHref($this->moduleUri($pageId, $period, $option))
+                    ->setActive($option === $activeView),
             );
         }
 

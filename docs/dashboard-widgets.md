@@ -64,6 +64,14 @@ Every widget that shows imported numbers (tiles, chart, most viewed pages, trend
 
 Unlike the page module, a dashboard widget covers one site per row, so its date is that site's own provider's and never a compromise between several.
 
+## Opening the full view
+
+Every widget that carries a site's numbers ends with a link into **Web → Page metrics**, opened on that site's root page. It is the same offer the page module's tile row makes, for the site instead of for one page, see [Opening the full view](page-tiles.md#opening-the-full-view) for what is on the other end and why the link carries no period.
+
+The link is left out for a reader the module would refuse, and here the page half of that check is not academic: a widget names a site's root page rather than a page the reader picked, so somebody who may not see that root page gets the widget's numbers without the link. On a dashboard listing several sites the decision is made per site, not once for the whole widget.
+
+Every one of these links reads "Open full view", so the site's own name is carried in the link's accessible name. A screen reader announces which site it leads to; on screen the site heading above it already says so.
+
 ## Movement, not direction
 
 The trend widget ranks by whether a page improved or declined, not by whether its number went up or down. The two only coincide for a metric where higher is better: a rising bounce rate is a decline, and a page whose bounce rate fell shows a green down arrow. Which way round a metric reads is set by its provider, see [Polarity](extending.md#polarity).

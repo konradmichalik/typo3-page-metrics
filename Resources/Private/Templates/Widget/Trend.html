@@ -78,6 +78,7 @@
                                 </f:else>
                             </f:if>
                             <f:render partial="DataFreshness" arguments="{freshness: siteTrend.dataFreshness}" />
+                            <f:render partial="WidgetModuleLink" arguments="{urls: moduleUrls, site: siteTrend.site}" />
                         </div>
                     </f:for>
                 </div>

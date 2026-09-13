@@ -810,12 +810,16 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
 
         // The headline is the stored total, never the sum of the parts: the
         // parts are what the provider could attribute, and a provider that
-        // attributes none of it still has a correct tile.
+        // attributes none of it still has a correct tile. What it could not
+        // attribute is carried as a part of its own, so the popover's "Made
+        // up of" stays a true claim instead of listing 70 under a headline
+        // of 100.
         self::assertSame(100, $tile->value);
         self::assertSame(
             [
                 ['label' => 'Direct', 'formattedValue' => '25'],
                 ['label' => 'Search', 'formattedValue' => '45'],
+                ['label' => 'Unattributed', 'formattedValue' => '30'],
             ],
             $tile->breakdown,
         );

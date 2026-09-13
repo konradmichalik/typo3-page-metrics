@@ -465,6 +465,123 @@
             <trans-unit id="module.page.noProvider" resname="module.page.noProvider">
                 <source>No metric provider is configured for this site, so there is nothing to show here yet.</source>
             </trans-unit>
+            <trans-unit id="module.view.compare" resname="module.view.compare">
+                <source>Compare</source>
+            </trans-unit>
+            <trans-unit id="module.view.pages" resname="module.view.pages">
+                <source>Pages</source>
+            </trans-unit>
+            <trans-unit id="module.view.placeholder" resname="module.view.placeholder">
+                <source>This view is being built.</source>
+            </trans-unit>
+            <trans-unit id="module.link" resname="module.link">
+                <source>Open full view</source>
+            </trans-unit>
+            <trans-unit id="module.link.hint" resname="module.link.hint">
+                <source>Every metric as a labelled table, the chart over the whole period, and the period's markers as a list.</source>
+            </trans-unit>
+            <trans-unit id="module.compare.baseline.label" resname="module.compare.baseline.label">
+                <source>Compare against</source>
+            </trans-unit>
+            <trans-unit id="module.compare.baseline.previous" resname="module.compare.baseline.previous">
+                <source>The period immediately before</source>
+            </trans-unit>
+            <trans-unit id="module.compare.baseline.month" resname="module.compare.baseline.month">
+                <source>The same days one month earlier</source>
+            </trans-unit>
+            <trans-unit id="module.compare.baseline.quarter" resname="module.compare.baseline.quarter">
+                <source>The same days one quarter earlier</source>
+            </trans-unit>
+            <trans-unit id="module.compare.baseline.year" resname="module.compare.baseline.year">
+                <source>The same days one year earlier</source>
+            </trans-unit>
+            <trans-unit id="module.compare.baseline.selected" resname="module.compare.baseline.selected">
+                <source>selected</source>
+            </trans-unit>
+            <trans-unit id="module.compare.intro" resname="module.compare.intro">
+                <source>This page over %1$s, held against %2$s. Both periods are %3$s days long: two totals taken over windows of different lengths are not comparable, so the baseline keeps the length of the period you selected and only moves back in time.</source>
+            </trans-unit>
+            <trans-unit id="module.compare.significance" resname="module.compare.significance">
+                <source>A difference counts as significant only when it clears both thresholds the metric itself names: a share of the earlier period's value and a floor in the metric's own unit. That is the rule the dashboard's trend widget ranks by, so the word means the same thing in both places. Anything under it is printed plainly and named as normal variation, because a handful of visits produces that much on its own.</source>
+            </trans-unit>
+            <trans-unit id="module.compare.thisPeriod" resname="module.compare.thisPeriod">
+                <source>Selected period</source>
+            </trans-unit>
+            <trans-unit id="module.compare.referencePeriod" resname="module.compare.referencePeriod">
+                <source>Compared against</source>
+            </trans-unit>
+            <trans-unit id="module.compare.difference" resname="module.compare.difference">
+                <source>Difference</source>
+            </trans-unit>
+            <trans-unit id="module.compare.verdict" resname="module.compare.verdict">
+                <source>Reading</source>
+            </trans-unit>
+            <trans-unit id="module.compare.verdict.significant" resname="module.compare.verdict.significant">
+                <source>Significant change</source>
+            </trans-unit>
+            <trans-unit id="module.compare.verdict.insignificant" resname="module.compare.verdict.insignificant">
+                <source>Within normal variation</source>
+            </trans-unit>
+            <trans-unit id="module.compare.verdict.new" resname="module.compare.verdict.new">
+                <source>Nothing recorded in the earlier period</source>
+            </trans-unit>
+            <trans-unit id="module.compare.verdict.notComparable" resname="module.compare.verdict.notComparable">
+                <source>Not comparable, the period was never imported</source>
+            </trans-unit>
+            <trans-unit id="module.compare.unavailable" resname="module.compare.unavailable">
+                <source>There is nothing to compare for this page: it belongs to no site with metrics configured.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.intro" resname="module.pages.intro">
+                <source>One row per page of this site, one column per metric, covering %1$s. Every column is sorted on the server rather than in the browser, because the page that is four hundredth by views can be the first by bounce rate.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.scope" resname="module.pages.scope">
+                <source>A page is listed when it recorded something in this period, or when it recorded %1$s in %2$s and nothing since, which is the page worth finding. Pages you cannot see in the page tree are left out. A count with no stored value reads as zero, because that is how an importer records a page that had no traffic, while a rate with nothing to divide reads as no value at all.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.trendIntro" resname="module.pages.trendIntro">
+                <source>The trend column compares %1$s against the period of the same length before this one, %2$s. It follows whichever column the table is sorted by, so sorting by another metric compares that one instead.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.page" resname="module.pages.page">
+                <source>Page</source>
+            </trans-unit>
+            <trans-unit id="module.pages.trend" resname="module.pages.trend">
+                <source>Trend: %1$s</source>
+            </trans-unit>
+            <trans-unit id="module.pages.sortBy" resname="module.pages.sortBy">
+                <source>sort by %1$s</source>
+            </trans-unit>
+            <trans-unit id="module.pages.sortedAscending" resname="module.pages.sortedAscending">
+                <source>sorted lowest first, activate to sort highest first</source>
+            </trans-unit>
+            <trans-unit id="module.pages.sortedDescending" resname="module.pages.sortedDescending">
+                <source>sorted highest first, activate to sort lowest first</source>
+            </trans-unit>
+            <trans-unit id="module.pages.noValue" resname="module.pages.noValue">
+                <source>not recorded</source>
+            </trans-unit>
+            <trans-unit id="module.pages.empty" resname="module.pages.empty">
+                <source>No page of this site recorded anything in this period.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.showing" resname="module.pages.showing">
+                <source>Showing %1$s to %2$s of %3$s pages.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.pagination" resname="module.pages.pagination">
+                <source>Table pages</source>
+            </trans-unit>
+            <trans-unit id="module.pages.previous" resname="module.pages.previous">
+                <source>Previous</source>
+            </trans-unit>
+            <trans-unit id="module.pages.next" resname="module.pages.next">
+                <source>Next</source>
+            </trans-unit>
+            <trans-unit id="module.pages.pageOf" resname="module.pages.pageOf">
+                <source>Page %1$s of %2$s</source>
+            </trans-unit>
+            <trans-unit id="popover.breakdown.unattributed" resname="popover.breakdown.unattributed">
+                <source>Unattributed</source>
+            </trans-unit>
+            <trans-unit id="module.pages.noSite" resname="module.pages.noSite">
+                <source>This page does not belong to a configured site, so there is no site whose pages could be listed.</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

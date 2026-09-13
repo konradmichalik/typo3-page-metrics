@@ -333,13 +333,7 @@ final readonly class SiteMetricsOverviewBuilder
 
     private function resolveProvider(Site $site): ?MetricProviderInterface
     {
-        foreach ($this->providers as $provider) {
-            if ($provider->supports($site)) {
-                return $provider;
-            }
-        }
-
-        return null;
+        return $this->metricDefinitionCollector->supporting($this->providers, $site)[0] ?? null;
     }
 
     private function primaryDefinition(MetricProviderInterface $provider, Site $site): MetricDefinition

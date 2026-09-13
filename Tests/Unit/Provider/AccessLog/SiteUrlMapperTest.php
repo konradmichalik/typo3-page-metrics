@@ -47,6 +47,26 @@ final class SiteUrlMapperTest extends TestCase
         self::assertSame('https://example.com/about', $mapper->urlFor($this->line('/about', 'example.com')));
     }
 
+    public function testCountsALineWhoseTrailingTokenIsNotAHostAtAll(): void
+    {
+        // The parser's last group captures whatever the LogFormat put there,
+        // not only %v: a format ending in %D writes a request duration. Read
+        // as a virtual host it matches nothing and would drop every line of
+        // the file, which is a working install reporting zero facts and no
+        // error.
+        $mapper = SiteUrlMapper::forSite(new Site('main', 1, ['base' => 'https://example.com/']));
+
+        self::assertSame('https://example.com/about', $mapper->urlFor($this->line('/about', '12345')));
+    }
+
+    public function testCountsALineWhoseTrailingTokenIsAQuotedForwardedAddress(): void
+    {
+        // nginx's extended default ends in "$http_x_forwarded_for".
+        $mapper = SiteUrlMapper::forSite(new Site('main', 1, ['base' => 'https://example.com/']));
+
+        self::assertSame('https://example.com/about', $mapper->urlFor($this->line('/about', '"203.0.113.7"')));
+    }
+
     public function testRejectsALineServedByAnotherVirtualHost(): void
     {
         $mapper = SiteUrlMapper::forSite(new Site('main', 1, ['base' => 'https://example.com/']));

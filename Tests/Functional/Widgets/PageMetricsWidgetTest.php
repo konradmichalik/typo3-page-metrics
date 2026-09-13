@@ -116,6 +116,21 @@ final class PageMetricsWidgetTest extends FunctionalTestCase
         self::assertStringNotContainsString('ghost', $content);
     }
 
+    public function testOffersTheWayIntoTheModuleInTheWidgetsFoot(): void
+    {
+        // A widget carries a site's numbers and nothing that says where the
+        // rest of them are. The link names the site's own root page, which
+        // is the page the widget's figures are about.
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 42);
+
+        $content = $this->renderWidget();
+
+        self::assertStringContainsString('pagemetrics-module-link', $content);
+        self::assertStringContainsString('module/web/pagemetrics', $content);
+        self::assertStringContainsString('Open full view', $content);
+    }
+
     private function renderWidget(): string
     {
         $request = (new ServerRequest('https://example.com/typo3/module/dashboard'))

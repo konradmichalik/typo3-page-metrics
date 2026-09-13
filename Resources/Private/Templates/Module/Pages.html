@@ -1,0 +1,189 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:comment>
+    The Module layout draws the docheader around this, so the period switch
+    and the view switch the controller registers have somewhere to appear.
+</f:comment>
+<f:layout name="Module" />
+
+<f:section name="Before">
+    <f:comment>
+        Keeps the page tree and this module pointing at the same page, the
+        same handshake the page view does: the tree writes the selected uid
+        into ModuleStateStorage, and a module that does not update it sends
+        the reader back to a different page the next time they switch.
+    </f:comment>
+    <f:asset.module identifier="@typo3/backend/element/immediate-action-element.js" />
+    <f:variable name="moduleStateArguments" value="{0: 'web', 1: pageId}" />
+    <typo3-immediate-action action="TYPO3.Backend.Storage.ModuleStateStorage.update" args="{moduleStateArguments -> f:format.json() -> f:format.htmlspecialchars()}"></typo3-immediate-action>
+</f:section>
+
+<f:section name="Content">
+<div class="pagemetrics-module pagemetrics-module-wide" data-page-id="{pageId}" data-period="{period}" data-view="pages">
+    <f:if condition="{pagesTable}">
+        <f:then>
+            <f:if condition="{pagesTable.hasProvider}">
+                <f:then>
+                    <f:comment>
+                        Prose beside the table, not a tooltip on it. The reason
+                        to build a module at all is room to say what a figure
+                        means, and hiding that behind a hover would be the same
+                        mistake in a new place.
+                    </f:comment>
+                    <p class="pagemetrics-module-intro">
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.intro" arguments="{0: pagesTable.currentRangeLabel}" default="One row per page of this site, one column per metric, covering %1$s. Every column is sorted on the server rather than in the browser, because the page that is four hundredth by views can be the first by bounce rate." />
+                    </p>
+                    <p class="pagemetrics-module-intro">
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.scope" arguments="{0: pagesTable.trendLabel, 1: pagesTable.previousRangeLabel}" default="A page is listed when it recorded something in this period, or when it recorded %1$s in %2$s and nothing since, which is the page worth finding. Pages you cannot see in the page tree are left out. A count with no stored value reads as zero, because that is how an importer records a page that had no traffic, while a rate with nothing to divide reads as no value at all." />
+                    </p>
+                    <p class="pagemetrics-module-intro">
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.trendIntro" arguments="{0: pagesTable.trendLabel, 1: pagesTable.previousRangeLabel}" default="The trend column compares %1$s against the period of the same length before this one, %2$s. It follows whichever column the table is sorted by, so sorting by another metric compares that one instead." />
+                    </p>
+
+                    <f:if condition="{pagesTable.rows}">
+                        <f:then>
+                            <div class="table-fit">
+                                <table class="table table-striped pagemetrics-module-table pagemetrics-pages-table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.page" default="Page" /></th>
+                                            <f:for each="{pagesTable.columns}" as="column">
+                                                <f:comment>
+                                                    aria-sort is "none" on every column but the
+                                                    one actually sorted, and the header is a real
+                                                    link rather than a clickable cell, so the
+                                                    keyboard reaches it and the browser can say
+                                                    where it goes.
+                                                </f:comment>
+                                                <th scope="col" class="text-end" aria-sort="{column.ariaSort}">
+                                                    <f:variable name="columnUri"><f:be.uri route="web_pagemetrics" parameters="{id: pageId, period: period, view: 'pages', sort: column.key, direction: column.nextDirection}" /></f:variable>
+                                                    <a href="{columnUri}" class="pagemetrics-pages-sort{f:if(condition: column.isSorted, then: ' pagemetrics-pages-sort-active')}">
+                                                        {column.label}
+                                                        <f:if condition="{column.isSorted}">
+                                                            <f:then>
+                                                                <span aria-hidden="true"><f:if condition="{column.ariaSort} == 'ascending'"><f:then>&#9650;</f:then><f:else>&#9660;</f:else></f:if></span>
+                                                                <span class="pagemetrics-visually-hidden"><f:if condition="{column.ariaSort} == 'ascending'"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.sortedAscending" default="sorted lowest first, activate to sort highest first" /></f:then><f:else><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.sortedDescending" default="sorted highest first, activate to sort lowest first" /></f:else></f:if></span>
+                                                            </f:then>
+                                                            <f:else>
+                                                                <span class="pagemetrics-visually-hidden"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.sortBy" arguments="{0: column.label}" default="sort by %1$s" /></span>
+                                                            </f:else>
+                                                        </f:if>
+                                                    </a>
+                                                    <f:comment>
+                                                        The provider's own description under the
+                                                        column label, read rather than hovered,
+                                                        the same text the page view puts under
+                                                        each metric name.
+                                                    </f:comment>
+                                                    <span class="pagemetrics-module-metric-description">{column.description}</span>
+                                                </th>
+                                            </f:for>
+                                            <th scope="col" class="text-end"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.trend" arguments="{0: pagesTable.trendLabel}" default="Trend: %1$s" /></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <f:for each="{pagesTable.rows}" as="row">
+                                            <tr>
+                                                <th scope="row">
+                                                    <f:variable name="rowUri"><f:be.uri route="web_pagemetrics" parameters="{id: row.pageUid, period: period, view: 'page'}" /></f:variable>
+                                                    <a href="{rowUri}">{row.title}</a>
+                                                </th>
+                                                <f:for each="{row.cells}" as="cell">
+                                                    <td class="text-end">
+                                                        <f:if condition="{cell.hasValue}">
+                                                            <f:then>{cell.formattedValue}</f:then>
+                                                            <f:else>
+                                                                <span class="text-body-secondary" aria-hidden="true">&#8212;</span>
+                                                                <span class="pagemetrics-visually-hidden"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.noValue" default="not recorded" /></span>
+                                                            </f:else>
+                                                        </f:if>
+                                                    </td>
+                                                </f:for>
+                                                <td class="text-end">
+                                                    <f:comment>
+                                                        The same three states the tiles and the
+                                                        widget tables draw, for the same reasons:
+                                                        no badge where the previous period was
+                                                        never imported, "new" where there is
+                                                        nothing to compare against, a percentage
+                                                        otherwise. The badge carries an arrow and
+                                                        a written movement beside its colour, so
+                                                        nothing here is told by colour alone.
+                                                    </f:comment>
+                                                    <f:if condition="{row.hasNoComparison}">
+                                                        <f:then><span class="text-body-secondary" title="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.notImported', default: 'The previous period was never imported, so there is nothing to compare against.')}">&#8212;</span></f:then>
+                                                        <f:else>
+                                                            <f:variable name="deltaText"><f:if condition="{row.isNew}"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:then><f:else>{row.deltaPercent}%</f:else></f:if></f:variable>
+                                                            <f:render partial="TrendBadge" arguments="{trend: row.trend, sentiment: row.sentiment, deltaText: deltaText, isNew: row.isNew}" />
+                                                        </f:else>
+                                                    </f:if>
+                                                </td>
+                                            </tr>
+                                        </f:for>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="pagemetrics-pages-pager">
+                                <p class="pagemetrics-module-intro">
+                                    <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.showing" arguments="{0: pagesTable.firstRowNumber, 1: pagesTable.lastRowNumber, 2: pagesTable.totalRows}" default="Showing %1$s to %2$s of %3$s pages." />
+                                </p>
+                                <f:if condition="{pagesTable.pageCount} > 1">
+                                    <nav aria-label="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.pagination', default: 'Table pages')}">
+                                        <f:if condition="{pagesTable.hasPreviousPage}">
+                                            <f:variable name="previousUri"><f:be.uri route="web_pagemetrics" parameters="{id: pageId, period: period, view: 'pages', sort: pagesTable.sortKey, direction: pagesTable.sortDirection, tablePage: pagesTable.previousPageNumber}" /></f:variable>
+                                            <a class="btn btn-default" href="{previousUri}"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.previous" default="Previous" /></a>
+                                        </f:if>
+                                        <span class="pagemetrics-pages-pager-position"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.pageOf" arguments="{0: pagesTable.pageNumber, 1: pagesTable.pageCount}" default="Page %1$s of %2$s" /></span>
+                                        <f:if condition="{pagesTable.hasNextPage}">
+                                            <f:variable name="nextUri"><f:be.uri route="web_pagemetrics" parameters="{id: pageId, period: period, view: 'pages', sort: pagesTable.sortKey, direction: pagesTable.sortDirection, tablePage: pagesTable.nextPageNumber}" /></f:variable>
+                                            <a class="btn btn-default" href="{nextUri}"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.next" default="Next" /></a>
+                                        </f:if>
+                                    </nav>
+                                </f:if>
+                            </div>
+                        </f:then>
+                        <f:else>
+                            <div class="callout callout-info">
+                                <div class="callout-body">
+                                    <p><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.empty" default="No page of this site recorded anything in this period." /></p>
+                                </div>
+                            </div>
+                        </f:else>
+                    </f:if>
+                </f:then>
+                <f:else>
+                    <f:comment>
+                        No provider means a site-configuration answer rather
+                        than an empty period, the same reading the page view
+                        makes of the same state.
+                    </f:comment>
+                    <div class="callout callout-info">
+                        <div class="callout-body">
+                            <p><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.noProvider" default="No metric provider is configured for this site, so there is nothing to show here yet." /></p>
+                        </div>
+                    </div>
+                </f:else>
+            </f:if>
+        </f:then>
+        <f:else>
+            <f:comment>
+                No table, and the two reasons for that are different answers.
+                A page belonging to no configured site cannot have one, which
+                is a fact the reader can act on; anything else means the
+                controller assigned nothing, which is a statement about the
+                module. An empty table is neither: it would be a claim about
+                the site.
+            </f:comment>
+            <div class="callout callout-info">
+                <div class="callout-body">
+                    <f:if condition="{hasSite}">
+                        <f:then><p><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.view.placeholder" default="This view is being built." /></p></f:then>
+                        <f:else><p><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.noSite" default="This page does not belong to a configured site, so there is no site whose pages could be listed." /></p></f:else>
+                    </f:if>
+                </div>
+            </div>
+        </f:else>
+    </f:if>
+</div>
+</f:section>
+</html>

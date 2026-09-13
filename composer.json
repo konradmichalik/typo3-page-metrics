@@ -94,10 +94,10 @@
 			"@test:coverage:functional",
 			"@test:coverage:merge"
 		],
-		"test:coverage:functional": "phpunit -c phpunit.functional.xml --coverage-php .Build/coverage/functional.cov",
+		"test:coverage:functional": "@php -d memory_limit=1024M vendor/bin/phpunit -c phpunit.functional.xml --coverage-php .Build/coverage/functional.cov",
 		"test:coverage:merge": "@php Tests/Coverage/merge.php",
 		"test:coverage:unit": "phpunit -c phpunit.xml --coverage-php .Build/coverage/unit.cov",
-		"test:functional": "phpunit -c phpunit.functional.xml",
+		"test:functional": "@php -d memory_limit=1024M vendor/bin/phpunit -c phpunit.functional.xml",
 		"test:unit": "phpunit -c phpunit.xml --no-coverage"
 	}
 }

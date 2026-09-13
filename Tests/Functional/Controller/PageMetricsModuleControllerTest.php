@@ -23,8 +23,11 @@ use TYPO3\CMS\Backend\Module\ModuleData;
 use TYPO3\CMS\Backend\Routing\Route;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
+use TYPO3\CMS\Core\Exception\SiteNotFoundException;
 use TYPO3\CMS\Core\Http\{NormalizedParams, ServerRequest};
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Site\Entity\{NullSite, SiteInterface};
+use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 /**
@@ -145,6 +148,56 @@ final class PageMetricsModuleControllerTest extends FunctionalTestCase
         self::assertStringContainsString('No metric provider is configured', $body);
     }
 
+    public function testTheCompareViewRendersItsComparisonRatherThanThePageView(): void
+    {
+        // The controller only builds the comparison for the view that reads
+        // it, so this is what proves the wiring and not just the template.
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 30);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.pageviews', 20);
+
+        // The baseline picker is what only the compare view has, so it is
+        // what proves the dispatch went to the right template and that the
+        // controller built the comparison the template needs.
+        $body = (string) $this->dispatch(['id' => '2'], ['view' => 'compare'])->getBody();
+
+        self::assertStringContainsString('pagemetrics-compare-picker', $body);
+    }
+
+    public function testThePageViewDoesNotCarryTheComparePicker(): void
+    {
+        // One dispatch per test: the docheader is container-scoped, so two
+        // renders in one test share state that two requests never would.
+        $this->writeSiteConfiguration();
+
+        $body = (string) $this->dispatch(['id' => '2'], ['view' => 'page'])->getBody();
+
+        self::assertStringNotContainsString('pagemetrics-compare-picker', $body);
+    }
+
+    public function testOffersTheViewSwitchOnceThereIsMoreThanOneView(): void
+    {
+        $body = (string) $this->dispatch(['id' => '2'])->getBody();
+
+        self::assertStringContainsString('Compare', $body);
+        self::assertStringContainsString('Pages', $body);
+    }
+
+    public function testThePagesViewRendersTheSitesTable(): void
+    {
+        // The builder needs the site off the request, which the test has to
+        // supply the way the backend site resolver would, so this is what
+        // proves that wiring and not just the template.
+        $this->writeSiteConfiguration();
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 30);
+
+        $body = (string) $this->dispatch(['id' => '2'], ['view' => 'pages'])->getBody();
+
+        self::assertStringContainsString('aria-sort', $body);
+        self::assertStringNotContainsString('This view is being built', $body);
+    }
+
     public function testRefusesAPageTheUserMayNotSee(): void
     {
         // Page 3 has perms_everybody = 0, so the editor has no PAGE_SHOW on
@@ -201,10 +254,26 @@ final class PageMetricsModuleControllerTest extends FunctionalTestCase
             ->withQueryParams($queryParams)
             ->withAttribute('route', $route)
             ->withAttribute('moduleData', new ModuleData('web_pagemetrics', $moduleData))
+            ->withAttribute('site', $this->siteAttribute())
             ->withAttribute('applicationType', SystemEnvironmentBuilder::REQUESTTYPE_BE);
 
         return $request->withAttribute('normalizedParams', NormalizedParams::createFromRequest($request));
     }
+
+    /**
+     * What the backend's own site resolver puts on the request from the same
+     * page uid. A NullSite where no site configuration was written, which is
+     * exactly what a view asking about "the site" has to cope with.
+     */
+    private function siteAttribute(): SiteInterface
+    {
+        try {
+            return $this->get(SiteFinder::class)->getSiteByPageId(2);
+        } catch (SiteNotFoundException) {
+            return new NullSite();
+        }
+    }
+
     private function writeSiteConfiguration(): void
     {
         $this->get(SiteWriter::class)->write('main', [

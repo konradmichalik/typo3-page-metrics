@@ -180,19 +180,38 @@ class DailyMetricsRepository
      */
     public function sumsByDimensionPrefix(array $pageUids, int $languageId, string $metric, DateRange $range, string $dimensionPrefix): array
     {
-        if ([] === $pageUids) {
+        return $this->sumsByMetricAndDimensionPrefix($pageUids, $languageId, [$metric], $range, $dimensionPrefix)[$metric] ?? [];
+    }
+
+    /**
+     * The same split for several metrics at once, as metric => dimension =>
+     * total.
+     *
+     * One query rather than one per metric, because the LIKE cannot use the
+     * table's index prefix: a page-header render asks for every count tile it
+     * shows, and paying a full aggregate scan per tile is how a tile row of
+     * eight metrics turns into eight table scans for a popover.
+     *
+     * @param list<int>    $pageUids
+     * @param list<string> $metrics
+     *
+     * @return array<string, array<string, int>>
+     */
+    public function sumsByMetricAndDimensionPrefix(array $pageUids, int $languageId, array $metrics, DateRange $range, string $dimensionPrefix): array
+    {
+        if ([] === $pageUids || [] === $metrics) {
             return [];
         }
 
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $rows = $queryBuilder
-            ->select('dimension')
+            ->select('metric', 'dimension')
             ->addSelectLiteral('SUM('.$queryBuilder->quoteIdentifier('value').') AS total')
             ->from(self::TABLE)
             ->where(
                 $queryBuilder->expr()->in('page_uid', $queryBuilder->createNamedParameter($pageUids, Connection::PARAM_INT_ARRAY)),
                 $queryBuilder->expr()->eq('sys_language_uid', $queryBuilder->createNamedParameter($languageId, ParameterType::INTEGER)),
-                $queryBuilder->expr()->eq('metric', $queryBuilder->createNamedParameter($metric)),
+                $queryBuilder->expr()->in('metric', $queryBuilder->createNamedParameter($metrics, Connection::PARAM_STR_ARRAY)),
                 // Escaped, so a prefix is read as text and not as a LIKE
                 // pattern: an underscore in one would otherwise match any
                 // single character.
@@ -200,14 +219,15 @@ class DailyMetricsRepository
                 $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($range->from->format('Y-m-d'))),
                 $queryBuilder->expr()->lte('date', $queryBuilder->createNamedParameter($range->until->format('Y-m-d'))),
             )
-            ->groupBy('dimension')
-            ->orderBy('dimension')
+            ->groupBy('metric', 'dimension')
+            ->orderBy('metric')
+            ->addOrderBy('dimension')
             ->executeQuery()
             ->fetchAllAssociative();
 
         $sums = [];
         foreach ($rows as $row) {
-            $sums[(string) $row['dimension']] = (int) $row['total'];
+            $sums[(string) $row['metric']][(string) $row['dimension']] = (int) $row['total'];
         }
 
         return $sums;

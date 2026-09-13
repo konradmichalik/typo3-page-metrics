@@ -112,16 +112,15 @@ final readonly class Ga4KeyEventMetrics
                     'inListFilter' => ['values' => $this->eventNames($goals)],
                 ],
             ],
-            'limit' => 100000,
         ];
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
+     * @param iterable<array<string, mixed>> $rows
      *
      * @return iterable<UrlMetric>
      */
-    public function metricsFor(Site $site, string $baseUrl, array $rows): iterable
+    public function metricsFor(Site $site, string $baseUrl, iterable $rows): iterable
     {
         $configuredEvents = $this->eventNames($this->goalsFor($site));
 

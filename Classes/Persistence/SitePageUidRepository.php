@@ -15,10 +15,15 @@ namespace KonradMichalik\Typo3PageMetrics\Persistence;
 
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\{Connection, ConnectionPool};
+use TYPO3\CMS\Core\Database\Query\QueryHelper;
 
+use function array_filter;
+use function array_flip;
 use function array_map;
 use function array_push;
+use function array_values;
 use function in_array;
+use function trim;
 
 /**
  * SitePageUidRepository.
@@ -167,6 +172,56 @@ final readonly class SitePageUidRepository
         }
 
         return $frontier;
+    }
+
+    /**
+     * The subset of $pageUids the backend user behind $permsClause is
+     * allowed to see, in the order they were asked about.
+     *
+     * One query for the whole set rather than BackendUtility::readPageAccess()
+     * per page: a site-wide table asks this about every page of a site at
+     * once, and the per-page call is the same SELECT with the same clause,
+     * so doing it row by row would only buy an N+1.
+     *
+     * $permsClause is the fragment BackendUserAuthentication::getPagePermsClause()
+     * produces and is core's own SQL, not user input - the same value
+     * readPageAccess() concatenates. stripLogicalOperatorPrefix() because a
+     * hook may return it with a leading AND, which is how core itself guards
+     * against that (see QueryHelper's own callers).
+     *
+     * @param list<int> $pageUids
+     *
+     * @return list<int>
+     */
+    public function readableUids(array $pageUids, string $permsClause): array
+    {
+        if ([] === $pageUids || '' === trim($permsClause)) {
+            return [];
+        }
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $readable = array_map(intval(...), $queryBuilder
+            ->select('uid')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->in('uid', $queryBuilder->createNamedParameter($pageUids, Connection::PARAM_INT_ARRAY)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)),
+                QueryHelper::stripLogicalOperatorPrefix($permsClause),
+            )
+            ->executeQuery()
+            ->fetchFirstColumn());
+
+        // The caller's order, not the database's: the caller built the list
+        // from a tree walk and a filter must not quietly reshuffle it.
+        //
+        // Flipped to a lookup rather than scanned with in_array(): this is
+        // called with every page of a site, so a linear scan per page is
+        // quadratic on exactly the surface that grows. Twenty thousand pages
+        // is four hundred million comparisons, which is a module render that
+        // times out rather than one that is slow.
+        $lookup = array_flip($readable);
+
+        return array_values(array_filter($pageUids, static fn (int $pageUid): bool => isset($lookup[$pageUid])));
     }
 
     /**

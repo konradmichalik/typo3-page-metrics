@@ -25,10 +25,38 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  * the provider directly, so "does this provider have per-site metrics" is
  * decided in one place instead of at each of the five call sites.
  *
+ * And which providers answer for a site at all, for the same reason: that
+ * loop had been written out at seven call sites across five classes, and two
+ * of them were written independently in the same afternoon because there was
+ * nothing to reuse.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class MetricDefinitionCollector
 {
+    /**
+     * The providers configured for this site, in the order the container
+     * tagged them. Empty where the site opted into none, which is a
+     * site-configuration answer and not an empty period: a caller that shows
+     * numbers has to tell those apart.
+     *
+     * @param iterable<MetricProviderInterface> $providers
+     *
+     * @return list<MetricProviderInterface>
+     */
+    public function supporting(iterable $providers, Site $site): array
+    {
+        $supporting = [];
+
+        foreach ($providers as $provider) {
+            if ($provider->supports($site)) {
+                $supporting[] = $provider;
+            }
+        }
+
+        return $supporting;
+    }
+
     /**
      * @return list<MetricDefinition>
      */

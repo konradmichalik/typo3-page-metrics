@@ -125,6 +125,39 @@ final class SiteMetricsWidgetsTest extends FunctionalTestCase
         self::assertStringNotContainsString('unconfigured', $content);
     }
 
+    public function testBothWidgetsOfferTheWayIntoTheModuleInTheirFoot(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->get(UnresolvedUrlRepository::class)->record('matomo', new DateTimeImmutable('today'), 'https://example.com/gone', 'matomo.pageviews', UnresolvedReason::NonPage, 3, 100);
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('a1', new DateTimeImmutable('today'), 'Release 2.0'));
+
+        $notFound = $this->renderWidget('dashboard.widget.pageMetricsNotFoundPages', NotFoundPagesWidget::class);
+        $annotations = $this->renderWidget('dashboard.widget.pageMetricsAnnotations', AnnotationsWidget::class);
+
+        self::assertStringContainsString('module/web/pagemetrics', $notFound);
+        self::assertStringContainsString('Open full view', $notFound);
+        self::assertStringContainsString('module/web/pagemetrics', $annotations);
+        self::assertStringContainsString('Open full view', $annotations);
+    }
+
+    public function testNeitherWidgetOffersItToAUserWhoCannotOpenTheModule(): void
+    {
+        // The dashboard is reachable by more users than the module is, so
+        // the widgets make the same access decision the tile row makes and
+        // for the same reason.
+        $this->importCSVDataSet(__DIR__.'/../Service/Fixtures/module_readers.csv');
+        $backendUser = $this->setUpBackendUser(21);
+        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
+        $this->writeSiteConfiguration();
+        $this->get(UnresolvedUrlRepository::class)->record('matomo', new DateTimeImmutable('today'), 'https://example.com/gone', 'matomo.pageviews', UnresolvedReason::NonPage, 3, 100);
+
+        $notFound = $this->renderWidget('dashboard.widget.pageMetricsNotFoundPages', NotFoundPagesWidget::class);
+
+        self::assertStringNotContainsString('pagemetrics-module-link', $notFound);
+        // The widget's own content is untouched by that decision.
+        self::assertStringContainsString('/gone', $notFound);
+    }
+
     /**
      * @param class-string<AbstractSiteMetricsWidget> $expectedClass
      */

@@ -44,6 +44,11 @@ use function sprintf;
  * sub-request in its own slot rather than failing the request the page views
  * arrive in.
  *
+ * That covers a failing slot, not a failing request. A timeout, a disabled
+ * bulk API or a segment-restricted token fails the whole call, which is why
+ * MatomoMetricProvider catches around this one request: the split is worth
+ * far less than the day's page views it would otherwise take with it.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class MatomoChannelMetrics

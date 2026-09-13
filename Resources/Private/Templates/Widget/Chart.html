@@ -23,6 +23,7 @@
                         ></div>
                         <f:render partial="AnnotationLegend" arguments="{categories: overview.annotationCategories}" />
                         <f:render partial="DataFreshness" arguments="{freshness: overview.dataFreshness}" />
+                        <f:render partial="WidgetModuleLink" arguments="{urls: moduleUrls, site: overview.site}" />
                     </div>
                 </f:for>
             </div>

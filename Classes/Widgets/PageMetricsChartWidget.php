@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\AnnotationCategory;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, SiteMetricsOverview};
-use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, SiteMetricsOverviewBuilder, SparklineLabelProvider};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, ModuleLinkBuilder, SiteMetricsOverviewBuilder, SparklineLabelProvider};
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
@@ -56,6 +56,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
         private BackendViewFactory $backendViewFactory,
         private SparklineLabelProvider $labelProvider,
         private AnnotationPayloadBuilder $annotationPayloadBuilder,
+        private ModuleLinkBuilder $moduleLinkBuilder,
     ) {}
 
     /**
@@ -136,6 +137,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
             'sparklineLabels' => $this->labelProvider->all(),
             'configuration' => $this->configuration,
             'compact' => 'small' === $this->configuration->getHeight(),
+            'moduleUrls' => $this->moduleLinkBuilder->forSites($this->siteFinder->getAllSites()),
         ]);
 
         return new WidgetResult($view->render('Widget/Chart'), [] !== $overviews ? $this->buildLabel($period, $overviews) : null);

@@ -54,7 +54,7 @@ Each key event becomes one tile, stored as the ordinary metric
 in the page report: splitting a key event by name needs the `eventName`
 dimension, and adding that dimension to the existing report would split every
 page-view row by event name too. So a site with key events configured sends
-one additional `runReport` per import, filtered server-side to the configured
+one additional report per import, filtered server-side to the configured
 names. A site without them sends exactly the requests it always sent.
 
 GA4's Data API can take 24-48 hours to finalize a day's data, so its most
@@ -69,7 +69,7 @@ a breakdown in the sessions tile's popover (see
 [Where visitors came from](../page-tiles.md#where-visitors-came-from)).
 Nothing has to be configured for it.
 
-It is one additional `runReport` per import, covering the whole range at once
+It is one additional report per import, covering the whole range at once
 because `date` is a dimension of it just as it is of the two reports already
 sent. Scoped to `pagePath` rather than to `landingPage`: the split hangs
 under the sessions tile, which counts sessions that included the page, and a
@@ -99,6 +99,22 @@ providers can genuinely disagree is described under
 A channel group this extension has never heard of is counted as `Other`
 rather than dropped, because Google adds groups over time and a split that
 silently loses traffic is worse than one admitting it cannot name it.
+
+## Reports and paging
+
+Every report asks for the whole retention window at once, because `date` is
+one of its dimensions. The Data API answers in pages of 10000 rows, and the
+import reads a page, hands its rows to the importer, and only then asks for
+the next one. A small property is one request per report; a large one is as
+many requests as its row count needs.
+
+What that buys is an import whose memory does not grow with the retention
+window. The channel report is the largest of them, one row per channel per
+page per day against the page report's one row per page per day, and holding
+it whole was enough to end a first import of a large property in an
+out-of-memory error. That kind of error is not catchable, so the import could
+not even report it: it died before committing a single day, and the next run
+started in the same place and died again.
 
 <details>
 <summary><strong>Setting up GA4 access (click to expand)</strong></summary>

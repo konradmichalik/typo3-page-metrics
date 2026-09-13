@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Controller\Ajax;
 
-use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsAccessChecker, PageMetricsViewDataBuilder, SparklineLabelProvider};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, ModuleLinkBuilder, PageMetricsAccessChecker, PageMetricsViewDataBuilder, SparklineLabelProvider};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Http\HtmlResponse;
@@ -37,6 +37,7 @@ final readonly class PageMetricsTilesController
         private PageMetricsAccessChecker $accessChecker,
         private SparklineLabelProvider $labelProvider,
         private AnnotationPayloadBuilder $annotationPayloadBuilder,
+        private ModuleLinkBuilder $moduleLinkBuilder,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
@@ -73,6 +74,12 @@ final readonly class PageMetricsTilesController
             'hasSubpages' => $viewData->hasSubpages,
             'dataFreshness' => $viewData->dataFreshness,
             'addAnnotationUrl' => $viewData->addAnnotationUrl,
+            // Built here rather than in PageHeaderMetricsRenderer: the way
+            // into the module costs a TSconfig read, a module permission and
+            // one page lookup, and none of that belongs on the page module's
+            // synchronous render path. Null where the module would refuse
+            // this reader, which the template reads as "no link".
+            'moduleUrl' => $this->moduleLinkBuilder->forPage($viewData->pageId),
             'annotations' => $this->annotationPayloadBuilder->build($viewData->annotations),
         ]);
 

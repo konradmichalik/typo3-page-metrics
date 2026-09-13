@@ -28,8 +28,10 @@ use function str_starts_with;
  * Where a page's sessions came from, stored as dimensions on the sessions
  * metric rather than as metrics of their own.
  *
- * One extra runReport per import covers the whole range, because date is a
+ * One extra report per import covers the whole range, because date is a
  * dimension of it like it is of the reports Ga4MetricProvider already sends.
+ * Ga4MetricProvider pages that report and feeds the pages through here as
+ * they arrive.
  *
  * Scoped to pagePath and not to landingPage, although the session-scoped
  * channel dimension would combine with either. The split is read back as the
@@ -95,16 +97,20 @@ final readonly class Ga4ChannelMetrics
             'dateRanges' => [$dateRange],
             'dimensions' => [['name' => 'date'], ['name' => 'pagePath'], ['name' => 'sessionDefaultChannelGroup']],
             'metrics' => [['name' => 'sessions']],
-            'limit' => 100000,
         ];
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
+     * Rows are taken one at a time and never collected: this report is the
+     * largest of the import, one row per channel per page per day against
+     * the page report's one row per page per day, and holding it whole is
+     * what made a first import of a large site die on memory.
+     *
+     * @param iterable<array<string, mixed>> $rows
      *
      * @return iterable<UrlMetric>
      */
-    public function metricsFor(string $baseUrl, array $rows): iterable
+    public function metricsFor(string $baseUrl, iterable $rows): iterable
     {
         foreach ($rows as $row) {
             $parsed = $this->parseRow($row);

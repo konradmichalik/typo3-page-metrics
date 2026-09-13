@@ -21,6 +21,8 @@ use KonradMichalik\Typo3PageMetrics\Provider\Ga4\{Ga4ApiClient, Ga4ChannelMetric
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
+use function sprintf;
+
 /**
  * Ga4MetricProviderTest.
  *
@@ -423,6 +425,183 @@ final class Ga4MetricProviderTest extends TestCase
         $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-01'));
 
         self::assertSame([], iterator_to_array($this->subject->fetch($this->site, $range)));
+    }
+
+    /**
+     * Characterization of the whole fetch(), pinned so that the paging
+     * rework cannot quietly change what reaches the importer: every report
+     * appears in its fixed order, every row of every page exactly once, and
+     * the channel rows carry a dimension while the headline rows do not.
+     */
+    public function testFetchYieldsEveryRowOfEveryPagedReportExactlyOnceAndInReportOrder(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+        $this->apiClient->method('runReport')->willReturnCallback(
+            fn (Ga4Configuration $configuration, array $body): array => $this->pagedResponse($body),
+        );
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
+        $metrics = iterator_to_array($this->subject->fetch($this->siteWithGoals(), $range), false);
+
+        $rendered = array_map(
+            static fn ($metric): string => sprintf(
+                '%s %s %s %s %d',
+                $metric->date->format('Y-m-d'),
+                $metric->url,
+                $metric->metric,
+                $metric->dimension ?? '-',
+                $metric->value,
+            ),
+            $metrics,
+        );
+
+        self::assertSame([
+            '2026-08-01 https://example.com/page-0 ga4.pageviews - 10',
+            '2026-08-01 https://example.com/page-0 ga4.sessions - 5',
+            '2026-08-01 https://example.com/page-0 ga4.engagement_time_seconds - 100',
+            '2026-08-02 https://example.com/page-1 ga4.pageviews - 11',
+            '2026-08-02 https://example.com/page-1 ga4.sessions - 6',
+            '2026-08-02 https://example.com/page-1 ga4.engagement_time_seconds - 101',
+            '2026-08-01 https://example.com/page-2 ga4.pageviews - 12',
+            '2026-08-01 https://example.com/page-2 ga4.sessions - 7',
+            '2026-08-01 https://example.com/page-2 ga4.engagement_time_seconds - 102',
+            '2026-08-01 https://example.com/landing-0 ga4.landing_sessions - 10',
+            '2026-08-01 https://example.com/landing-0 ga4.landing_bounces - 5',
+            '2026-08-02 https://example.com/landing-1 ga4.landing_sessions - 11',
+            '2026-08-02 https://example.com/landing-1 ga4.landing_bounces - 6',
+            '2026-08-01 https://example.com/landing-2 ga4.landing_sessions - 12',
+            '2026-08-01 https://example.com/landing-2 ga4.landing_bounces - 6',
+            '2026-08-01 https://example.com/page-0 ga4.sessions channel:direct 10',
+            '2026-08-02 https://example.com/page-1 ga4.sessions channel:search 11',
+            '2026-08-01 https://example.com/page-2 ga4.sessions channel:direct 12',
+            '2026-08-01 https://example.com/page-0 ga4.key_event.generate_lead - 10',
+            '2026-08-02 https://example.com/page-1 ga4.key_event.purchase - 11',
+            '2026-08-01 https://example.com/page-2 ga4.key_event.generate_lead - 12',
+        ], $rendered);
+    }
+
+    public function testFetchYieldsAPageReportRowBeforeAskingForTheNextPage(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+
+        $requests = 0;
+        $this->apiClient->method('runReport')->willReturnCallback(function (Ga4Configuration $configuration, array $body) use (&$requests): array {
+            if ([['name' => 'date'], ['name' => 'pagePath']] !== ($body['dimensions'] ?? null)) {
+                return ['rows' => []];
+            }
+
+            ++$requests;
+
+            return $this->pagedResponse($body);
+        });
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
+        $requestsWhenFirstMetricArrived = null;
+
+        foreach ($this->subject->fetch($this->site, $range) as $metric) {
+            $requestsWhenFirstMetricArrived = $requests;
+            break;
+        }
+
+        // The point of the rework: a row is handed on while the report it
+        // came from is still being paged through, not after the last page.
+        self::assertSame(1, $requestsWhenFirstMetricArrived);
+    }
+
+    public function testFetchYieldsAChannelRowBeforeAskingForTheNextChannelPage(): void
+    {
+        $this->resolver->method('resolve')->willReturn(new Ga4Configuration('123456789', 'test@example.com', 'key'));
+
+        $channelRequests = 0;
+        $this->apiClient->method('runReport')->willReturnCallback(function (Ga4Configuration $configuration, array $body) use (&$channelRequests): array {
+            if (['name' => 'sessionDefaultChannelGroup'] !== ($body['dimensions'][2] ?? null)) {
+                return ['rows' => []];
+            }
+
+            ++$channelRequests;
+
+            return $this->pagedResponse($body);
+        });
+
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-02'));
+        $channelRequestsWhenFirstMetricArrived = null;
+        $dimensions = [];
+
+        foreach ($this->subject->fetch($this->site, $range) as $metric) {
+            $channelRequestsWhenFirstMetricArrived ??= $channelRequests;
+            $dimensions[] = $metric->dimension;
+        }
+
+        self::assertSame(1, $channelRequestsWhenFirstMetricArrived);
+        // Every row of both pages, each of them once: paging lazily must
+        // not drop a row and must not repeat one, or the importer's
+        // aggregate would be wrong in either direction.
+        self::assertSame(['channel:direct', 'channel:search', 'channel:direct'], $dimensions);
+        self::assertSame(2, $channelRequests);
+    }
+
+    /**
+     * Two rows on the first page and one on the second, for whichever of the
+     * four reports asked. Shaped like a GA4 response: 'rowCount' is the true
+     * total, 'rows' only what fits the requested 'limit'.
+     *
+     * @param array<string, mixed> $body
+     *
+     * @return array<string, mixed>
+     */
+    private function pagedResponse(array $body): array
+    {
+        $offset = $body['offset'] ?? 0;
+        self::assertIsInt($offset);
+
+        $dimensions = $body['dimensions'] ?? [];
+        self::assertIsArray($dimensions);
+
+        $rows = [];
+
+        foreach (0 === $offset ? [0, 1] : [2] as $index) {
+            $rows[] = $this->responseRow($dimensions, $index);
+        }
+
+        return ['rows' => $rows, 'rowCount' => 3];
+    }
+
+    /**
+     * @param array<mixed> $dimensions
+     *
+     * @return array<string, mixed>
+     */
+    private function responseRow(array $dimensions, int $index): array
+    {
+        $secondDimension = $dimensions[1]['name'] ?? null;
+        $thirdDimension = $dimensions[2]['name'] ?? null;
+        $count = (string) (10 + $index);
+
+        $dimensionValues = [
+            ['value' => 0 === $index % 2 ? '20260801' : '20260802'],
+            ['value' => ('landingPage' === $secondDimension ? '/landing-' : '/page-').$index],
+        ];
+
+        if (null !== $thirdDimension) {
+            $dimensionValues[] = ['value' => $this->thirdDimensionValue($thirdDimension, $index)];
+
+            return ['dimensionValues' => $dimensionValues, 'metricValues' => [['value' => $count]]];
+        }
+
+        $metricValues = 'landingPage' === $secondDimension
+            ? [['value' => $count], ['value' => '0.5']]
+            : [['value' => $count], ['value' => (string) (5 + $index)], ['value' => (string) (100 + $index)]];
+
+        return ['dimensionValues' => $dimensionValues, 'metricValues' => $metricValues];
+    }
+
+    private function thirdDimensionValue(mixed $dimension, int $index): string
+    {
+        if ('sessionDefaultChannelGroup' === $dimension) {
+            return 0 === $index % 2 ? 'Direct' : 'Organic Search';
+        }
+
+        return 0 === $index % 2 ? 'generate_lead' : 'purchase';
     }
 
     private function siteWithGoals(): Site

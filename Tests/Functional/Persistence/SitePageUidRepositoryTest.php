@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Persistence;
 
 use KonradMichalik\Typo3PageMetrics\Persistence\SitePageUidRepository;
+use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 /**
@@ -31,6 +32,7 @@ final class SitePageUidRepositoryTest extends FunctionalTestCase
     {
         parent::setUp();
         $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
+        $this->importCSVDataSet(__DIR__.'/Fixtures/be_users.csv');
         $this->subject = $this->get(SitePageUidRepository::class);
     }
 
@@ -67,5 +69,33 @@ final class SitePageUidRepositoryTest extends FunctionalTestCase
     public function testDescendantsAtLevelIgnoresDeletedChildren(): void
     {
         self::assertSame([], $this->subject->descendantsAtLevel(3, 1));
+    }
+
+    public function testReadableUidsKeepsEveryPageForAnAdministrator(): void
+    {
+        self::assertSame([1, 2, 5, 6], $this->subject->readableUids([1, 2, 5, 6], $this->permsClauseFor(1)));
+    }
+
+    public function testReadableUidsDropsAPageTheUserMayNotSee(): void
+    {
+        // Page 2 is the one with perms_everybody = 0 in the fixture, and the
+        // editor is in no group, so it is the only page of the four that the
+        // page tree would not show them either.
+        self::assertSame([1, 5, 6], $this->subject->readableUids([1, 2, 5, 6], $this->permsClauseFor(2)));
+    }
+
+    public function testReadableUidsDropsADeletedPage(): void
+    {
+        self::assertSame([3], $this->subject->readableUids([3, 4], $this->permsClauseFor(1)));
+    }
+
+    public function testReadableUidsReturnsNothingForAnEmptyRequest(): void
+    {
+        self::assertSame([], $this->subject->readableUids([], $this->permsClauseFor(1)));
+    }
+
+    private function permsClauseFor(int $backendUserUid): string
+    {
+        return $this->setUpBackendUser($backendUserUid)->getPagePermsClause(Permission::PAGE_SHOW);
     }
 }

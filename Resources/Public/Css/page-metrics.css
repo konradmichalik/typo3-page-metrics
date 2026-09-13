@@ -1481,3 +1481,178 @@
 .pagemetrics-module-table th[scope="row"] {
     max-width: 32rem;
 }
+
+/* ------------------------------------------------------------------------
+   The way into the backend module, from the page module's tile row and from
+   the foot of a dashboard widget. Issue #73.
+   ------------------------------------------------------------------------ */
+
+/* An offer, not a call to action: it takes the size and the colour of the
+   date mark it sits beside, and only gains weight once it is hovered or
+   focused. A button here would push, and the tiles are what the reader came
+   for. */
+.pagemetrics-module-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--typo3-text-color-variant, #6a7085);
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.pagemetrics-module-link:hover,
+.pagemetrics-module-link:focus-visible {
+    color: var(--typo3-text-color-base, #14213d);
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 8%, transparent);
+    text-decoration: none;
+}
+
+.pagemetrics-module-link-icon {
+    display: inline-flex;
+}
+
+.pagemetrics-module-link-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* In a widget the link belongs under the widget's own content, on the same
+   line as nothing else, so it reads as the end of the block rather than as
+   another row of it. */
+.pagemetrics-widget-foot {
+    margin-top: 8px;
+}
+
+/* The tile row is right-aligned as a whole, so the link needs no alignment
+   of its own there; a widget's foot is left-aligned like everything above
+   it, and the padding that makes the row's pill sit right would push it off
+   that edge. */
+.pagemetrics-widget-foot .pagemetrics-module-link {
+    padding-inline: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Compare view (backend module)
+   --------------------------------------------------------------------------- */
+
+.pagemetrics-compare-picker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-block: 1rem;
+}
+
+/* A real heading, so the picker is a landmark the keyboard and the screen
+   reader can reach, at the size of the label it actually is. */
+.pagemetrics-compare-picker-label {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.pagemetrics-compare-baselines {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* The date range under the column head, so the head itself can keep saying
+   which period it is rather than only when it ran. */
+.pagemetrics-compare-range {
+    display: block;
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--typo3-text-color-variant, #515151);
+}
+
+/* A movement that cleared the metric's threshold, named in words next to the
+   badge that colours it: the colour is the second carrier of that fact and
+   never the only one. */
+.pagemetrics-compare-verdict {
+    font-weight: 600;
+}
+
+/* Everything that did not clear it, and the two states that could not be
+   judged at all. Quiet on purpose: a percentage that reads as loudly as a
+   significant one is the misreading this view exists to prevent. */
+.pagemetrics-compare-quiet {
+    color: var(--typo3-text-color-variant, #515151);
+}
+
+/* ==========================================================================
+   Backend module: the pages view
+   ========================================================================== */
+
+/* The 72rem cap the rest of the module wears keeps a label near its figure
+   on a two-column table. This one is as wide as the site has metrics, and
+   capping it would only move the scrollbar inside the table. */
+.pagemetrics-module-wide {
+    max-width: none;
+}
+
+/* Figures read down the column, so the header sits over the last digit
+   rather than over the first. */
+.pagemetrics-pages-table th[scope="col"] {
+    vertical-align: bottom;
+}
+
+.pagemetrics-pages-table th[scope="row"] {
+    max-width: 24rem;
+    font-weight: 600;
+}
+
+/* The column description is the provider's own sentence, set small under the
+   label so a six-column header stays one line of labels. */
+.pagemetrics-pages-table .pagemetrics-module-metric-description {
+    max-width: 18rem;
+    margin-inline-start: auto;
+    text-align: end;
+}
+
+.pagemetrics-pages-sort {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    color: inherit;
+    text-decoration: none;
+}
+
+.pagemetrics-pages-sort:hover,
+.pagemetrics-pages-sort:focus-visible {
+    text-decoration: underline;
+}
+
+/* The sorted column is marked by the arrow beside its label and by the
+   underline, never by the colour alone: a reader who cannot tell the two
+   greys apart still has the arrow and the aria-sort on the header. */
+.pagemetrics-pages-sort-active {
+    text-decoration: underline;
+}
+
+.pagemetrics-pages-pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-block-start: 1rem;
+}
+
+.pagemetrics-pages-pager nav {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.pagemetrics-pages-pager-position {
+    color: var(--typo3-text-color-variant, #515151);
+}
+

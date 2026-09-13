@@ -154,6 +154,16 @@ More than two days behind, the mark changes to a clock and spells the warning ou
 
 This is also why the popover's first two figures are called "Last day" and "Previous day" rather than "Today" and "Yesterday": they are the last two days of the selected period, which is rarely today and yesterday.
 
+## Opening the full view
+
+Beside the date mark sits a link into **Web → Page metrics**, this extension's own backend module, opened on the page the tiles are about. The tile row answers one question at a glance; the module answers the ones that follow it, with every metric as a labelled table, the chart across the full width, the period's markers as a list and a comparison against the period before.
+
+The link carries the page and nothing else. The period chosen above the tiles does not travel with it, because the module keeps its own period as a stored per-user setting rather than as URL state: a query parameter named like one of those settings is persisted before the module is even reached, so a link carrying a period would not pre-select one for that visit, it would overwrite the period that reader gets on every later visit, including the ones opened from the module menu. The module names its period in the docheader, so a period that differs from the tile row's is visible rather than silent, and changing it is one click.
+
+No link appears where the module would refuse the reader: where `tx_typo3pagemetrics.disabled = 1` is set for them (see [Security](security.md)), where none of their groups lists the module (it is declared `access = user`, so a non-admin needs it granted), or where they have no show permission on the page itself. A link to a page that answers "you may not see this" is worse than no link at all.
+
+One case it does not cover: `options.hideModules = web_pagemetrics` takes the entry out of the module menu but leaves the route open, so a user who has that setting without the TSconfig switch still gets this link, and the module still opens for them. That is the same split [Security](security.md) describes, where only the TSconfig switch is a boundary and the module setting tidies the menu.
+
 ## Days without data
 
 A sparkline distinguishes a day with no traffic from a day the extension has

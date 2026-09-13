@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\TrendSentiment;
-use KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder;
+use KonradMichalik\Typo3PageMetrics\Service\{ModuleLinkBuilder, SiteMetricsOverviewBuilder};
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Settings\SettingDefinition;
@@ -49,6 +49,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
         private SiteMetricsOverviewBuilder $overviewBuilder,
         private SiteFinder $siteFinder,
         private BackendViewFactory $backendViewFactory,
+        private ModuleLinkBuilder $moduleLinkBuilder,
     ) {}
 
     /**
@@ -109,6 +110,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
         $view = $this->backendViewFactory->create($context->request, ['konradmichalik/typo3-page-metrics', 'typo3/cms-dashboard']);
         $view->assignMultiple([
             'sites' => $sites,
+            'moduleUrls' => $this->moduleLinkBuilder->forSites($this->siteFinder->getAllSites()),
             'sentiment' => $this->rowSentiment($sites)->value,
             'columnLabel' => '' !== $metric ? ($this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites())[$metric] ?? null) : null,
             'configuration' => $this->configuration,

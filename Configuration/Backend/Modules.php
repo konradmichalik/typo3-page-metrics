@@ -46,10 +46,20 @@ return [
                 'target' => PageMetricsModuleController::class.'::handleRequest',
             ],
         ],
+        // BackendModuleValidator merges a query parameter named like any of
+        // these into the stored data and persists it before the request
+        // reaches the controller, so every docheader control and every
+        // in-view picker is a plain link and nothing writes state by hand.
         'moduleData' => [
             'period' => 30,
             'view' => 'page',
             'includeSubpages' => false,
+            'compareBaseline' => 'previous',
+            // Which metric you always look at is a preference and belongs
+            // here; which page of the table you stopped on is a position
+            // inside one reading and stays in the URL.
+            'sort' => '',
+            'direction' => 'desc',
         ],
     ],
 ];

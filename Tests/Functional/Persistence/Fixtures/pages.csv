@@ -1,8 +1,8 @@
 "pages"
-,"uid","pid","deleted","hidden","sys_language_uid","l10n_parent","slug","title"
-,1,0,0,0,0,0,"/","Home"
-,2,1,0,0,0,0,"/about","About"
-,3,0,0,0,0,0,"/other","Other Root"
-,4,3,1,0,0,0,"/deleted-child","Deleted Child"
-,5,1,0,0,0,0,"/services","Services"
-,6,5,0,0,0,0,"/services/team","Team"
+,"uid","pid","deleted","hidden","sys_language_uid","l10n_parent","slug","title","perms_userid","perms_groupid","perms_user","perms_group","perms_everybody"
+,1,0,0,0,0,0,"/","Home",1,0,31,0,1
+,2,1,0,0,0,0,"/about","About",1,0,31,0,0
+,3,0,0,0,0,0,"/other","Other Root",1,0,31,0,1
+,4,3,1,0,0,0,"/deleted-child","Deleted Child",1,0,31,0,1
+,5,1,0,0,0,0,"/services","Services",1,0,31,0,1
+,6,5,0,0,0,0,"/services/team","Team",1,0,31,0,1

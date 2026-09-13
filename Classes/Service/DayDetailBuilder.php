@@ -142,11 +142,7 @@ final readonly class DayDetailBuilder
         /** @var list<array{sortOrder: int, value: DayMetricValue}> $ordered */
         $ordered = [];
 
-        foreach ($this->providers as $provider) {
-            if (!$provider->supports($site)) {
-                continue;
-            }
-
+        foreach ($this->metricDefinitionCollector->supporting($this->providers, $site) as $provider) {
             $coverage = $this->importCoverage->forProvider($provider->getIdentifier(), $site->getIdentifier());
 
             foreach ($this->metricDefinitionCollector->forSite($provider, $site) as $definition) {
@@ -268,11 +264,7 @@ final readonly class DayDetailBuilder
         $latestKnownDay = (new DateTimeImmutable('today'))->modify('-1 day');
         $rows = [];
 
-        foreach ($this->providers as $provider) {
-            if (!$provider->supports($site)) {
-                continue;
-            }
-
+        foreach ($this->metricDefinitionCollector->supporting($this->providers, $site) as $provider) {
             $coverage = $this->importCoverage->forProvider($provider->getIdentifier(), $site->getIdentifier());
 
             // Counts only, and no rate metrics at all. The claim this block

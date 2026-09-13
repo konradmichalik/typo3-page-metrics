@@ -15,6 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Provider\Matomo;
 
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, MetricDefinition, MetricSignificance, RateMetricDefinition, UrlMetric};
+use KonradMichalik\Typo3PageMetrics\Exception\MatomoRequestFailedException;
 use KonradMichalik\Typo3PageMetrics\Provider\SiteAwareMetricProviderInterface;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -191,10 +192,23 @@ final readonly class MatomoMetricProvider implements SiteAwareMetricProviderInte
             // importer keys its aggregate by dimension, so a channel row
             // lands beside the headline rather than in it, and the headline
             // stays the total it was before this existed.
-            yield from $this->channelMetrics->metricsFor(
-                $this->apiClient->request($configuration, $this->channelMetrics->bulkRequestParameters($configuration, $day)),
-                $day,
-            );
+            //
+            // Its own try, and this is the whole point of it: the split is
+            // the least important thing this loop yields, and a bulk request
+            // that times out, or a Matomo whose bulk API is switched off or
+            // whose token may not use a segment, throws for the request and
+            // not for one slot inside it. Unguarded that throw leaves the
+            // generator, ImportCommand catches it per provider, and every day
+            // already collected is discarded: page views, visits and goals
+            // lost for a run, to fail at the one figure nobody would trade
+            // them for.
+            try {
+                $channels = $this->apiClient->request($configuration, $this->channelMetrics->bulkRequestParameters($configuration, $day));
+            } catch (MatomoRequestFailedException) {
+                continue;
+            }
+
+            yield from $this->channelMetrics->metricsFor($channels, $day);
         }
     }
 }

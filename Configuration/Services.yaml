@@ -216,3 +216,25 @@ services:
     # reach one controller.
     KonradMichalik\Typo3PageMetrics\Controller\PageMetricsModuleController:
         public: true
+
+    # Public so functional tests can fetch it directly via $this->get() and
+    # assert who the module link is offered to, without rendering a tile row
+    # or a widget to find out.
+    KonradMichalik\Typo3PageMetrics\Service\ModuleLinkBuilder:
+        public: true
+
+    # The tagged iterator has to be named, like every other consumer of the
+    # metric providers. Public so functional tests can fetch it directly via
+    # $this->get() instead of rendering the module's compare view.
+    KonradMichalik\Typo3PageMetrics\Service\PeriodComparisonBuilder:
+        arguments:
+            $providers: !tagged_iterator page_metrics.metric_provider
+        public: true
+
+    # The tagged iterator has to be named, like every other consumer of the
+    # metric providers. Public so functional tests can fetch it directly via
+    # $this->get() instead of rendering the module's pages view.
+    KonradMichalik\Typo3PageMetrics\Service\SitePagesTableBuilder:
+        arguments:
+            $providers: !tagged_iterator page_metrics.metric_provider
+        public: true
