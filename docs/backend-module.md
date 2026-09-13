@@ -26,6 +26,41 @@ where the page had no figures in the previous period, and a dash where that
 period was never imported, because a percentage against days nobody fetched is
 not a smaller number, it is not a number.
 
+**Compare.** Two periods of the same page held against each other, metric by
+metric, with a chart of the site's main metric over both.
+
+Which two periods is a choice of four, all keeping the length of the period you
+selected and only moving the start back: the period immediately before, or the
+same days one month, one quarter or one year earlier. Only the start moves,
+because two totals taken over windows of different lengths are not comparable
+and nothing downstream could tell them apart.
+
+The chart draws both periods to **one** scale, which is what lets you compare
+their heights rather than only their shapes. Its x axis counts days into each
+period rather than dates, because the two cover different ones: day one is held
+against day one. The earlier period is the dashed line, dashed rather than
+differently coloured because it is the same metric and because a dash survives a
+forced-colours mode where a hue does not.
+
+A difference is called significant only when it clears both thresholds the
+metric itself names, which is the same rule the dashboard's trend widget ranks
+by. Anything under that is printed plainly and named as normal variation.
+
+**Pages.** Every page of the site as a table, sortable by any metric and by
+content decay, with pages you cannot see in the page tree left out.
+
+The column the table is sorted by carries three things in one cell: the total
+for the period, that same figure drawn day by day, and the change against the
+period before. All three follow the sort, so ordering by another metric draws
+that one instead. A day that was never imported is a gap in the drawing rather
+than a zero, and the drawing says nothing the figure and the change beside it
+do not, which is why a screen reader is given those two and not the picture.
+
+What each column counts is stated once above the table rather than once in
+every header. That repetition was most of why the table had to be scrolled
+sideways, and putting it behind a hover would have been the mistake this module
+exists to avoid.
+
 Further views follow one at a time and each is its own change.
 
 ## Period

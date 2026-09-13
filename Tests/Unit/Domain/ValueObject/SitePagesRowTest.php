@@ -57,7 +57,7 @@ final class SitePagesRowTest extends TestCase
         return new SitePagesRow(
             2,
             'About',
-            [new SitePagesCell(true, '42')],
+            [new SitePagesCell(true, '42', false, null)],
             -80,
             TrendDirection::Down,
             MetricPolarity::HigherIsBetter,

@@ -35,8 +35,15 @@
                     <p class="pagemetrics-module-intro">
                         <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.scope" arguments="{0: pagesTable.trendLabel, 1: pagesTable.previousRangeLabel}" default="A page is listed when it recorded something in this period, or when it recorded %1$s in %2$s and nothing since, which is the page worth finding. Pages you cannot see in the page tree are left out. A count with no stored value reads as zero, because that is how an importer records a page that had no traffic, while a rate with nothing to divide reads as no value at all." />
                     </p>
+                    <f:comment>
+                        The trend column is gone and this paragraph is what
+                        replaced its header: the shape and the change now sit
+                        in the column of the metric they are about, and a
+                        reader has to be told that the drawing is that metric
+                        day by day rather than something new.
+                    </f:comment>
                     <p class="pagemetrics-module-intro">
-                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.trendIntro" arguments="{0: pagesTable.trendLabel, 1: pagesTable.previousRangeLabel}" default="The trend column compares %1$s against the period of the same length before this one, %2$s. It follows whichever column the table is sorted by, so sorting by another metric compares that one instead." />
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.trendShape" arguments="{0: pagesTable.trendLabel, 1: pagesTable.previousRangeLabel}" default="The %1$s column carries three things: the total for this period, that same figure drawn day by day, and the change against the period of the same length before this one, %2$s. All three follow whichever column the table is sorted by, so sorting by another metric draws that one instead. A day that was never imported is left blank in the drawing rather than drawn as a zero, and a page that recorded nothing at all this period gets no drawing, only its figure and its change. The drawing says nothing the figure and the change beside it do not, so a screen reader is given those two and not the picture." />
                     </p>
                     <f:comment>
                         "Decay" is a word this view invents, so it is the one
@@ -61,7 +68,41 @@
 
                     <f:if condition="{pagesTable.rows}">
                         <f:then>
-                            <div class="table-fit">
+                            <f:comment>
+                                The provider's own description of every column,
+                                once above the table instead of once inside
+                                every column header, which is what made the
+                                table wider than the screen. Still prose beside
+                                the view and still read rather than hovered:
+                                moving an explanation out of a cell is allowed,
+                                moving it behind a hover is the mistake this
+                                module exists to avoid.
+                            </f:comment>
+                            <p class="pagemetrics-module-intro">
+                                <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.columnsIntro" default="What each column counts, said once here rather than once in every column header:" />
+                            </p>
+                            <dl class="pagemetrics-pages-glossary">
+                                <f:for each="{pagesTable.columns}" as="column">
+                                    <div class="pagemetrics-pages-glossary-entry">
+                                        <dt>{column.label}</dt>
+                                        <dd>{column.description}</dd>
+                                    </div>
+                                </f:for>
+                                <div class="pagemetrics-pages-glossary-entry">
+                                    <dt><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.decay" default="Decay" /></dt>
+                                    <dd><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.decayDescription" default="Falling traffic on a page nobody has changed." /></dd>
+                                </div>
+                            </dl>
+
+                            <f:comment>
+                                The chart labels sit once on the wrapper rather
+                                than on every row's chart: sparkline.js reads
+                                them off the nearest ancestor carrying them (see
+                                getLabels()), and repeating the whole label set
+                                twenty-five times would be the payload of the
+                                table several times over.
+                            </f:comment>
+                            <div class="table-fit" data-labels="{f:format.json(value: sparklineLabels)}">
                                 <table class="table table-striped pagemetrics-module-table pagemetrics-pages-table">
                                     <thead>
                                         <tr>
@@ -88,21 +129,13 @@
                                                             </f:else>
                                                         </f:if>
                                                     </a>
-                                                    <f:comment>
-                                                        The provider's own description under the
-                                                        column label, read rather than hovered,
-                                                        the same text the page view puts under
-                                                        each metric name.
-                                                    </f:comment>
-                                                    <span class="pagemetrics-module-metric-description">{column.description}</span>
                                                 </th>
                                             </f:for>
-                                            <th scope="col" class="text-end"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.trend" arguments="{0: pagesTable.trendLabel}" default="Trend: %1$s" /></th>
                                             <f:comment>
-                                                The decay column sits next to the trend because
-                                                the two are read together: the trend is the fall,
-                                                this is the neglect, and the verdict is only the
-                                                two at once. Sortable exactly like a metric
+                                                The decay column is the neglect half of the
+                                                verdict and the sorted metric's own column is the
+                                                fall, so the two are still read together, one at
+                                                each end of the row. Sortable exactly like a metric
                                                 header, with the same aria-sort and the same real
                                                 link, because it is a column of this table and not
                                                 a mode the table is put into.
@@ -121,7 +154,6 @@
                                                         </f:else>
                                                     </f:if>
                                                 </a>
-                                                <span class="pagemetrics-module-metric-description"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.decayDescription" default="Falling traffic on a page nobody has changed." /></span>
                                             </th>
                                         </tr>
                                     </thead>
@@ -133,7 +165,7 @@
                                                     <a href="{rowUri}">{row.title}</a>
                                                 </th>
                                                 <f:for each="{row.cells}" as="cell">
-                                                    <td class="text-end">
+                                                    <td class="text-end{f:if(condition: cell.showsTrend, then: ' pagemetrics-pages-sorted-cell')}">
                                                         <f:if condition="{cell.hasValue}">
                                                             <f:then>{cell.formattedValue}</f:then>
                                                             <f:else>
@@ -141,27 +173,57 @@
                                                                 <span class="pagemetrics-visually-hidden"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.pages.noValue" default="not recorded" /></span>
                                                             </f:else>
                                                         </f:if>
+                                                        <f:comment>
+                                                            The shape and the change of the metric
+                                                            the table is ordered by, in that
+                                                            metric's own column. Both used to be a
+                                                            column of their own, and a table that
+                                                            already ran past the edge of the screen
+                                                            could not afford one.
+                                                        </f:comment>
+                                                        <f:if condition="{cell.showsTrend}">
+                                                            <f:if condition="{cell.hasSparkline}">
+                                                                <f:comment>
+                                                                    The renderer the page view and the
+                                                                    dashboard widgets already use:
+                                                                    initializeStaticCharts() draws any
+                                                                    .pagemetrics-widget-chart from this
+                                                                    payload, so a table of shapes needs
+                                                                    no chart code of its own.
+
+                                                                    Hidden from assistive technology on
+                                                                    purpose. The renderer labels each
+                                                                    chart with its own date and value
+                                                                    range, and twenty-five of those in
+                                                                    one table would be read out ahead of
+                                                                    the figure and the change that say
+                                                                    the same thing in the same cell. The
+                                                                    row stays fully readable as text,
+                                                                    which is the only reason a drawing
+                                                                    may be treated as decoration.
+                                                                </f:comment>
+                                                                <div class="pagemetrics-widget-chart pagemetrics-pages-sparkline" aria-hidden="true" data-sparkline="{f:format.json(value: cell.sparkline)}"></div>
+                                                            </f:if>
+                                                            <f:comment>
+                                                                The same three states the tiles and the
+                                                                widget tables draw, for the same reasons:
+                                                                no badge where the previous period was
+                                                                never imported, "new" where there is
+                                                                nothing to compare against, a percentage
+                                                                otherwise. The badge carries an arrow and
+                                                                a written movement beside its colour, so
+                                                                nothing here is told by colour alone.
+                                                            </f:comment>
+                                                            <f:if condition="{row.hasNoComparison}">
+                                                                <f:then><span class="text-body-secondary" title="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.notImported', default: 'The previous period was never imported, so there is nothing to compare against.')}">&#8212;</span></f:then>
+                                                                <f:else>
+                                                                    <f:variable name="deltaText"><f:if condition="{row.isNew}"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:then><f:else>{row.deltaPercent}%</f:else></f:if></f:variable>
+                                                                    <f:render partial="TrendBadge" arguments="{trend: row.trend, sentiment: row.sentiment, deltaText: deltaText, isNew: row.isNew}" />
+                                                                </f:else>
+                                                            </f:if>
+                                                        </f:if>
                                                     </td>
                                                 </f:for>
-                                                <td class="text-end">
-                                                    <f:comment>
-                                                        The same three states the tiles and the
-                                                        widget tables draw, for the same reasons:
-                                                        no badge where the previous period was
-                                                        never imported, "new" where there is
-                                                        nothing to compare against, a percentage
-                                                        otherwise. The badge carries an arrow and
-                                                        a written movement beside its colour, so
-                                                        nothing here is told by colour alone.
-                                                    </f:comment>
-                                                    <f:if condition="{row.hasNoComparison}">
-                                                        <f:then><span class="text-body-secondary" title="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.notImported', default: 'The previous period was never imported, so there is nothing to compare against.')}">&#8212;</span></f:then>
-                                                        <f:else>
-                                                            <f:variable name="deltaText"><f:if condition="{row.isNew}"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:then><f:else>{row.deltaPercent}%</f:else></f:if></f:variable>
-                                                            <f:render partial="TrendBadge" arguments="{trend: row.trend, sentiment: row.sentiment, deltaText: deltaText, isNew: row.isNew}" />
-                                                        </f:else>
-                                                    </f:if>
-                                                </td>
                                                 <td class="text-end">
                                                     <f:comment>
                                                         The verdict is a word and the evidence is a

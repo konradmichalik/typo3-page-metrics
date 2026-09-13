@@ -206,7 +206,9 @@ final class CsvExportBuilderTest extends TestCase
      */
     private function comparison(array $rows): PeriodComparison
     {
-        return new PeriodComparison(ComparisonBaseline::default(), 30, '', '', $rows, ComparisonBaseline::all());
+        // No chart: the export writes the table, and a chart payload is a
+        // shape for the renderer rather than a column of anything.
+        return new PeriodComparison(ComparisonBaseline::default(), 30, '', '', $rows, ComparisonBaseline::all(), [], '', false);
     }
 
     private function comparisonRow(string $identifier, ?int $deltaPercent, bool $isSignificant, bool $isComparable = true): PeriodComparisonRow

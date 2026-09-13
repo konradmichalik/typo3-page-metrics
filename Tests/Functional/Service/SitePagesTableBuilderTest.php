@@ -384,6 +384,115 @@ final class SitePagesTableBuilderTest extends FunctionalTestCase
         self::assertSame([false, false, false, false], array_map(static fn ($column): bool => $column->isSorted, $table->columns));
     }
 
+    public function testDrawsTheSortedMetricsDailyShapeOnTheCellThatCarriesIt(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->upsert(1, 'matomo.pageviews', $this->today, 5);
+        $this->upsert(1, 'matomo.pageviews', $this->today->modify('-2 days'), 3);
+
+        $cells = $this->build($this->site())->rows[0]->cells;
+        $series = $cells[0]->sparkline[0];
+
+        // The shape sits in the column of the metric it is the shape of,
+        // which is what lets the trend column go entirely.
+        self::assertTrue($cells[0]->showsTrend);
+        self::assertFalse($cells[1]->showsTrend);
+        self::assertFalse($cells[1]->hasSparkline);
+        self::assertSame('Page views', $series['label']);
+        self::assertSame('count', $series['unit']);
+        self::assertCount(7, $series['values']);
+        self::assertSame(5, $series['values'][$this->today->format('Y-m-d')]);
+        self::assertSame(3, $series['values'][$this->today->modify('-2 days')->format('Y-m-d')]);
+        // A quiet day inside the imported window is a real zero, because a
+        // provider writes no row for a page nobody visited.
+        self::assertSame(0, $series['values'][$this->today->modify('-1 day')->format('Y-m-d')]);
+    }
+
+    public function testLeavesADayNobodyImportedBlankInTheShapeRatherThanDrawingItAsZero(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->upsert(1, 'matomo.pageviews', $this->today, 5);
+        $this->get(ImportStateRepository::class)->markImported(
+            'matomo',
+            'main',
+            $this->today,
+            new DateRange($this->today->modify('-2 days'), $this->today),
+            true,
+        );
+
+        $values = $this->build($this->site())->rows[0]->cells[0]->sparkline[0]['values'];
+
+        // Four of the seven days are outside the imported window, and a line
+        // drawn at zero through them reads as a traffic collapse.
+        self::assertNull($values[$this->today->modify('-6 days')->format('Y-m-d')]);
+        self::assertNull($values[$this->today->modify('-3 days')->format('Y-m-d')]);
+        self::assertSame(5, $values[$this->today->format('Y-m-d')]);
+    }
+
+    public function testDrawsTheShapeOfWhicheverMetricTheTableIsSortedBy(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->upsert(1, 'matomo.entries', $this->today, 10);
+        $this->upsert(1, 'matomo.entry_bounces', $this->today, 4);
+
+        $cells = $this->build($this->site(), 'matomo.bounce_rate')->rows[0]->cells;
+        $series = $cells[3]->sparkline[0];
+
+        self::assertFalse($cells[0]->showsTrend);
+        self::assertTrue($cells[3]->showsTrend);
+        self::assertSame('percent', $series['unit']);
+        self::assertSame(40, $series['values'][$this->today->format('Y-m-d')]);
+        // A day with nothing to divide reads as zero, which is what
+        // RateSeriesCalculator answers everywhere else a rate is drawn, from
+        // the page view's chart to the tiles. One reading of an empty day per
+        // extension, not one per view.
+        self::assertSame(0, $series['values'][$this->today->modify('-1 day')->format('Y-m-d')]);
+    }
+
+    public function testKeepsTheShapeOnTheSitesPrimaryMetricWhileSortingByDecay(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->fell(1, 200, 40);
+        $this->touchPage(1, '-900 days');
+
+        $cells = $this->build($this->site(), SitePagesTable::SORT_DECAY)->rows[0]->cells;
+
+        self::assertTrue($cells[0]->showsTrend);
+        self::assertSame('Page views', $cells[0]->sparkline[0]['label']);
+    }
+
+    public function testDrawsNoShapeForAPageThatRecordedNothingInThisPeriod(): void
+    {
+        $this->writeSiteConfiguration();
+        // Listed only because it recorded the sorted metric in the period
+        // before this one, which is the row this view exists to find. There
+        // is no shape to draw, and the cell and the badge still say so.
+        $this->upsert(1, 'matomo.pageviews', $this->today->modify('-10 days'), 80);
+        $this->upsert(2, 'matomo.pageviews', $this->today, 5);
+
+        $row = $this->rowFor($this->build($this->site()), 1);
+
+        self::assertFalse($row->cells[0]->hasSparkline);
+        self::assertTrue($row->cells[0]->showsTrend);
+        self::assertSame('0', $row->cells[0]->formattedValue);
+        self::assertSame(-100, $row->deltaPercent);
+    }
+
+    public function testTheExportCarriesTheSumAndTheChangeButNoDailyShape(): void
+    {
+        $this->writeSiteConfiguration();
+        $this->upsert(1, 'matomo.pageviews', $this->today, 5);
+
+        $exported = $this->stream($this->site())[0];
+
+        // A CSV row is one line per page. A daily series would either add a
+        // column per day, so the file changes shape with the period, or go in
+        // as a blob nothing can read as a column, and the sum and the change
+        // beside it are what the shape depicts anyway.
+        self::assertObjectNotHasProperty('sparkline', $exported);
+        self::assertSame(5, $exported->values['matomo.pageviews']);
+    }
+
     public function testStreamsEveryRowAndNotOnlyThePageTheTableShows(): void
     {
         $this->writeSiteConfiguration();

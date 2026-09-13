@@ -1617,13 +1617,6 @@
     font-weight: 600;
 }
 
-/* The column description is the provider's own sentence, set small under the
-   label so a six-column header stays one line of labels. */
-.pagemetrics-pages-table .pagemetrics-module-metric-description {
-    max-width: 18rem;
-    margin-inline-start: auto;
-    text-align: end;
-}
 
 .pagemetrics-pages-sort {
     display: inline-flex;
@@ -1705,4 +1698,59 @@
     flex-shrink: 0;
     font-size: 0.85em;
     opacity: 0.7;
+}
+
+/* The scale caveat under a multi-series legend: its own line rather than a
+   third legend item, which is what it would otherwise wrap as. Whether the
+   heights of two lines may be compared at all is a property of the chart, not
+   one more series in it. */
+.pagemetrics-sparkline-legend-note {
+    flex-basis: 100%;
+}
+
+/* ==========================================================================
+   Pages table: the shape beside the figure
+   ========================================================================== */
+
+/* Narrow and short on purpose. This is a shape in a table cell, not a chart:
+   it answers "falling or not" at a glance and leaves the question of how far
+   to the percentage beside it. Without the height the dashboard chart's own
+   260px would apply and every row would be a screenful. */
+.pagemetrics-pages-sparkline {
+    width: 96px;
+    margin-inline-start: auto;
+}
+
+.pagemetrics-pages-sparkline .pagemetrics-sparkline {
+    height: 24px;
+}
+
+/* The renderer draws a date axis under every chart it makes. Twenty-five of
+   them would repeat the period the prose above the table already states once. */
+.pagemetrics-pages-sparkline .pagemetrics-sparkline-dates {
+    display: none;
+}
+
+.pagemetrics-pages-sorted-cell {
+    white-space: nowrap;
+}
+
+/* The descriptions, once above the table rather than once in every column
+   header. That repetition was most of why the table had to be scrolled
+   sideways, and a hover would have been the mistake the module exists to
+   avoid. */
+.pagemetrics-pages-glossary {
+    display: grid;
+    gap: 0.25rem 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    margin-bottom: 1rem;
+}
+
+.pagemetrics-pages-glossary dt {
+    font-weight: 600;
+}
+
+.pagemetrics-pages-glossary dd {
+    margin: 0;
+    color: var(--typo3-text-color-variant, #6a7085);
 }

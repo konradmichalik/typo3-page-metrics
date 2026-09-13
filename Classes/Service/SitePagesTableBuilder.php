@@ -23,10 +23,13 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 
 use function array_chunk;
+use function array_combine;
+use function array_fill_keys;
 use function array_filter;
 use function array_key_exists;
 use function array_keys;
 use function array_map;
+use function array_replace;
 use function array_slice;
 use function array_values;
 use function ceil;
@@ -52,6 +55,11 @@ use function usort;
  * has. Nothing here asks a question per row: a site-wide table is exactly
  * the place where a per-row query becomes an N+1 over a whole site.
  *
+ * The one figure that is not site-wide is the sparkline every row carries:
+ * that is asked for after the sort has picked the twenty-five rows on
+ * screen, and for those rows only, in one query for a count metric or two
+ * for a rate (see sparklinesFor()). The export pays for none of it.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class SitePagesTableBuilder
@@ -63,6 +71,7 @@ final readonly class SitePagesTableBuilder
         private SitePageUidRepository $pageUidRepository,
         private DailyMetricsRepository $dailyMetricsRepository,
         private RateMetricReader $rateMetricReader,
+        private RateSeriesCalculator $rateSeriesCalculator,
         private MetricValueFormatter $valueFormatter,
         private ImportCoverage $importCoverage,
         private MetricDefinitionCollector $metricDefinitionCollector,
@@ -96,7 +105,7 @@ final readonly class SitePagesTableBuilder
         return new SitePagesTable(
             true,
             $this->columnsFor($dataSet->metrics, $dataSet->sortKey, $dataSet->sortDirection),
-            $this->rowsFor($visiblePageUids, $dataSet),
+            $this->rowsFor($visiblePageUids, $dataSet, $this->sparklinesFor($site, $visiblePageUids, $languageId, $dataSet)),
             $dataSet->sortKey,
             $dataSet->sortDirection,
             $dataSet->sortMetric->label,
@@ -272,6 +281,92 @@ final readonly class SitePagesTableBuilder
             $decaySort
                 ? $this->sortedByDecay(array_keys($sortValues), $decaying, $ages, $sortDirection)
                 : $this->sorted(array_keys($sortValues), $sortValues, $sortDirection),
+        );
+    }
+
+    /**
+     * The daily shape of the sorted metric for each row that is actually on
+     * screen, ready to be handed to sparkline.js as it stands.
+     *
+     * Asked for after the sort has chosen the twenty-five rows on screen, and
+     * for those rows only, which is what keeps this affordable: one query per
+     * rendered screen for a count metric and two for a rate (its numerator and
+     * its denominator), whatever the length of the site, and none at all for
+     * the CSV export, which draws nothing. A series per row would be
+     * twenty-five queries for one table.
+     *
+     * Every day outside the imported window comes back null rather than zero,
+     * and the renderer leaves a gap there. Drawing a line at zero through days
+     * nobody fetched is the reading ImportCoverage exists to prevent, and on a
+     * table of twenty-five rows it would repeat that false collapse
+     * twenty-five times.
+     *
+     * @param list<int> $pageUids
+     *
+     * @return array<int, array{label: string, color: string, unit: string, values: array<string, int|null>}>
+     */
+    private function sparklinesFor(Site $site, array $pageUids, int $languageId, SitePagesDataSet $dataSet): array
+    {
+        $metric = $dataSet->sortMetric;
+        // The provider is resolved a second time rather than carried down from
+        // dataSetFor(), and it costs nothing: both read the site configuration,
+        // and ImportCoverage caches a provider's window per request. The
+        // nullsafe hop is unreachable in practice, because build() returns
+        // early on a site with no provider at all.
+        $coverage = $this->importCoverage->forProvider($this->resolveProvider($site)?->getIdentifier() ?? '', $site->getIdentifier());
+
+        $series = $metric instanceof MetricDefinition
+            ? $this->dailyMetricsRepository->seriesByPage($pageUids, $languageId, $metric->identifier, $dataSet->currentRange)
+            : $this->rateSeriesByPage($metric, $pageUids, $languageId, $dataSet->currentRange);
+
+        return array_map(
+            fn (array $values): array => [
+                'label' => $metric->label,
+                'color' => $metric->color,
+                'unit' => $metric->unit->value,
+                'values' => $this->importCoverage->mask($values, $coverage),
+            ],
+            $series,
+        );
+    }
+
+    /**
+     * A rate day by day, per page: sum(numerator) over sum(denominator) for
+     * each single day, which is the arithmetic RateSeriesCalculator already
+     * does for the page view's chart and for every rate tile. Reused rather
+     * than rewritten, so a rate drawn in this table means the same thing as
+     * the same rate drawn anywhere else in the extension, a day with nothing
+     * to divide included.
+     *
+     * The numerator is filled out to the denominator's own days first: the
+     * series is keyed on the pages a denominator was recorded for, and a page
+     * carrying only a denominator would otherwise come back with a shorter
+     * line than the period it covers.
+     *
+     * Mapped and recombined rather than looped, because array_map over two
+     * arrays at once returns a list and the page uid is the key the caller
+     * reads the result by.
+     *
+     * @param list<int> $pageUids
+     *
+     * @return array<int, array<string, int>>
+     */
+    private function rateSeriesByPage(RateMetricDefinition $metric, array $pageUids, int $languageId, DateRange $range): array
+    {
+        $numerators = $this->dailyMetricsRepository->seriesByPage($pageUids, $languageId, $metric->numerator, $range);
+        $denominators = $this->dailyMetricsRepository->seriesByPage($pageUids, $languageId, $metric->denominator, $range);
+
+        return array_combine(
+            array_keys($denominators),
+            array_map(
+                fn (int $pageUid, array $denominatorSeries): array => $this->rateSeriesCalculator->series(
+                    array_replace(array_fill_keys(array_keys($denominatorSeries), 0), $numerators[$pageUid] ?? []),
+                    $denominatorSeries,
+                    $metric->unit,
+                ),
+                array_keys($denominators),
+                $denominators,
+            ),
         );
     }
 
@@ -502,11 +597,12 @@ final readonly class SitePagesTableBuilder
     }
 
     /**
-     * @param list<int> $pageUids
+     * @param list<int>                                                                                      $pageUids
+     * @param array<int, array{label: string, color: string, unit: string, values: array<string, int|null>}> $sparklines
      *
      * @return list<SitePagesRow>
      */
-    private function rowsFor(array $pageUids, SitePagesDataSet $dataSet): array
+    private function rowsFor(array $pageUids, SitePagesDataSet $dataSet, array $sparklines): array
     {
         // One title lookup for the rows actually on screen, after the sort
         // has decided which those are, the same order as
@@ -519,7 +615,18 @@ final readonly class SitePagesTableBuilder
             $cells = [];
             foreach ($dataSet->metrics as $metric) {
                 $value = self::valueOf($metric, $dataSet->currentValues[$metric->identifier], $pageUid);
-                $cells[] = new SitePagesCell(null !== $value, null !== $value ? $this->valueFormatter->format($value, $metric->unit) : '');
+                // The shape and the movement go in the column of the metric
+                // they are about, which is always the one the table is
+                // ordered by. Sorting by decay is not sorting by a metric, and
+                // resolveSortMetric() has already answered that with the
+                // site's first metric, so the cell that carries them is never
+                // in doubt.
+                $cells[] = new SitePagesCell(
+                    null !== $value,
+                    null !== $value ? $this->valueFormatter->format($value, $metric->unit) : '',
+                    $metric->identifier === $dataSet->sortMetric->identifier,
+                    $sparklines[$pageUid] ?? null,
+                );
             }
 
             $trend = $this->trendFor($pageUid, $dataSet);

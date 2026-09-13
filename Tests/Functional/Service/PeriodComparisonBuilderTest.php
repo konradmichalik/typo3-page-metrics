@@ -22,6 +22,7 @@ use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
+use function array_keys;
 use function array_map;
 use function sprintf;
 
@@ -228,6 +229,113 @@ final class PeriodComparisonBuilderTest extends FunctionalTestCase
             ['previous', 'month', 'quarter', 'year'],
             array_map(static fn (ComparisonBaseline $baseline): string => $baseline->key, $this->build()->baselineOptions),
         );
+    }
+
+    public function testTheChartLaysBothPeriodsOverEachOtherDayByDay(): void
+    {
+        // Day 1 against day 1 is the only alignment that means anything: the
+        // two ranges cover different dates, so a shared axis cannot name
+        // them and counts the days of the period instead.
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(2, 0, 'matomo', $today->modify('-6 days'), 'matomo.pageviews', 40);
+        $repository->upsert(2, 0, 'matomo', $today->modify('-13 days'), 'matomo.pageviews', 10);
+
+        $chart = $this->build()->chart;
+
+        self::assertCount(2, $chart);
+        self::assertSame(
+            ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'],
+            array_keys($chart[0]['values']),
+        );
+        self::assertSame(array_keys($chart[0]['values']), array_keys($chart[1]['values']));
+        self::assertSame(40, $chart[0]['values']['Day 1']);
+        self::assertSame(10, $chart[1]['values']['Day 1']);
+    }
+
+    public function testTheChartDrawsTheMetricThePageViewAlreadyCharts(): void
+    {
+        $this->writeSiteConfiguration();
+
+        $comparison = $this->build();
+
+        self::assertSame('Page views', $comparison->chartLabel);
+        self::assertSame('count', $comparison->chart[0]['unit']);
+    }
+
+    public function testTheEarlierPeriodIsSubordinateAndNotToldApartByColour(): void
+    {
+        $this->writeSiteConfiguration();
+
+        $comparison = $this->build();
+
+        self::assertFalse($comparison->chart[0]['subordinate']);
+        self::assertTrue($comparison->chart[1]['subordinate']);
+        // Same metric, so the same colour. What separates the two lines is
+        // the dash the renderer draws the subordinate one with and the range
+        // each legend entry names, neither of which is a hue.
+        self::assertSame($comparison->chart[0]['color'], $comparison->chart[1]['color']);
+        self::assertStringContainsString($comparison->currentRangeLabel, $comparison->chart[0]['label']);
+        self::assertStringContainsString($comparison->referenceRangeLabel, $comparison->chart[1]['label']);
+    }
+
+    public function testADayNobodyImportedIsBlankInTheChartRatherThanALineAtZero(): void
+    {
+        // The same fabricated zeros the tile sparkline blanks out, and the
+        // reason a baseline outside the imported window must not be drawn:
+        // a flat line at the bottom reads as a period that collapsed.
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today, new DateRange($today->modify('-6 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 130);
+
+        $chart = $this->build()->chart;
+
+        self::assertSame(130, $chart[0]['values']['Day 7']);
+        self::assertNull($chart[1]['values']['Day 1']);
+        self::assertNull($chart[1]['values']['Day 7']);
+    }
+
+    public function testDrawsNoChartWhereTheTwoPeriodsShareDays(): void
+    {
+        // A baseline moves only its start back, so a 90 day period against
+        // "one month earlier" holds 59 of its own days against itself. The
+        // table still compares the totals, which is the reader's choice, but
+        // a chart of it would lay a period over itself under a caption saying
+        // the two cover different days.
+        $this->writeSiteConfiguration();
+
+        $comparison = $this->subject()->build(2, 0, 90, 'month');
+
+        self::assertNotNull($comparison);
+        self::assertTrue($comparison->periodsOverlap);
+        self::assertSame([], $comparison->chart);
+    }
+
+    public function testStillDrawsAChartWhereTheBaselineClearsThePeriod(): void
+    {
+        $this->writeSiteConfiguration();
+
+        $comparison = $this->subject()->build(2, 0, 7, 'month');
+
+        self::assertNotNull($comparison);
+        self::assertFalse($comparison->periodsOverlap);
+        self::assertNotSame([], $comparison->chart);
+    }
+
+    public function testBuildsNoChartForACallerThatWillNotDrawOne(): void
+    {
+        // The CSV export reads neither the series nor the label, and chart()
+        // costs two full-range queries. The pages export pays for none of its
+        // own drawing either.
+        $this->writeSiteConfiguration();
+
+        $comparison = $this->subject()->build(2, 0, 7, 'previous', false, false);
+
+        self::assertNotNull($comparison);
+        self::assertSame([], $comparison->chart);
+        self::assertNotSame([], $comparison->rows);
     }
 
     private function build(string $baselineKey = 'previous'): PeriodComparison

@@ -115,6 +115,34 @@ final class ModuleCompareTemplateTest extends FunctionalTestCase
         self::assertStringNotContainsString('data-hint-title', $html);
     }
 
+    public function testBothPeriodsAreDrawnOnOneChartAgainstOneSharedScale(): void
+    {
+        // Without the shared scale the two lines are drawn to the same
+        // height whatever their values, which is the misreading the whole
+        // view exists to prevent.
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 130);
+        $repository->upsert(2, 0, 'matomo', $today->modify('-10 days'), 'matomo.pageviews', 100);
+
+        $html = $this->render();
+
+        self::assertStringContainsString('pagemetrics-widget-chart', $html);
+        self::assertStringContainsString('data-shared-scale="1"', $html);
+        self::assertStringContainsString('Page views over both periods', $html);
+        // The axis counts days of the period, because the two lines cover
+        // different dates and one of them would have to be labelled wrong.
+        self::assertStringContainsString('Day 1', $html);
+    }
+
+    public function testTheChartSaysWhatItsAxisMeansInProseBesideIt(): void
+    {
+        $html = $this->render();
+
+        self::assertStringContainsString('day 1 of the selected period against day 1 of the earlier one', $html);
+        self::assertStringContainsString('dashed line', $html);
+    }
+
     private function render(string $baselineKey = 'previous'): string
     {
         $request = (new ServerRequest('https://example.com/typo3/module/web/pagemetrics', 'GET'))

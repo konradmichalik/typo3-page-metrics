@@ -537,14 +537,8 @@
             <trans-unit id="module.pages.scope" resname="module.pages.scope">
                 <source>A page is listed when it recorded something in this period, or when it recorded %1$s in %2$s and nothing since, which is the page worth finding. Pages you cannot see in the page tree are left out. A count with no stored value reads as zero, because that is how an importer records a page that had no traffic, while a rate with nothing to divide reads as no value at all.</source>
             </trans-unit>
-            <trans-unit id="module.pages.trendIntro" resname="module.pages.trendIntro">
-                <source>The trend column compares %1$s against the period of the same length before this one, %2$s. It follows whichever column the table is sorted by, so sorting by another metric compares that one instead.</source>
-            </trans-unit>
             <trans-unit id="module.pages.page" resname="module.pages.page">
                 <source>Page</source>
-            </trans-unit>
-            <trans-unit id="module.pages.trend" resname="module.pages.trend">
-                <source>Trend: %1$s</source>
             </trans-unit>
             <trans-unit id="module.pages.sortBy" resname="module.pages.sortBy">
                 <source>sort by %1$s</source>
@@ -638,6 +632,36 @@
             </trans-unit>
             <trans-unit id="module.pages.decayNotImported" resname="module.pages.decayNotImported">
                 <source>No page is marked as decaying for this period, because the period it would be compared against was never imported. The column still sorts by how long ago each page changed.</source>
+            </trans-unit>
+            <trans-unit id="module.compare.chart.heading" resname="module.compare.chart.heading">
+                <source>%1$s over both periods</source>
+            </trans-unit>
+            <trans-unit id="module.compare.chart.intro" resname="module.compare.chart.intro">
+                <source>Both lines are %2$s, drawn to one shared scale so their heights can be held against each other. The axis counts the %1$s days of the period instead of naming dates, because the two periods cover different ones: the lines are laid over each other day by day, day 1 of the selected period against day 1 of the earlier one. The earlier period is the dashed line, and a day nobody imported is a gap rather than a zero.</source>
+            </trans-unit>
+            <trans-unit id="module.compare.chart.day" resname="module.compare.chart.day">
+                <source>Day %d</source>
+            </trans-unit>
+            <trans-unit id="module.compare.chart.selected" resname="module.compare.chart.selected">
+                <source>Selected period</source>
+            </trans-unit>
+            <trans-unit id="module.compare.chart.baseline" resname="module.compare.chart.baseline">
+                <source>Earlier period</source>
+            </trans-unit>
+            <trans-unit id="chart.scaleShared" resname="chart.scaleShared">
+                <source>Both lines are drawn to one shared scale, so their heights can be compared.</source>
+            </trans-unit>
+            <trans-unit id="chart.scaleSeparate" resname="chart.scaleSeparate">
+                <source>Each line is drawn to its own scale, so only the shapes can be compared, not the heights.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.trendShape" resname="module.pages.trendShape">
+                <source>The %1$s column carries three things: the total for this period, that same figure drawn day by day, and the change against the period of the same length before this one, %2$s. All three follow whichever column the table is sorted by, so sorting by another metric draws that one instead. A day that was never imported is left blank in the drawing rather than drawn as a zero, and a page that recorded nothing at all this period gets no drawing, only its figure and its change. The drawing says nothing the figure and the change beside it do not, so a screen reader is given those two and not the picture.</source>
+            </trans-unit>
+            <trans-unit id="module.pages.columnsIntro" resname="module.pages.columnsIntro">
+                <source>What each column counts, said once here rather than once in every column header:</source>
+            </trans-unit>
+            <trans-unit id="module.compare.overlap" resname="module.compare.overlap">
+                <source>These two periods share days, because a baseline moves only its start back and this period is longer than the step. The figures below still compare the two totals, but there is no chart: drawing them would lay part of this period over itself. Pick a baseline further back, or a shorter period, to see one.</source>
             </trans-unit>
         </body>
     </file>

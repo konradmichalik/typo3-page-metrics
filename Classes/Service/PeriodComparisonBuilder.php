@@ -21,6 +21,7 @@ use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricP
 use Throwable;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
@@ -28,6 +29,7 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use function abs;
 use function array_map;
 use function array_sum;
+use function preg_match;
 use function sprintf;
 use function usort;
 
@@ -54,6 +56,8 @@ use function usort;
  */
 final readonly class PeriodComparisonBuilder
 {
+    private const LL = 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:';
+
     /**
      * @param iterable<MetricProviderInterface> $providers
      */
@@ -78,7 +82,7 @@ final readonly class PeriodComparisonBuilder
      * reason: the page uid arrives from the request, so the permission check
      * is what stands between a hand-built URL and another page's numbers.
      */
-    public function build(int $pageId, int $languageId, int $periodDays, ?string $baselineKey, bool $includeSubpages = false): ?PeriodComparison
+    public function build(int $pageId, int $languageId, int $periodDays, ?string $baselineKey, bool $includeSubpages = false, bool $withChart = true): ?PeriodComparison
     {
         if ($pageId < 1) {
             return null;
@@ -102,6 +106,19 @@ final readonly class PeriodComparisonBuilder
         $reference = $baseline->reference($current, $periodDays);
         $pageUids = $includeSubpages ? $this->pageUidRepository->descendantsOf($pageId) : [$pageId];
 
+        // No chart where the two periods share days. Only the start moves
+        // back, so a 90 day period against "one month earlier" overlaps by
+        // 59 of them: the table has always compared those totals, but drawing
+        // them as two lines shows a period held against itself, and the prose
+        // beside the chart says in as many words that the periods cover
+        // different days. A drawing that contradicts its own caption is worse
+        // than no drawing.
+        //
+        // $withChart is false for the CSV export, which reads neither the
+        // series nor the label: chart() costs two full-range queries, and the
+        // pages export pays for none of its own drawing either.
+        $chartMetric = $withChart && !$current->overlaps($reference) ? $this->chartMetric($site) : null;
+
         return new PeriodComparison(
             $baseline,
             $periodDays,
@@ -109,6 +126,9 @@ final readonly class PeriodComparisonBuilder
             self::rangeLabel($reference),
             $this->rows($site, $pageUids, $languageId, $current, $reference),
             ComparisonBaseline::all(),
+            null === $chartMetric ? [] : $this->chart($chartMetric['provider'], $chartMetric['definition'], $site, $pageUids, $languageId, $current, $reference),
+            null === $chartMetric ? '' : $chartMetric['definition']->label,
+            $current->overlaps($reference),
         );
     }
 
@@ -226,6 +246,139 @@ final readonly class PeriodComparisonBuilder
     }
 
     /**
+     * The one metric the chart carries, out of the several the table does.
+     *
+     * The site's primary counted metric, which is the first one its
+     * providers declare. Machine traffic is left out here exactly as it is
+     * left out of the rows.
+     *
+     * Close to, but not the same as, the rule the page view's chart picks by:
+     * that one runs over built tiles and skips a metric with no data for the
+     * page, this one runs over definitions and does not. On a page whose
+     * leading metric happens to be empty the two views of this module chart
+     * different things. Which of the three rules in the codebase is the right
+     * one is #88; naming the divergence here rather than asserting a
+     * consistency that does not hold.
+     *
+     * Which metric is drawn is not a choice the reader can make yet, and
+     * cannot be made one from here: a picker is a set of links like the
+     * baseline picker (a GET form drops the request token), and the key
+     * those links carry has to be declared in the module's `moduleData` and
+     * read by the controller before this class ever sees it.
+     *
+     * @return array{provider: string, definition: MetricDefinition}|null
+     */
+    private function chartMetric(Site $site): ?array
+    {
+        /** @var list<array{sortOrder: int, provider: string, definition: MetricDefinition}> $candidates */
+        $candidates = [];
+
+        foreach ($this->metricDefinitionCollector->supporting($this->providers, $site) as $provider) {
+            foreach ($this->metricDefinitionCollector->forSite($provider, $site) as $definition) {
+                if (MetricUnit::Count !== $definition->unit || MetricGroup::Machine === $definition->group) {
+                    continue;
+                }
+
+                $candidates[] = ['sortOrder' => $definition->sortOrder, 'provider' => $provider->getIdentifier(), 'definition' => $definition];
+            }
+        }
+
+        usort($candidates, static fn (array $a, array $b): int => $a['sortOrder'] <=> $b['sortOrder']);
+        $first = $candidates[0] ?? null;
+
+        return null === $first ? null : ['provider' => $first['provider'], 'definition' => $first['definition']];
+    }
+
+    /**
+     * The selected period first and the baseline second, which is the order
+     * the renderer draws and legends them in.
+     *
+     * @param list<int> $pageUids
+     *
+     * @return list<array{label: string, color: string, unit: string, subordinate: bool, values: array<string, int|null>}>
+     */
+    private function chart(string $provider, MetricDefinition $definition, Site $site, array $pageUids, int $languageId, DateRange $current, DateRange $reference): array
+    {
+        $coverage = $this->importCoverage->forProvider($provider, $site->getIdentifier());
+        $dayLabel = $this->dayLabel();
+
+        return [
+            $this->chartSeries($this->translate('module.compare.chart.selected', 'Selected period'), $definition, $pageUids, $languageId, $current, $coverage, $dayLabel, false),
+            // Its own key rather than the "Compared against" of the table
+            // header: a legend entry has to name the line, and the prose
+            // beside the chart calls it the earlier period.
+            $this->chartSeries($this->translate('module.compare.chart.baseline', 'Earlier period'), $definition, $pageUids, $languageId, $reference, $coverage, $dayLabel, true),
+        ];
+    }
+
+    /**
+     * Both series carry the metric's own colour rather than one apiece: they
+     * are the same metric, and a second hue would say they are not. What
+     * separates them is the dash the renderer gives the subordinate one,
+     * which is geometry and therefore survives a forced-colours mode, and
+     * the range each legend entry names, which survives having no sight of
+     * the chart at all.
+     *
+     * @param list<int> $pageUids
+     *
+     * @return array{label: string, color: string, unit: string, subordinate: bool, values: array<string, int|null>}
+     */
+    private function chartSeries(string $name, MetricDefinition $definition, array $pageUids, int $languageId, DateRange $range, ?DateRange $coverage, string $dayLabel, bool $subordinate): array
+    {
+        // Masked exactly as the tiles mask their sparkline: a day outside the
+        // imported window is blank, never a point at zero, which is the whole
+        // difference between "nothing happened" and "nobody asked".
+        $series = $this->importCoverage->mask(
+            $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $range),
+            $coverage,
+        );
+
+        $values = [];
+        $day = 1;
+        foreach ($series as $value) {
+            $values[sprintf($dayLabel, $day)] = $value;
+            ++$day;
+        }
+
+        return [
+            'label' => sprintf('%s, %s', $name, self::rangeLabel($range)),
+            'color' => $definition->color,
+            'unit' => $definition->unit->value,
+            'subordinate' => $subordinate,
+            'values' => $values,
+        ];
+    }
+
+    /**
+     * The x axis of a two-period chart, and the only honest one: the reader
+     * is looking at two different date ranges, so a date would be right for
+     * one line and wrong for the other.
+     */
+    private function dayLabel(): string
+    {
+        $pattern = $this->translate('module.compare.chart.day', 'Day %d');
+
+        // Exactly one specifier, not merely a present one. A translation that
+        // lost the placeholder would fold every day onto one key and leave a
+        // chart of a single point; one that gained a second ("Tag %d von %s")
+        // or carries a stray literal % reaches sprintf() with one argument
+        // and throws, taking the whole view and the compare export with it.
+        // A pattern nobody can format is refused rather than trusted.
+        return 1 === preg_match('/^[^%]*%d[^%]*$/', $pattern) ? $pattern : 'Day %d';
+    }
+
+    /**
+     * sL() answers with an empty string for a key it cannot resolve, and an
+     * empty legend entry is a line nobody can name.
+     */
+    private function translate(string $key, string $fallback): string
+    {
+        $label = $this->getLanguageService()->sL(self::LL.$key);
+
+        return '' === $label ? $fallback : $label;
+    }
+
+    /**
      * The sign is prefixed rather than left to the formatter, which spells a
      * duration as minutes and seconds: a drop of seventy seconds through it
      * reads "-1:-10", and a negative amount of currency loses its sign to
@@ -262,5 +415,10 @@ final readonly class PeriodComparisonBuilder
     private function getBackendUser(): BackendUserAuthentication
     {
         return $GLOBALS['BE_USER'];
+    }
+
+    private function getLanguageService(): LanguageService
+    {
+        return $GLOBALS['LANG'];
     }
 }

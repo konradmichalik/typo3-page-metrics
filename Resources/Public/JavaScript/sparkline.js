@@ -56,6 +56,8 @@ const FALLBACK_LABELS = {
   sliderPage: 'Page %1$s',
   chartSummary: 'Chart from %1$s to %2$s, values from %3$s to %4$s',
   chartSummaryDates: 'Chart from %1$s to %2$s',
+  chartScaleShared: 'Both lines are drawn to one shared scale, so their heights can be compared.',
+  chartScaleSeparate: 'Each line is drawn to its own scale, so only the shapes can be compared, not the heights.',
   'annotationCategory.release': 'Release',
   'annotationCategory.campaign': 'Campaign',
   'annotationCategory.content': 'Content change',
@@ -142,7 +144,11 @@ function segmentsOf(points) {
   return segments;
 }
 
-function appendSeriesPath(svg, points, { stroke, withArea }) {
+// `dashed` marks a series as the subordinate one: same colour, broken line.
+// A dash is geometry rather than colour, which is the only kind of difference
+// that survives a forced-colours mode, where every stroke on the chart is
+// repainted in the one system colour.
+function appendSeriesPath(svg, points, { stroke, withArea, dashed = false }) {
   segmentsOf(points).forEach((segment) => {
     // A single day surrounded by gaps has no line to draw, so it becomes a
     // dot: a zero-length stroke with a round cap, which non-scaling-stroke
@@ -183,6 +189,9 @@ function appendSeriesPath(svg, points, { stroke, withArea }) {
     polyline.setAttribute('fill', 'none');
     polyline.setAttribute('stroke', stroke);
     polyline.setAttribute('stroke-width', '1');
+    if (dashed) {
+      polyline.setAttribute('stroke-dasharray', '3 2');
+    }
     polyline.setAttribute('vector-effect', 'non-scaling-stroke');
     svg.appendChild(polyline);
   });
@@ -226,8 +235,14 @@ function boundsOf(values) {
 // The axis is therefore truncated and carries no scale of its own: the chart
 // is a silhouette of the period, and the numbers that give it magnitude are
 // on the row directly above it.
-function plotAgainstBounds(values, step) {
-  const [scaleLow, scaleHigh] = scaleBounds(values.filter((value) => value !== null));
+//
+// sharedBounds, when given, is the band another caller already computed over
+// several series taken together (see sharedScaleBounds()), so every line of an
+// overlay maps against the same two numbers. It is still a scaleBounds() band,
+// just taken over more values: the percentile reasoning above holds whether
+// the outlier day belongs to one series or another.
+function plotAgainstBounds(values, step, sharedBounds = null) {
+  const [scaleLow, scaleHigh] = sharedBounds ?? scaleBounds(values.filter((value) => value !== null));
   const range = scaleHigh - scaleLow;
   // Inset so neither edge clips what is drawn on it. A 1px stroke sitting on
   // the viewBox boundary loses half its width to the SVG's own clip, and the
@@ -277,7 +292,14 @@ function buildDateAxis(dates) {
   // period this extension offers except one that happens to straddle New
   // Year. Truncated from the left rather than reformatted, so the reading
   // order stays the one every other date in the backend uses.
-  const sameYear = shown[0].slice(0, 4) === shown[shown.length - 1].slice(0, 4);
+  //
+  // Only for an axis that is actually made of dates. A chart overlaying two
+  // periods of one metric is keyed by the day's position in the period
+  // instead (see PeriodComparison), because a date would be right for one of
+  // its two lines and wrong for the other, and truncating those labels would
+  // leave "Day 1" and "Day 30" reading as "1" and "0".
+  const isDate = (label) => /^\d{4}-\d{2}-\d{2}$/.test(label);
+  const sameYear = shown.every(isDate) && shown[0].slice(0, 4) === shown[shown.length - 1].slice(0, 4);
 
   shown.forEach((date) => {
     const label = document.createElement('span');
@@ -291,18 +313,25 @@ function buildDateAxis(dates) {
 // The chart's textual equivalent. An SVG of clamped polylines conveys nothing
 // at all without sight, and the axis labels are bare numbers in the corners -
 // this is the one place the range gets stated as a sentence.
-function buildChartSummary(labels, dates, bounds, unit) {
+//
+// scaleNote says which scale the heights were drawn to, and is given only
+// where there is more than one line to mistake for another. It is stated
+// rather than left to be inferred from whether a range is quoted: a reader
+// who cannot see the chart is being told what a sighted one can measure off
+// it, and "these two heights are comparable" is the whole difference between
+// the overlay this view draws and the one the dashboard widget draws.
+function buildChartSummary(labels, dates, bounds, unit, scaleNote = null) {
   const summary = (null !== bounds ? labels.chartSummary : labels.chartSummaryDates)
     .replace('%1$s', dates[0])
     .replace('%2$s', dates[dates.length - 1]);
 
-  if (null === bounds) {
-    return summary;
-  }
+  const withBounds = null === bounds
+    ? summary
+    : summary
+      .replace('%3$s', formatValueForUnit(bounds[0], unit))
+      .replace('%4$s', formatValueForUnit(bounds[1], unit));
 
-  return summary
-    .replace('%3$s', formatValueForUnit(bounds[0], unit))
-    .replace('%4$s', formatValueForUnit(bounds[1], unit));
+  return null === scaleNote ? withBounds : `${withBounds}. ${scaleNote}`;
 }
 
 // One explaining tooltip for the whole file, shared by the popover's figures
@@ -1652,17 +1681,46 @@ function scaleBounds(values) {
   return low === high ? [sorted[0], sorted[sorted.length - 1]] : [low, high];
 }
 
+// One band over every series' values taken together, so the overlay has a
+// single axis and a line twice as high really is twice the number.
+//
+// The band itself is still scaleBounds()' percentile band, computed once over
+// the union rather than per series: sharing the scale must not also change
+// what a scale is, or the chart would answer differently depending on how
+// many series it was handed.
+function sharedScaleBounds(seriesList, dates) {
+  const values = [];
+
+  seriesList.forEach((series) => {
+    dates.forEach((date) => {
+      const value = series.values[date] ?? null;
+      if (value !== null) {
+        values.push(value);
+      }
+    });
+  });
+
+  return scaleBounds(values);
+}
+
 // Each series is scaled against its own range rather than a shared
 // [0, max]: metrics like "Visits" and "Bounce rate" live on wildly
 // different scales, and overlaying them is about comparing shape/trend
 // over time, not reading them off one shared axis. For a single series
 // this is the same tight-range behaviour the chart always had, just
 // outlier-tolerant now (see scaleBounds()).
-function computePlottedSeries(seriesList, dates, step) {
+//
+// sharedBounds opts out of that, and only a caller overlaying series of one
+// metric may: two periods of the same number have a common axis, and drawing
+// each to its own bounds would put a period that halved at the same height as
+// one that doubled. It stays opt-in because the dashboard chart widget
+// genuinely overlays different units, where one axis would be the lie
+// instead.
+function computePlottedSeries(seriesList, dates, step, sharedBounds = null) {
   return seriesList.map((series) => {
     const values = dates.map((date) => series.values[date] ?? null);
 
-    return { ...series, values, ...plotAgainstBounds(values, step) };
+    return { ...series, values, ...plotAgainstBounds(values, step, sharedBounds) };
   });
 }
 
@@ -1680,6 +1738,10 @@ function renderSeriesLines(svg, plotted) {
       // Overlaid, a fill would just muddy the overlap between series, so it
       // stays with the single-metric case.
       withArea: !isMultiSeries,
+      // Set by a payload that has a reference series to subordinate (see
+      // PeriodComparison); absent everywhere else, where every series is
+      // equally the point.
+      dashed: true === series.subordinate,
     });
   });
 }
@@ -1820,7 +1882,14 @@ function attachChartInteractivity({ svg, container, plotted, markers, tooltipPar
 // The color-dot + label row shown under the chart once there's more than
 // one series to disambiguate - a single series already carries its label
 // in the widget's own heading, so there's nothing to add here.
-function buildLegend(plotted) {
+//
+// It also carries scaleNote, the sentence saying whether the heights may be
+// compared at all. The legend is where it belongs: it is the only chrome that
+// exists precisely because there is more than one line, which is the only
+// case in which the question can be asked. Hidden from assistive technology
+// because buildChartSummary() already states it inside the chart's own
+// aria-label, the same split the date axis above already makes.
+function buildLegend(plotted, scaleNote) {
   if (plotted.length <= 1) {
     return null;
   }
@@ -1831,7 +1900,15 @@ function buildLegend(plotted) {
   plotted.forEach((series) => {
     const dot = document.createElement('span');
     dot.className = 'pagemetrics-sparkline-legend-dot';
-    dot.style.background = series.color;
+    if (true === series.subordinate) {
+      // Hollow and broken, matching the line it stands for. Two series of
+      // one metric share that metric's colour, so a filled dot apiece would
+      // leave the legend unable to tell them apart at all.
+      dot.style.background = 'transparent';
+      dot.style.border = `1px dashed ${series.color}`;
+    } else {
+      dot.style.background = series.color;
+    }
 
     const item = document.createElement('div');
     item.className = 'pagemetrics-sparkline-legend-item';
@@ -1839,6 +1916,12 @@ function buildLegend(plotted) {
     item.appendChild(document.createTextNode(series.label));
     legend.appendChild(item);
   });
+
+  const note = document.createElement('div');
+  note.className = 'pagemetrics-sparkline-legend-note';
+  note.setAttribute('aria-hidden', 'true');
+  note.textContent = scaleNote;
+  legend.appendChild(note);
 
   return legend;
 }
@@ -1861,7 +1944,10 @@ function initializeStaticCharts(root) {
 
     const width = SPARKLINE_WIDTH * 3;
     const step = dates.length > 1 ? width / (dates.length - 1) : 0;
-    const plotted = computePlottedSeries(seriesList, dates, step);
+    // Opt-in, and only a payload overlaying one metric with itself asks for
+    // it - see computePlottedSeries() for why this is not the default.
+    const sharedScale = container.dataset.sharedScale === '1';
+    const plotted = computePlottedSeries(seriesList, dates, step, sharedScale ? sharedScaleBounds(seriesList, dates) : null);
 
     const svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${width} ${SPARKLINE_HEIGHT}`);
@@ -1879,17 +1965,26 @@ function initializeStaticCharts(root) {
     // so there is no one axis to label - two numbers in the corners would
     // belong to whichever series happened to be first and silently misread
     // the others. The legend tells them apart instead.
-    const bounds = plotted.length > 1 ? null : boundsOf(plotted[0].values);
+    //
+    // Under a shared scale there is exactly one axis, so the range is quoted
+    // again, and over every series rather than the first: the reader is being
+    // told what the height they can now compare is measured in.
+    const bounds = plotted.length > 1 && !sharedScale
+      ? null
+      : boundsOf(plotted.flatMap((series) => series.values));
+    // Nothing to say where there is only one line: no second height exists to
+    // mistake it for.
+    const scaleNote = plotted.length > 1 ? (sharedScale ? labels.chartScaleShared : labels.chartScaleSeparate) : null;
 
     const wrapper = document.createElement('div');
     wrapper.className = 'pagemetrics-sparkline-wrapper';
     wrapper.setAttribute('role', 'img');
-    wrapper.setAttribute('aria-label', buildChartSummary(labels, dates, bounds, plotted[0].unit));
+    wrapper.setAttribute('aria-label', buildChartSummary(labels, dates, bounds, plotted[0].unit, scaleNote));
     wrapper.appendChild(svg);
     markers.forEach((marker) => wrapper.appendChild(marker));
     wrapper.appendChild(tooltipParts.tooltip);
 
-    const legend = buildLegend(plotted);
+    const legend = buildLegend(plotted, scaleNote);
     if (legend) {
       container.appendChild(legend);
     }

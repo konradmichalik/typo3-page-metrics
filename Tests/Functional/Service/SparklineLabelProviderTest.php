@@ -74,6 +74,8 @@ final class SparklineLabelProviderTest extends FunctionalTestCase
             'sliderPage',
             'chartSummary',
             'chartSummaryDates',
+            'chartScaleShared',
+            'chartScaleSeparate',
             'annotationCategory.release',
             'annotationCategory.campaign',
             'annotationCategory.content',

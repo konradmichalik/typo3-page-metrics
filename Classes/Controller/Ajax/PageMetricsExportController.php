@@ -148,7 +148,7 @@ final readonly class PageMetricsExportController
      */
     private function comparisonExport(int $pageId, int $periodDays, string $baselineKey, bool $includeSubpages): ?CsvExport
     {
-        $comparison = $this->periodComparisonBuilder->build($pageId, 0, $periodDays, $baselineKey, $includeSubpages);
+        $comparison = $this->periodComparisonBuilder->build($pageId, 0, $periodDays, $baselineKey, $includeSubpages, false);
         $site = $this->resolveSite($pageId);
 
         if (null === $comparison || null === $site) {

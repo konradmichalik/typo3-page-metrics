@@ -67,6 +67,49 @@
 
             <f:if condition="{comparison.rows}">
                 <f:then>
+                    <f:if condition="{comparison.chart}">
+                        <f:comment>
+                            The same renderer the page view and the dashboard
+                            widgets draw through: initializeStaticCharts() in
+                            sparkline.js picks up any .pagemetrics-widget-chart
+                            on the page, so this view carries no chart code.
+
+                            data-shared-scale is what makes two periods of one
+                            metric readable at all. Without it every series is
+                            drawn against its own bounds, which is right for
+                            the widget overlaying page views on a bounce rate
+                            and is exactly wrong here: a period that halved
+                            would be drawn at the same height as one that
+                            doubled.
+                        </f:comment>
+                        <h2><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.chart.heading" arguments="{0: comparison.chartLabel}" default="%1$s over both periods" /></h2>
+                        <p class="pagemetrics-module-intro">
+                            <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.chart.intro" arguments="{0: comparison.periodDays, 1: comparison.chartLabel}" default="Both lines are %2$s, drawn to one shared scale so their heights can be held against each other. The axis counts the %1$s days of the period instead of naming dates, because the two periods cover different ones: the lines are laid over each other day by day, day 1 of the selected period against day 1 of the earlier one. The earlier period is the dashed line, and a day nobody imported is a gap rather than a zero." />
+                        </p>
+                        <div class="pagemetrics-module-chart">
+                            <div
+                                class="pagemetrics-widget-chart"
+                                data-labels="{f:format.json(value: sparklineLabels)}"
+                                data-shared-scale="1"
+                                data-sparkline="{f:format.json(value: comparison.chart)}"
+                            ></div>
+                        </div>
+                    </f:if>
+
+                    <f:if condition="{comparison.periodsOverlap}">
+                        <f:comment>
+                            Said, not silently omitted. Only the start of a
+                            baseline moves back, so a 90 day period against
+                            "one month earlier" holds 59 of its own days
+                            against itself. The table still compares the two
+                            totals, which is the reader's choice to make, but
+                            drawing them as two lines would show a period held
+                            against itself under a caption saying the periods
+                            cover different days.
+                        </f:comment>
+                        <p class="pagemetrics-module-intro"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.compare.overlap" default="These two periods share days, because a baseline moves only its start back and this period is longer than the step. The figures below still compare the two totals, but there is no chart: drawing them would lay part of this period over itself. Pick a baseline further back, or a shorter period, to see one." /></p>
+                    </f:if>
+
                     <div class="table-fit">
                         <table class="table table-striped pagemetrics-module-table">
                             <thead>

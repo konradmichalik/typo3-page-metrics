@@ -134,6 +134,48 @@ final class ModulePagesTemplateTest extends FunctionalTestCase
         self::assertStringNotContainsString('data-hint-title', $html);
     }
 
+    public function testDrawsTheSortedMetricsShapeInItsOwnColumnInsteadOfATrendColumn(): void
+    {
+        $html = $this->render();
+
+        // The page, the two metrics and decay. The trend column is gone: the
+        // shape and the change it used to hold now sit in the column of the
+        // metric they are about.
+        self::assertSame(4, substr_count($html, '<th scope="col"'));
+        self::assertStringContainsString('pagemetrics-widget-chart', $html);
+        self::assertStringContainsString('data-sparkline=', $html);
+    }
+
+    public function testKeepsTheChangeInTheSameCellAsTheShape(): void
+    {
+        $html = $this->render();
+
+        // A shape says "falling" and only a number says how far, so the
+        // percentage stays. In the same cell, because a column of its own is
+        // exactly what this change removed.
+        self::assertMatchesRegularExpression('/data-sparkline=.{0,4000}?pagemetrics-trend.*?<\/td>/s', $html);
+    }
+
+    public function testDescribesEachColumnOnceAboveTheTableRatherThanInEveryHeader(): void
+    {
+        $html = $this->render();
+
+        // Prose, still, and read rather than hovered. Once, beside the table,
+        // instead of once per column header, which is what made the table
+        // wider than the screen.
+        self::assertSame(1, substr_count($html, 'How often the page was viewed.'));
+        self::assertStringContainsString('pagemetrics-pages-glossary', $html);
+        self::assertLessThan(strpos($html, '<table'), strpos($html, 'How often the page was viewed.'));
+        self::assertStringNotContainsString('data-hint-title', $html);
+    }
+
+    public function testLeavesTheShapeOutOfTheAccessibleTreeBecauseTheCellSaysItInWords(): void
+    {
+        $html = $this->render();
+
+        self::assertMatchesRegularExpression('/<div[^>]*class="[^"]*pagemetrics-widget-chart[^"]*"[^>]*aria-hidden="true"/', $html);
+    }
+
     public function testSaysWhichPartOfTheWholeIsOnScreen(): void
     {
         $html = $this->render();
@@ -196,7 +238,7 @@ final class ModulePagesTemplateTest extends FunctionalTestCase
             new SitePagesRow(
                 2,
                 'About',
-                [new SitePagesCell(true, '42'), new SitePagesCell(false, '')],
+                [new SitePagesCell(true, '42', true, $this->series()), new SitePagesCell(false, '', false, null)],
                 12,
                 TrendDirection::Up,
                 MetricPolarity::HigherIsBetter,
@@ -207,7 +249,7 @@ final class ModulePagesTemplateTest extends FunctionalTestCase
             new SitePagesRow(
                 3,
                 'Contact',
-                [new SitePagesCell(true, '7'), new SitePagesCell(false, '')],
+                [new SitePagesCell(true, '7', true, $this->series()), new SitePagesCell(false, '', false, null)],
                 -4,
                 TrendDirection::Down,
                 MetricPolarity::HigherIsBetter,
@@ -220,7 +262,9 @@ final class ModulePagesTemplateTest extends FunctionalTestCase
             new SitePagesRow(
                 4,
                 'Imprint',
-                [new SitePagesCell(true, '1'), new SitePagesCell(false, '')],
+                // Nothing was recorded for this one in the period, so there
+                // is no shape to draw and the cell still carries the change.
+                [new SitePagesCell(true, '1', true, null), new SitePagesCell(false, '', false, null)],
                 0,
                 TrendDirection::Flat,
                 MetricPolarity::HigherIsBetter,
@@ -244,5 +288,20 @@ final class ModulePagesTemplateTest extends FunctionalTestCase
             true,
             SitePagesColumn::forDecay(false, SitePagesTable::DIRECTION_DESCENDING),
         );
+    }
+
+    /**
+     * @return array{label: string, color: string, unit: string, values: array<string, int|null>}
+     */
+    private function series(): array
+    {
+        // The last of the three days was never imported, which the renderer
+        // has to leave blank rather than draw at zero.
+        return [
+            'label' => 'Page views',
+            'color' => '#1a73e8',
+            'unit' => 'count',
+            'values' => ['2026-09-11' => 4, '2026-09-12' => 9, '2026-09-13' => null],
+        ];
     }
 }

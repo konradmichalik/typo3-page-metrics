@@ -82,7 +82,7 @@ final class SitePagesTableTest extends TestCase
             static fn (int $pageUid): SitePagesRow => new SitePagesRow(
                 $pageUid,
                 'Page '.$pageUid,
-                [new SitePagesCell(true, '1')],
+                [new SitePagesCell(true, '1', false, null)],
                 0,
                 TrendDirection::Flat,
                 MetricPolarity::HigherIsBetter,
