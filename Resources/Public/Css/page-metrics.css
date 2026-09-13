@@ -35,8 +35,14 @@
    sixth control in among them would crowd the group an editor actually uses.
    It shares .pagemetrics-options-trigger with the options button and only adds
    the placement, since two controls in the same row that look different are
-   two controls. */
-.pagemetrics-collapse-toggle {
+   two controls.
+
+   Selected through its parent, which is not decoration. The control carries
+   both classes, and .pagemetrics-options-trigger sets position: relative at
+   equal specificity further down this file, so a plain .pagemetrics-collapse-
+   toggle loses the cascade on source order alone and the control silently
+   stays in the flow. That is exactly what it did, wherever top/left put it. */
+.pagemetrics-header > .pagemetrics-collapse-toggle {
     position: absolute;
     top: 0;
     left: 0;
@@ -158,7 +164,11 @@
     z-index: 10;
     top: calc(100% + 4px);
     right: 0;
+    /* A floor, not a width: the entries set their own and the widest one
+       wins, so a longer label in another language widens the menu rather
+       than wrapping inside it. */
     min-width: 180px;
+    width: max-content;
     padding: 4px;
     border: 1px solid var(--typo3-component-border-color, #cbcbcb);
     border-radius: var(--typo3-component-border-radius, 4px);
@@ -175,6 +185,11 @@
     font-size: 0.8125rem;
     color: var(--typo3-text-color-base, #14213d);
     text-decoration: none;
+    /* One line per entry. The menu grows to fit instead: an entry broken
+       across two lines beside a checkbox reads as two entries, and these are
+       short labels that only wrapped once the icon took its share of the
+       min-width below. */
+    white-space: nowrap;
 }
 
 .pagemetrics-options-menu-item:hover,
