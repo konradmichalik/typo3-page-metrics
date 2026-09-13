@@ -398,6 +398,7 @@ zuerst und in dieser Reihenfolge:
    `pages.tstamp` ist alt) und eine site-weite Auswertung ohne EXT:dashboard brauchen einen Ort.
    Das aufgelöste Modul wieder einzuführen ist eine eigene Entscheidung mit eigenem Spec, weil
    sie die Positionierung der Extension berührt. Hier bewusst nicht entschieden.
+   **Nachtrag:** entschieden in [`2026-09-13-backend-module-design.md`](2026-09-13-backend-module-design.md).
 2. **Verweildauer-Polarität.** `Neutral` oder `HigherIsBetter`? Bei einer Kontaktseite ist eine
    kurze Verweildauer ein gutes Zeichen. Vorschlag: `Neutral` als Default, pro Site
    überschreibbar.
