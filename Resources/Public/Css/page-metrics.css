@@ -1754,3 +1754,14 @@
     margin: 0;
     color: var(--typo3-text-color-variant, #6a7085);
 }
+
+/* The record note under a metric's figure in the module: the same shape as
+   the description above it, because it is the same kind of thing, a sentence
+   that belongs to the number rather than a second number beside it. */
+.pagemetrics-module-metric-note {
+    display: block;
+    margin-block-start: 0.125rem;
+    font-weight: 400;
+    font-size: 0.8125rem;
+    color: var(--typo3-text-color-variant, #515151);
+}

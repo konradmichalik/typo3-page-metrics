@@ -125,6 +125,60 @@ final class PageMetricsModuleControllerTest extends FunctionalTestCase
         self::assertStringContainsString('data-sparkline', $body);
     }
 
+    public function testChartsTheSameMetricOnAPageThatHasNoDataForIt(): void
+    {
+        // Page 2 recorded page views, page 4 recorded none. Both are the same
+        // site, so both name the site's primary metric: a reader clicking
+        // from one to the other would otherwise compare two different figures
+        // under the same heading without being told (see #88). The price is
+        // that page 4 draws an empty line, which is what is true about it.
+        $this->writeSiteConfiguration();
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 30);
+
+        self::assertStringContainsString('"label":"Page views"', self::chartPayloadOf((string) $this->dispatch(['id' => '2'])->getBody()));
+    }
+
+    public function testChartsThatSameMetricOnTheOtherPageOfTheSite(): void
+    {
+        // The other half of the test above, dispatched on its own because the
+        // docheader is container-scoped and two renders in one test share
+        // state that two requests never would.
+        $this->writeSiteConfiguration();
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 30);
+
+        self::assertStringContainsString('"label":"Page views"', self::chartPayloadOf((string) $this->dispatch(['id' => '4'])->getBody()));
+    }
+
+    public function testChartsNothingForASiteThatCountsOnlyMachineTraffic(): void
+    {
+        // The site asked for the bot buckets and nothing else, so it has no
+        // primary metric at all: every surface that leads with one is asking
+        // how the page does with people, which a crawler count does not
+        // answer. The tile row still shows it, the chart does not lead with
+        // it.
+        $this->writeSiteConfiguration(['accesslog' => ['pathPattern' => '/var/log/nginx/access.log*', 'metrics' => ['machine']]]);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', new DateTimeImmutable('today'), 'bot.search', 30);
+
+        $body = (string) $this->dispatch(['id' => '2'])->getBody();
+
+        self::assertStringContainsString('Bot traffic', $body);
+        self::assertStringNotContainsString('data-sparkline', $body);
+    }
+
+    public function testRendersASiteThatDeclaresNothingCountableAtAll(): void
+    {
+        // Only rates left once the site's own metric list is applied, and a
+        // rate can never be primary: the chart has nothing to draw and the
+        // view still has to come out, the same way it does for a site with no
+        // provider.
+        $this->writeSiteConfiguration(['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x', 'metrics' => ['matomo.bounce_rate']]]);
+
+        $body = (string) $this->dispatch(['id' => '2'])->getBody();
+
+        self::assertStringContainsString('pagemetrics-module', $body);
+        self::assertStringNotContainsString('data-sparkline', $body);
+    }
+
     public function testListsThePeriodsMarkersWithTheirKindAndText(): void
     {
         $this->writeSiteConfiguration();
@@ -224,6 +278,19 @@ final class PageMetricsModuleControllerTest extends FunctionalTestCase
         self::assertStringNotContainsString('pagemetrics-module', $body);
     }
 
+    /**
+     * The chart's own payload, out of the attribute the renderer reads it
+     * from. Asserted against rather than against the body, which carries
+     * every metric's label in the table below the chart and would answer yes
+     * to any of them.
+     */
+    private static function chartPayloadOf(string $body): string
+    {
+        preg_match('/data-sparkline="([^"]*)"/', $body, $matches);
+
+        return html_entity_decode($matches[1] ?? '');
+    }
+
     private function actAs(int $backendUserUid): void
     {
         $backendUser = $this->setUpBackendUser($backendUserUid);
@@ -274,7 +341,10 @@ final class PageMetricsModuleControllerTest extends FunctionalTestCase
         }
     }
 
-    private function writeSiteConfiguration(): void
+    /**
+     * @param array<string, array<string, mixed>> $providers what the site opts into, the Matomo default being the one every test that only needs "a site with numbers" uses
+     */
+    private function writeSiteConfiguration(array $providers = ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]): void
     {
         $this->get(SiteWriter::class)->write('main', [
             'rootPageId' => 1,
@@ -293,7 +363,7 @@ final class PageMetricsModuleControllerTest extends FunctionalTestCase
             'errorHandling' => [],
             'routes' => [],
             'pageMetrics' => [
-                'providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']],
+                'providers' => $providers,
             ],
         ]);
     }

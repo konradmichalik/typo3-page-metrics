@@ -118,6 +118,96 @@ final class MetricDefinitionCollectorTest extends TestCase
         self::assertSame([$provider], $this->subject->supporting([$provider], $site));
     }
 
+    public function testThePrimaryMetricIsTheFirstThingTheSiteCountsBySortOrder(): void
+    {
+        $provider = $this->supportingProvider(
+            'demo',
+            $this->definition('demo.visits', MetricGroup::Audience, 20),
+            $this->definition('demo.pageviews', MetricGroup::Audience, 10),
+        );
+
+        self::assertSame('demo.pageviews', $this->subject->primaryFor([$provider], $this->site)?->identifier);
+    }
+
+    public function testMachineTrafficIsNeverPrimaryEvenWhenItSortsFirst(): void
+    {
+        // Every surface that names a primary metric is answering "how is this
+        // page doing with people", which is not a question a crawler count
+        // answers.
+        $provider = $this->supportingProvider(
+            'demo',
+            $this->definition('bot.search', MetricGroup::Machine, 10),
+            $this->definition('demo.pageviews', MetricGroup::Audience, 20),
+        );
+
+        self::assertSame('demo.pageviews', $this->subject->primaryFor([$provider], $this->site)?->identifier);
+    }
+
+    public function testAMetricThatDoesNotCountIsNeverPrimaryEvenWhenItSortsFirst(): void
+    {
+        $provider = $this->supportingProvider(
+            'demo',
+            $this->definition('demo.goal.revenue', MetricGroup::Audience, 10, MetricUnit::Currency),
+            $this->definition('demo.pageviews', MetricGroup::Audience, 20),
+        );
+
+        self::assertSame('demo.pageviews', $this->subject->primaryFor([$provider], $this->site)?->identifier);
+    }
+
+    public function testASiteWithNothingCountableHasNoPrimaryMetric(): void
+    {
+        // The answer a site declaring only rates gets, and every caller has
+        // to treat it as it treats a site with no provider at all.
+        $provider = $this->supportingProvider('demo', $this->definition('demo.avg_time', MetricGroup::Audience, 10, MetricUnit::Seconds));
+
+        self::assertNull($this->subject->primaryFor([$provider], $this->site));
+    }
+
+    public function testASiteWithNoProviderHasNoPrimaryMetric(): void
+    {
+        $provider = $this->createMock(MetricProviderInterface::class);
+        $provider->method('supports')->willReturn(false);
+        $provider->method('getMetricDefinitions')->willReturn([$this->definition('demo.pageviews')]);
+
+        self::assertNull($this->subject->primaryFor([$provider], $this->site));
+    }
+
+    public function testThePrimaryMetricIsTheFirstAcrossEveryProviderTheSiteHas(): void
+    {
+        $first = $this->supportingProvider('demo', $this->definition('demo.pageviews', MetricGroup::Audience, 20));
+        $second = $this->supportingProvider('other', $this->definition('other.pageviews', MetricGroup::Audience, 10));
+
+        self::assertSame('other.pageviews', $this->subject->primaryFor([$first, $second], $this->site)?->identifier);
+    }
+
+    public function testThePrimaryMetricRespectsTheSitesOwnMetricList(): void
+    {
+        $site = $this->siteWith(['accesslog' => ['metrics' => ['bot.search']]]);
+
+        $provider = $this->supportingProvider(
+            'accesslog',
+            $this->definition('accesslog.pageviews', MetricGroup::Audience, 10),
+            $this->definition('bot.search', MetricGroup::Machine, 50),
+        );
+
+        self::assertNull($this->subject->primaryFor([$provider], $site));
+    }
+
+    public function testNamesTheProviderAMetricOfThisSiteCameFrom(): void
+    {
+        $first = $this->supportingProvider('demo', $this->definition('demo.pageviews'));
+        $second = $this->supportingProvider('other', $this->definition('other.pageviews'));
+
+        self::assertSame($second, $this->subject->providerOf([$first, $second], $this->site, 'other.pageviews'));
+    }
+
+    public function testNamesNoProviderForAMetricThisSiteDoesNotHave(): void
+    {
+        $provider = $this->supportingProvider('demo', $this->definition('demo.pageviews'));
+
+        self::assertNull($this->subject->providerOf([$provider], $this->site, 'other.pageviews'));
+    }
+
     /**
      * @param array<string, array<string, mixed>> $providers
      */
@@ -152,8 +242,18 @@ final class MetricDefinitionCollectorTest extends TestCase
         );
     }
 
-    private function definition(string $identifier, MetricGroup $group = MetricGroup::Audience): MetricDefinition
+    private function definition(string $identifier, MetricGroup $group = MetricGroup::Audience, int $sortOrder = 10, MetricUnit $unit = MetricUnit::Count): MetricDefinition
     {
-        return new MetricDefinition($identifier, 'Demo', 'Demo metric.', 'tabler-eye-search', MetricUnit::Count, 10, '#0969da', MetricPolarity::HigherIsBetter, $group);
+        return new MetricDefinition($identifier, 'Demo', 'Demo metric.', 'tabler-eye-search', $unit, $sortOrder, '#0969da', MetricPolarity::HigherIsBetter, $group);
+    }
+
+    private function supportingProvider(string $identifier, MetricDefinition ...$definitions): MetricProviderInterface&MockObject
+    {
+        $provider = $this->createMock(MetricProviderInterface::class);
+        $provider->method('getIdentifier')->willReturn($identifier);
+        $provider->method('supports')->willReturn(true);
+        $provider->method('getMetricDefinitions')->willReturn($definitions);
+
+        return $provider;
     }
 }

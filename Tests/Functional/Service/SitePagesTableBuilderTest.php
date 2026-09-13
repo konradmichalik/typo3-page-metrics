@@ -124,6 +124,24 @@ final class SitePagesTableBuilderTest extends FunctionalTestCase
         self::assertSame('matomo.pageviews', $table->sortKey);
     }
 
+    public function testStillBuildsATableForASiteWithNothingCountable(): void
+    {
+        // The site's own metric list left it no count metric, so it has no
+        // primary metric to open on: primaryFor() answers null rather than
+        // handing a rate to a decay verdict. A table of rates is still a
+        // table, and it opens on the first of its own columns rather than on
+        // nothing.
+        $this->writeSite(['providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x', 'metrics' => ['matomo.bounce_rate']]]]);
+        $this->upsert(1, 'matomo.entries', $this->today, 10);
+        $this->upsert(1, 'matomo.entry_bounces', $this->today, 4);
+
+        $table = $this->build($this->site());
+
+        self::assertTrue($table->hasProvider);
+        self::assertSame('matomo.avg_time_on_page', $table->sortKey);
+        self::assertCount(1, $table->rows);
+    }
+
     public function testACountWithNoRowReadsAsZeroAndARateWithNoDenominatorHasNoValue(): void
     {
         $this->writeSiteConfiguration();

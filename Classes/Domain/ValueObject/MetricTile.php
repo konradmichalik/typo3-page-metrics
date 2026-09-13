@@ -84,6 +84,21 @@ final readonly class MetricTile
      *                                                                                   import window, and because this is an `@api` constructor
      *                                                                                   a required parameter here would break every existing
      *                                                                                   ModifyMetricTilesEvent listener
+     * @param string                                             $recordFormattedValue   the part of $formattedValue that arrived on a record
+     *                                                                                   below this page rather than on the page's own address,
+     *                                                                                   formatted in the tile's own unit, from the
+     *                                                                                   via_route_enhancer dimension the import writes beside
+     *                                                                                   the headline. Empty, and therefore invisible, wherever
+     *                                                                                   no such traffic exists, which is almost every page: a
+     *                                                                                   formatted "0" would be a statement about records that
+     *                                                                                   are not there. A display string rather than the raw/
+     *                                                                                   formatted pair $value and $previousValue form, because
+     *                                                                                   nothing reads this as a datum - both surfaces that show
+     *                                                                                   it show it as text beside the headline, and an `@api`
+     *                                                                                   constructor is not the place for a field on
+     *                                                                                   speculation. Describes the tile's own period only and
+     *                                                                                   is never compared against another, so it has nothing
+     *                                                                                   to withhold where $hasNoComparison is true
      */
     public function __construct(
         public string $identifier,
@@ -105,6 +120,7 @@ final readonly class MetricTile
         public ?TileBenchmark $benchmark = null,
         bool $previousPeriodCovered = true,
         public int $previousValue = 0,
+        public string $recordFormattedValue = '',
     ) {
         $this->sentiment = TrendSentiment::of($trend, $polarity);
         $this->hasNoComparison = !$previousPeriodCovered;

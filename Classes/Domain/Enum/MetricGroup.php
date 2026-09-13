@@ -33,4 +33,10 @@ enum MetricGroup: string
 {
     case Audience = 'audience';
     case Machine = 'machine';
+
+    // Adding a third case is not a local change. Several places treat these
+    // two as complements, asking for "not Machine" in one and "Audience" in
+    // the other and meaning the same set (see InsightBuilder and
+    // MetricDefinitionCollector::primaryFor()). A third group would make
+    // those two answer differently without either of them changing.
 }

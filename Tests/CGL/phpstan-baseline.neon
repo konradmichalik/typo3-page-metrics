@@ -55,13 +55,26 @@ parameters:
 			count: 2
 			path: ../../Classes/Domain/ValueObject/RateMetricDefinition.php
 		-
+			# The sixth is recordFormattedValue, and it defaults for the two
+			# reasons together: it is empty on almost every page, because
+			# almost no page has records below it, and this is the `@api`
+			# constructor, so a required parameter would break every existing
+			# ModifyMetricTilesEvent listener for a field a listener-built
+			# tile has no way to know.
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
-			count: 5
+			count: 6
 			path: ../../Classes/Domain/ValueObject/MetricTile.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
 			count: 1
 			path: ../../Classes/Domain/ValueObject/UrlMetric.php
+		-
+			# ResolvedUrl, same reasoning: `@api`, and $record is a field only
+			# the resolver can fill. A required parameter would break every
+			# third-party caller on upgrade for a value none of them has.
+			identifier: ergebnis.noConstructorParameterWithDefaultValue
+			count: 1
+			path: ../../Classes/Domain/ValueObject/ResolvedUrl.php
 		-
 			# Annotation, same reasoning, five times over: category, dateUntil,
 			# pageUid, includeSubpages and collapsedCount all default to what

@@ -385,6 +385,15 @@ final readonly class InsightBuilder
      */
     private function audienceCountDefinitions(MetricProviderInterface $provider, Site $site): array
     {
+        // The same set MetricDefinitionCollector::primaryFor() leads with,
+        // and equal to it only because MetricGroup has exactly two cases:
+        // forSite() already returns counts alone, so filtering to Audience is
+        // filtering out Machine. A third group would make these two quietly
+        // disagree, and this widget would start speaking for a metric no
+        // other surface calls primary. Kept separate rather than folded in
+        // because this one needs the whole ordered list, not only its head:
+        // the second card is array_slice($counts, 1).
+
         $definitions = array_values(array_filter(
             $this->metricDefinitionCollector->forSite($provider, $site),
             static fn (MetricDefinition $definition): bool => MetricGroup::Audience === $definition->group,

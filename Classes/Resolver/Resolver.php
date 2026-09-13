@@ -107,7 +107,7 @@ final class Resolver
         $pageUid = $this->slugLookup->find($slug, $languageId);
 
         if (null !== $pageUid) {
-            return new ResolvedUrl($pageUid, $languageId, $viaRedirect, false);
+            return new ResolvedUrl($pageUid, $languageId, $viaRedirect, false, null);
         }
 
         $redirectTarget = $this->redirectFollower->findTarget($host, $path);
@@ -136,10 +136,10 @@ final class Resolver
         // keeps every genuine case and leaves the probes the cheap miss they
         // were.
         if (UnresolvedReason::Unknown === $reason && null !== $this->ancestorPage($slug, $languageId)) {
-            $pageUid = $this->routeMatcher->match($site, $language, $normalizedUrl, $slug);
+            $match = $this->routeMatcher->match($site, $language, $normalizedUrl, $slug);
 
-            if (null !== $pageUid) {
-                return new ResolvedUrl($pageUid, $languageId, $viaRedirect, true);
+            if (null !== $match) {
+                return new ResolvedUrl($match->pageUid, $languageId, $viaRedirect, true, $match->record);
             }
         }
 

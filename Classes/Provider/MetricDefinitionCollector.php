@@ -14,10 +14,12 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Provider;
 
 use KonradMichalik\Typo3PageMetrics\Configuration\SiteConfigurationReader;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricUnit};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricDefinition;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 use function in_array;
+use function usort;
 
 /**
  * MetricDefinitionCollector.
@@ -37,6 +39,10 @@ use function in_array;
  * time for the same reason: a consumer asks what this site has and gets an
  * answer that already accounts for what the site asked for. None of the five
  * knows the option exists.
+ *
+ * And, for the fourth time, which one metric of those a site leads with (see
+ * primaryFor()): three surfaces had each written their own rule for that and
+ * charted different metrics for one site.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
@@ -67,6 +73,73 @@ final readonly class MetricDefinitionCollector
         }
 
         return $supporting;
+    }
+
+    /**
+     * The site's primary metric: the first thing it counts, by sortOrder,
+     * across every provider it has.
+     *
+     * One site has one of these and every surface names the same one, which
+     * is the whole point of the method (see #88). A chart, a ranking and a
+     * decay verdict ask slightly different questions, but a reader who has
+     * to hold three answers apart to understand why two views of one page
+     * disagree is worse off than one who knows a single term.
+     *
+     * Counted, so never a rate: a chart whose area is a percentage says
+     * nothing, and a decay rule on a metric where falling can be the good
+     * news files improvements as neglect. Audience, so never machine
+     * traffic: every surface that leads with this metric is asking how the
+     * page does with people.
+     *
+     * Null where the site counts nothing at all, which the per-provider
+     * `metrics` allow list and a rate-only provider both make reachable. It
+     * is an answer rather than a failure, and callers treat it exactly as
+     * they treat a site with no provider.
+     *
+     * @param iterable<MetricProviderInterface> $providers
+     */
+    public function primaryFor(iterable $providers, Site $site): ?MetricDefinition
+    {
+        $candidates = [];
+
+        foreach ($this->supporting($providers, $site) as $provider) {
+            foreach ($this->forSite($provider, $site) as $definition) {
+                if (MetricUnit::Count === $definition->unit && MetricGroup::Machine !== $definition->group) {
+                    $candidates[] = $definition;
+                }
+            }
+        }
+
+        // Stable, so two providers declaring the same sortOrder are settled
+        // by the order the container tagged them, which is the order every
+        // other list of this site's metrics comes out in.
+        usort($candidates, static fn (MetricDefinition $a, MetricDefinition $b): int => $a->sortOrder <=> $b->sortOrder);
+
+        return $candidates[0] ?? null;
+    }
+
+    /**
+     * Which of the site's providers offers $identifier, for a caller that
+     * has to mask a series against the imported window: coverage is recorded
+     * per provider (see ImportCoverage), and the provider a metric came from
+     * is the only one whose window says anything about it.
+     *
+     * Null for a metric this site does not have, which is the same answer
+     * primaryFor() gives about the metric itself.
+     *
+     * @param iterable<MetricProviderInterface> $providers
+     */
+    public function providerOf(iterable $providers, Site $site, string $identifier): ?MetricProviderInterface
+    {
+        foreach ($this->supporting($providers, $site) as $provider) {
+            foreach ($this->forSite($provider, $site) as $definition) {
+                if ($definition->identifier === $identifier) {
+                    return $provider;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -23,20 +23,31 @@ namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
 final readonly class ResolvedUrl
 {
     /**
-     * @param bool $viaRouteEnhancer the URL is not this page's own address:
-     *                               TYPO3's router attributed it to the page
-     *                               through the site's routing configuration,
-     *                               which is how a record detail URL such as
-     *                               /news/my-article lands on /news. A tile
-     *                               counting such a hit is claiming "the page
-     *                               and what it renders below it", not "the
-     *                               page", so the distinction survives
-     *                               resolution instead of being dropped here
+     * @param bool             $viaRouteEnhancer the URL is not this page's own address:
+     *                                           TYPO3's router attributed it to the page
+     *                                           through the site's routing configuration,
+     *                                           which is how a record detail URL such as
+     *                                           /news/my-article lands on /news. A tile
+     *                                           counting such a hit is claiming "the page
+     *                                           and what it renders below it", not "the
+     *                                           page", so the distinction survives
+     *                                           resolution instead of being dropped here
+     * @param ?RecordReference $record           the record the matched route was about,
+     *                                           where the routing said so. Null covers
+     *                                           both "this is the page's own URL" and
+     *                                           "an enhanced route that is not about a
+     *                                           single record", such as a paginated
+     *                                           list
      */
     public function __construct(
         public int $pageUid,
         public int $languageUid,
         public bool $viaRedirect,
         public bool $viaRouteEnhancer,
+        // Defaulted, unlike the flags above it: this is an `@api`
+        // constructor, and a required fifth parameter would break every
+        // third-party caller on upgrade for a field only the resolver can
+        // fill. Same reasoning as MetricTile's trailing parameters.
+        public ?RecordReference $record = null,
     ) {}
 }

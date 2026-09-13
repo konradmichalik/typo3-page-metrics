@@ -15,8 +15,9 @@ namespace KonradMichalik\Typo3PageMetrics\Command;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Configuration\{PageMetricsSiteConfiguration, SiteConfigurationReader};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, ResolvedUrl, UrlMetric};
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{DateRange, RecordReference, ResolvedUrl, UrlMetric};
+use KonradMichalik\Typo3PageMetrics\Import\RecordAggregate;
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, RecordDailyMetricsRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\{AnnotationProviderInterface, MetricProviderInterface};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
 use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
@@ -55,6 +56,7 @@ final class ImportCommand extends Command
         private readonly UnresolvedUrlRepository $unresolvedUrlRepository,
         private readonly ImportStateRepository $importStateRepository,
         private readonly AnnotationRepository $annotationRepository,
+        private readonly RecordDailyMetricsRepository $recordDailyMetricsRepository,
         private readonly BotAgentDetailCollector $botAgentDetailCollector,
         private readonly ConnectionPool $connectionPool,
         private readonly iterable $providers,
@@ -204,7 +206,7 @@ final class ImportCommand extends Command
         // total rather than the second upsert() silently overwriting the
         // first - upsert() is a set operation by design (see its own
         // docblock), so summing has to happen before it, not in it.
-        [$aggregated, $earliestWithData] = $this->collectMetrics($site, $provider, $configuration, $range);
+        [$aggregated, $earliestWithData, $records] = $this->collectMetrics($site, $provider, $configuration, $range);
 
         // Null when the provider returned nothing at all for the range, in
         // which case this run establishes no window: it cannot tell an empty
@@ -242,9 +244,21 @@ final class ImportCommand extends Command
         // which is the exact reading the coverage window exists to prevent.
         $yesterday = $today->modify('-1 day');
 
+        // Records are split by the same day boundary and written inside the
+        // same transaction as that day's page rows, not after all of them.
+        // The cursor moves with each day, so a record loop running afterwards
+        // would have its days already marked imported: a crash between the
+        // two would leave those records permanently missing, because the next
+        // run resumes past them and only --force would go back.
+        $recordsByDay = $records->byDay();
+
         foreach ($this->groupByDay($aggregated) as $rowsForDay) {
-            $connection->transactional(function () use ($rowsForDay, $identifier, $site, $earliestWithData, $yesterday, $lastImported): void {
+            $day = $rowsForDay[0]['date']->format('Y-m-d');
+            $recordsForDay = $recordsByDay[$day] ?? [];
+
+            $connection->transactional(function () use ($rowsForDay, $recordsForDay, $identifier, $site, $earliestWithData, $yesterday, $lastImported): void {
                 $this->commitDay($rowsForDay, $identifier, $site, $earliestWithData, $yesterday, $lastImported);
+                $this->commitRecords($recordsForDay, $identifier);
             });
         }
 
@@ -293,12 +307,19 @@ final class ImportCommand extends Command
      * contiguous run of empty days before a provider's first data point is
      * far more often "there was nothing to track yet" than "nobody visited".
      *
-     * @return array{0: array<string, array{pageUid: int, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}>, 1: ?DateTimeImmutable}
+     * The third is the same aggregate for the records a route enhancer
+     * placed below a page. Kept apart rather than folded in: a record is
+     * identified by its table and uid, not by a page, and the same hit
+     * legitimately counts twice, once for the page (which means "this page
+     * and what it renders below it") and once for the record.
+     *
+     * @return array{0: array<string, array{pageUid: int, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}>, 1: ?DateTimeImmutable, 2: RecordAggregate}
      */
     private function collectMetrics(Site $site, MetricProviderInterface $provider, PageMetricsSiteConfiguration $configuration, DateRange $range): array
     {
         $identifier = $provider->getIdentifier();
         $aggregated = [];
+        $records = new RecordAggregate();
         $earliestWithData = null;
         $openDay = null;
 
@@ -364,9 +385,13 @@ final class ImportCommand extends Command
             $aggregated = $this->accumulate($aggregated, $result->pageUid, $result->languageUid, $urlMetric->date, $urlMetric->metric, $urlMetric->dimension ?? '', $urlMetric->value);
 
             $aggregated = $this->accumulateShares($aggregated, $result, $urlMetric, $isHeadline);
+
+            if (null !== $result->record) {
+                $records->add($result->record, $result->languageUid, $urlMetric->date, $urlMetric->metric, $urlMetric->dimension ?? '', $urlMetric->value);
+            }
         }
 
-        return [$aggregated, $earliestWithData];
+        return [$aggregated, $earliestWithData, $records];
     }
 
     /**
@@ -403,6 +428,16 @@ final class ImportCommand extends Command
         }
 
         return $aggregated;
+    }
+
+    /**
+     * @param list<array{record: RecordReference, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}> $rows
+     */
+    private function commitRecords(array $rows, string $identifier): void
+    {
+        foreach ($rows as $row) {
+            $this->recordDailyMetricsRepository->upsert($row['record'], $row['languageUid'], $identifier, $row['date'], $row['metric'], $row['value'], $row['dimension']);
+        }
     }
 
     /**

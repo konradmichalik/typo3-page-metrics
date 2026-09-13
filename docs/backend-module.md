@@ -27,7 +27,7 @@ period was never imported, because a percentage against days nobody fetched is
 not a smaller number, it is not a number.
 
 **Compare.** Two periods of the same page held against each other, metric by
-metric, with a chart of the site's main metric over both.
+metric, with a chart of the site's primary metric over both.
 
 Which two periods is a choice of four, all keeping the length of the period you
 selected and only moving the start back: the period immediately before, or the

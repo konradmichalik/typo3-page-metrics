@@ -246,19 +246,14 @@ final readonly class PeriodComparisonBuilder
     }
 
     /**
-     * The one metric the chart carries, out of the several the table does.
+     * The one metric the chart carries, out of the several the table does:
+     * the site's primary metric, resolved exactly as every other surface
+     * resolves it (see MetricDefinitionCollector::primaryFor()). The page
+     * view of this module draws the same one, so a reader switching tabs is
+     * looking at the same line.
      *
-     * The site's primary counted metric, which is the first one its
-     * providers declare. Machine traffic is left out here exactly as it is
-     * left out of the rows.
-     *
-     * Close to, but not the same as, the rule the page view's chart picks by:
-     * that one runs over built tiles and skips a metric with no data for the
-     * page, this one runs over definitions and does not. On a page whose
-     * leading metric happens to be empty the two views of this module chart
-     * different things. Which of the three rules in the codebase is the right
-     * one is #88; naming the divergence here rather than asserting a
-     * consistency that does not hold.
+     * Null where the site counts nothing, which the chart has no way to
+     * draw, and the view renders its table alone.
      *
      * Which metric is drawn is not a choice the reader can make yet, and
      * cannot be made one from here: a picker is a set of links like the
@@ -270,23 +265,18 @@ final readonly class PeriodComparisonBuilder
      */
     private function chartMetric(Site $site): ?array
     {
-        /** @var list<array{sortOrder: int, provider: string, definition: MetricDefinition}> $candidates */
-        $candidates = [];
+        $primary = $this->metricDefinitionCollector->primaryFor($this->providers, $site);
 
-        foreach ($this->metricDefinitionCollector->supporting($this->providers, $site) as $provider) {
-            foreach ($this->metricDefinitionCollector->forSite($provider, $site) as $definition) {
-                if (MetricUnit::Count !== $definition->unit || MetricGroup::Machine === $definition->group) {
-                    continue;
-                }
-
-                $candidates[] = ['sortOrder' => $definition->sortOrder, 'provider' => $provider->getIdentifier(), 'definition' => $definition];
-            }
+        if (null === $primary) {
+            return null;
         }
 
-        usort($candidates, static fn (array $a, array $b): int => $a['sortOrder'] <=> $b['sortOrder']);
-        $first = $candidates[0] ?? null;
+        // Named rather than assumed to be the first supporting provider:
+        // what the series is masked against is the window of the provider
+        // this metric came from, and a site can have more than one.
+        $provider = $this->metricDefinitionCollector->providerOf($this->providers, $site, $primary->identifier);
 
-        return null === $first ? null : ['provider' => $first['provider'], 'definition' => $first['definition']];
+        return null === $provider ? null : ['provider' => $provider->getIdentifier(), 'definition' => $primary];
     }
 
     /**

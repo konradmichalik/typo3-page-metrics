@@ -13,6 +13,48 @@ CREATE TABLE tx_typo3pagemetrics_daily (
 	UNIQUE KEY fact (date,page_uid,sys_language_uid,provider,metric,dimension)
 );
 
+# The record sibling of tx_typo3pagemetrics_daily, for the traffic a route
+# enhancer attributed to a single record: /news/my-article is one news
+# article, not just a hit on /news.
+#
+# A separate table rather than two more columns on the fact table. Widening
+# that table's unique key would touch every row an installed site already has
+# and add `record_table = ''` to every query on the page module's hot read
+# path, all to carry a column that is empty for the overwhelming majority of
+# rows. The read paths are disjoint anyway: page tiles never ask about a
+# record, record tiles never ask about a page.
+#
+# There is deliberately no page_uid column. A record reachable below two
+# detail pages is still one record, and "how is this article doing" has to
+# answer the same number either way, so the page must not be part of the
+# identity - and carrying it outside the key would leave it arbitrary
+# whichever page was imported last. The page keeps its own count in
+# tx_typo3pagemetrics_daily, where the same hit is already counted for the
+# page that rendered it.
+#
+# record_table is varchar(64) because that is the longest table name TYPO3
+# and its databases allow, and keeping it short keeps the unique key inside
+# InnoDB's 3072-byte index limit next to dimension varchar(255).
+#
+# record_uid is always the default-language uid (a persisted route mapper
+# returns the translation parent), so sys_language_uid is a dimension of the
+# fact here exactly as it is for pages.
+CREATE TABLE tx_typo3pagemetrics_record_daily (
+	uid int(11) unsigned NOT NULL auto_increment,
+	date date NOT NULL,
+	record_table varchar(64) DEFAULT '' NOT NULL,
+	record_uid int(11) unsigned DEFAULT '0' NOT NULL,
+	sys_language_uid int(11) DEFAULT '0' NOT NULL,
+	provider varchar(32) DEFAULT '' NOT NULL,
+	metric varchar(64) DEFAULT '' NOT NULL,
+	dimension varchar(255) DEFAULT '' NOT NULL,
+	value int(11) DEFAULT '0' NOT NULL,
+
+	PRIMARY KEY (uid),
+	KEY record_date (record_table,record_uid,sys_language_uid,date),
+	UNIQUE KEY fact (date,record_table,record_uid,sys_language_uid,provider,metric,dimension)
+);
+
 CREATE TABLE tx_typo3pagemetrics_unresolved (
 	uid int(11) unsigned NOT NULL auto_increment,
 	date date NOT NULL,

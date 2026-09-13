@@ -45,6 +45,12 @@ final class AddCustomTileEventListener
 }
 ```
 
+`MetricTile` has trailing parameters a listener should leave alone:
+`previousPeriodCovered`, `previousValue` and `recordFormattedValue` are filled
+by the import pipeline from the coverage window and from the dimension rows,
+and a tile built by a listener brought its own numbers and knows neither. They
+default to the values that say "no claim made".
+
 The event is dispatched once per page-header render, after the built-in
 `MetricProviderInterface` providers (Matomo, GA4) have already contributed
 their own tiles via `$event->getTiles()`. It also exposes `$event->site`,
@@ -135,3 +141,60 @@ For a provider that needs its own daily-import step, its own configurable
 retention and to participate in the dashboard widgets, implement
 `MetricProviderInterface` instead, see the `Matomo`, `Ga4` and `AccessLog`
 providers under `Classes/Provider/` for a full example.
+
+## Records below a page
+
+A detail URL such as `/news/my-article` is not a page slug. It is the page
+`/news` plus a route enhancer, and TYPO3's own router is what turns it back
+into "page 3, showing news article 42". The import asks the router, so no
+extension-specific code and no extra configuration is involved: a site that
+routes records already carries everything the attribution needs.
+
+The record's table comes from the enhancer's own aspect, because a persisted
+mapper cannot work without naming it:
+
+```yaml
+routeEnhancers:
+  News:
+    type: Extbase
+    extension: News
+    plugin: Pi1
+    routes:
+      - { routePath: '/{news_title}', _controller: 'News::detail', _arguments: {news_title: news} }
+    aspects:
+      news_title:
+        type: PersistedAliasMapper
+        tableName: tx_news_domain_model_news
+        routeFieldName: path_segment
+```
+
+`tableName` is the whole contract. Any mapper that declares one takes part,
+including a third-party one, and any mapper that does not is not about a
+record: a `StaticRangeMapper` on a pagination segment maps a number to a
+number, not to a row.
+
+What is deliberately refused:
+
+| Situation | Result |
+| --- | --- |
+| The route maps two records at once, e.g. `/{category}/{article}` | No record. The URL does not say which one the page is about |
+| One argument name claimed by two enhancers for different tables | No record, same reason |
+| A mapper that names no table | No record |
+| An enhancer whose extension is no longer installed | No record, and the import run continues |
+
+In each case the traffic still counts for the page that renders it, which is
+what already happened before any of this existed. A wrong record attribution
+would be worse than none: nothing downstream could tell.
+
+The uid stored is always the default-language one. A persisted mapper returns
+the translation parent for a translated record, exactly as page resolution
+returns the default-language page uid for a translated page, so "the record"
+means the same thing in every language and the language stays a dimension of
+the stored fact.
+
+Record facts live in `tx_typo3pagemetrics_record_daily`, keyed on
+`(date, record_table, record_uid, sys_language_uid, provider, metric, dimension)`.
+It is a sibling of `tx_typo3pagemetrics_daily` rather than an extension of it,
+so the page module's read path is untouched and carries no empty column. The
+same hit is counted in both tables on purpose: the page tile means "this page
+and what it renders below it", the record tile means "this record".

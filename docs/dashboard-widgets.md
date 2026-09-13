@@ -41,6 +41,13 @@ sentence:
 > Page views, 30 days: 1,655, up 29% against the previous period.
 > Biggest riser by page views: "Services", up 46% to 2,610.
 
+A site's **primary metric** is the first metric it counts: the one its
+providers declare earliest that counts things rather than measuring a rate,
+and that is not machine traffic. Every surface names the same one, so two
+pages of a site are never charted against different metrics. A site that
+declares only rates has no primary metric, and the surfaces that need one
+treat it as they treat a site with no provider at all.
+
 Four slots per site: the site's own movement on its primary metric, its most
 significant other metric, the page that rose most and the page that fell most.
 All sites' cards go into one ranked list and that list is cut to four, because

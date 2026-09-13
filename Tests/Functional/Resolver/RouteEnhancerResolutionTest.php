@@ -91,6 +91,28 @@ final class RouteEnhancerResolutionTest extends FunctionalTestCase
         self::assertFalse($result->viaRedirect);
     }
 
+    public function testCarriesTheRecordTheRouteEnhancerMatched(): void
+    {
+        // The mapper looked the segment up in its table to decide the route
+        // matches at all, so the uid is already in PageArguments. Which table
+        // it belongs to comes from the enhancer's own aspect configuration,
+        // which costs nothing to read back.
+        $result = $this->subject->resolve('https://example.com/news/my-article');
+
+        self::assertInstanceOf(ResolvedUrl::class, $result);
+        self::assertNotNull($result->record);
+        self::assertSame('tx_typo3pagemetrics_manual_annotation', $result->record->table);
+        self::assertSame(1, $result->record->uid);
+    }
+
+    public function testCarriesNoRecordForAPageThatIsItsOwnUrl(): void
+    {
+        $result = $this->subject->resolve('https://example.com/news');
+
+        self::assertInstanceOf(ResolvedUrl::class, $result);
+        self::assertNull($result->record);
+    }
+
     public function testLeavesABotProbeUnresolvedWithoutEverAskingTheRouter(): void
     {
         // The router is the most expensive step in the chain and an access

@@ -71,7 +71,29 @@
                                     </f:comment>
                                     <span class="pagemetrics-module-metric-description">{tile.description}</span>
                                 </th>
-                                <td class="text-end">{tile.formattedValue}</td>
+                                <td class="text-end">
+                                    {tile.formattedValue}
+                                    <f:comment>
+                                        Beside the figure it is part of, and
+                                        as a figure rather than as the share
+                                        the tile popover has room for: read
+                                        with the number above it this says
+                                        "1240, of which 830 on records below
+                                        this page", which is the sentence an
+                                        editor of an overview page needs
+                                        before they read the number as their
+                                        page doing well.
+
+                                        Nothing at all where no record
+                                        traffic arrived, which is almost
+                                        every page and every metric: an
+                                        empty string, not a zero, see
+                                        MetricTile::$recordFormattedValue.
+                                    </f:comment>
+                                    <f:if condition="{tile.recordFormattedValue}">
+                                        <span class="pagemetrics-module-metric-note"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.onRecords" arguments="{0: tile.recordFormattedValue}" default="of which %1$s on records below this page" /></span>
+                                    </f:if>
+                                </td>
                                 <td class="text-end">
                                     <f:if condition="{tile.hasNoComparison}">
                                         <f:then><span class="text-body-secondary">&#8212;</span></f:then>

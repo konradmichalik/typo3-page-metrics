@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Resolver;
 
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\RouteMatch;
 use Throwable;
 use TYPO3\CMS\Core\Http\{ServerRequest, Uri};
 use TYPO3\CMS\Core\Routing\{PageArguments, SiteRouteResult};
@@ -36,18 +37,27 @@ use function is_array;
  * keeps showing up in the "Not found pages" report, which is the whole
  * reason that report exists.
  *
+ * The same match also says which record the page is showing, where the route
+ * was about one: see RecordArgumentExtractor, which reads it out of the
+ * arguments this match already produced.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class RouteMatcher
 {
+    public function __construct(
+        private RecordArgumentExtractor $recordArgumentExtractor,
+    ) {}
+
     /**
      * @param string $url  the normalized absolute URL, used to build the request
      * @param string $path the path with the site/language base already stripped
      *
-     * @return int|null the uid of the rendering page in the default language,
-     *                  or null if the site's routing would not serve this URL
+     * @return RouteMatch|null the rendering page in the default language plus
+     *                         the record it shows, or null if the site's
+     *                         routing would not serve this URL
      */
-    public function match(Site $site, ?SiteLanguage $language, string $url, string $path): ?int
+    public function match(Site $site, ?SiteLanguage $language, string $url, string $path): ?RouteMatch
     {
         // Without enhancers the router can only ever match a plain page slug,
         // which SlugLookup has already tried by the time this runs. Skipping
@@ -80,7 +90,11 @@ final readonly class RouteMatcher
 
         $pageUid = $result->getPageId();
 
-        return $pageUid > 0 ? $pageUid : null;
+        if ($pageUid <= 0) {
+            return null;
+        }
+
+        return new RouteMatch($pageUid, $this->recordArgumentExtractor->extract($site, $result));
     }
 
     private function hasRouteEnhancers(Site $site): bool

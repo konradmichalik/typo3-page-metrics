@@ -13,8 +13,9 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Controller;
 
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricUnit, ModuleView};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\ModuleView;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\PageMetricsViewData;
+use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface};
 use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsAccessChecker, PageMetricsViewDataBuilder, PeriodComparisonBuilder, SitePagesTableBuilder, SparklineLabelProvider};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Backend\Module\ModuleData;
@@ -68,6 +69,9 @@ final readonly class PageMetricsModuleController
 
     private const DEFAULT_PERIOD = 30;
 
+    /**
+     * @param iterable<MetricProviderInterface> $providers
+     */
     public function __construct(
         private ModuleTemplateFactory $moduleTemplateFactory,
         private PageMetricsAccessChecker $accessChecker,
@@ -80,6 +84,8 @@ final readonly class PageMetricsModuleController
         private PeriodComparisonBuilder $periodComparisonBuilder,
         private SitePagesTableBuilder $sitePagesTableBuilder,
         private IconFactory $iconFactory,
+        private MetricDefinitionCollector $metricDefinitionCollector,
+        private iterable $providers,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): ResponseInterface
@@ -156,7 +162,7 @@ final readonly class PageMetricsModuleController
             'activeView' => $activeView,
             'includeSubpages' => $includeSubpages,
             'viewData' => $viewData,
-            'chartSeries' => self::chartSeriesOf($viewData),
+            'chartSeries' => $this->chartSeriesOf($viewData, $site instanceof Site ? $site : null),
             'sparklineLabels' => $this->labelProvider->all(),
             'annotations' => $this->annotationPayloadBuilder->build($viewData->annotations),
             // Only the view that reads it. The comparison is a second pass
@@ -188,10 +194,21 @@ final readonly class PageMetricsModuleController
     }
 
     /**
-     * The chart draws the site's primary metric, which is the first count
-     * tile, and nothing else. Every metric is in the table below it, and
-     * overlaying five series in a view whose whole point is being readable
-     * would undo the reason for building the view.
+     * The chart draws the site's primary metric and nothing else. Every
+     * metric is in the table below it, and overlaying five series in a view
+     * whose whole point is being readable would undo the reason for building
+     * the view.
+     *
+     * The site's metric, never this page's (see
+     * MetricDefinitionCollector::primaryFor()). The rule used to move on to
+     * the next metric where this page had no data for the first, so two
+     * pages of one site charted different figures under the same heading and
+     * a reader clicking from one to the other compared two things without
+     * being told. A page with nothing recorded draws an empty chart instead,
+     * which is what is true about it.
+     *
+     * Empty for a page belonging to no site, and for a site that counts
+     * nothing: neither has a metric to lead with.
      *
      * The payload is the shape sparkline.js already reads for the dashboard
      * chart widget (see PageMetricsChartWidget), so no chart code is written
@@ -199,10 +216,16 @@ final readonly class PageMetricsModuleController
      *
      * @return list<array{label: string, color: string, unit: string, values: array<string, int|null>}>
      */
-    private static function chartSeriesOf(PageMetricsViewData $viewData): array
+    private function chartSeriesOf(PageMetricsViewData $viewData, ?Site $site): array
     {
+        $primary = null !== $site ? $this->metricDefinitionCollector->primaryFor($this->providers, $site) : null;
+
+        if (null === $primary) {
+            return [];
+        }
+
         foreach ($viewData->tiles as $tile) {
-            if (MetricUnit::Count === $tile->unit && [] !== $tile->sparkline) {
+            if ($tile->identifier === $primary->identifier) {
                 return [['label' => $tile->label, 'color' => $tile->color, 'unit' => $tile->unit->value, 'values' => $tile->sparkline]];
             }
         }

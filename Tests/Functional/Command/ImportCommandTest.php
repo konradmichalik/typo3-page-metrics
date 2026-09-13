@@ -17,8 +17,8 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Analysis\Taxonomy\Bucket;
 use KonradMichalik\Typo3PageMetrics\Command\ImportCommand;
 use KonradMichalik\Typo3PageMetrics\Configuration\SiteConfigurationReader;
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, UrlMetric};
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, RecordReference, UrlMetric};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, RecordDailyMetricsRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\{AnnotationProviderInterface, MetricProviderInterface};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
 use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
@@ -653,6 +653,76 @@ final class ImportCommandTest extends FunctionalTestCase
         self::assertSame(1, $count);
     }
 
+    public function testWritesARecordsOwnRowsBesideThePagesWithoutReplacingThem(): void
+    {
+        // The same hit is the page's and the record's, deliberately: a page
+        // tile means "this page and what it renders below it", a record tile
+        // means "this record". A run that wrote only one of the two would
+        // make one of those sentences false. This is also what keeps the
+        // record table from being written by nobody, which is what it was
+        // until the import learned to read the resolution's record.
+        // One extra page plus the records, rather than the resolver's whole
+        // page fixture, whose root collides with this class's own.
+        $this->importCSVDataSet(__DIR__.'/Fixtures/route-enhancer-page.csv');
+        $this->importCSVDataSet(__DIR__.'/../Resolver/Fixtures/route-enhancer-records.csv');
+        $this->writeRouteEnhancerSite();
+
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricProvider([
+            new UrlMetric('https://example.com/news/my-article', $today, 'stub.hits', 7),
+        ]);
+
+        $this->runImport([$stub]);
+
+        $record = $this->get(RecordDailyMetricsRepository::class)->dailySeries(
+            new RecordReference('tx_typo3pagemetrics_manual_annotation', 1),
+            0,
+            'stub.hits',
+            new DateRange($today, $today),
+        );
+
+        $page = $this->dailyMetricsRepository->dailySeries(3, 0, 'stub.hits', new DateRange($today, $today));
+        self::assertSame(7, $page[$today->format('Y-m-d')] ?? null, 'the page did not get the hit either, so resolution failed rather than the record write');
+        self::assertSame(7, $record[$today->format('Y-m-d')] ?? null);
+    }
+
+    /**
+     * A site whose news page routes its articles, so a detail URL resolves to
+     * the page and to the record behind it. Mirrors the fixture the resolver
+     * tests use rather than inventing a second shape.
+     */
+    private function writeRouteEnhancerSite(): void
+    {
+        $this->get(SiteWriter::class)->write('main', [
+            'rootPageId' => 1,
+            'base' => 'https://example.com/',
+            'languages' => [
+                0 => ['title' => 'English', 'enabled' => true, 'languageId' => 0, 'base' => '/', 'locale' => 'en_US.UTF-8', 'navigationTitle' => 'English', 'flag' => 'us'],
+            ],
+            'errorHandling' => [],
+            'routes' => [],
+            // Carried over from setUp's own configuration: overwriting the
+            // site without it would leave the provider unconfigured and the
+            // whole site skipped, which fails as "nothing was imported"
+            // rather than as "the enhancer did not match".
+            'pageMetrics' => ['enabled' => true, 'retentionDays' => 5],
+            'routeEnhancers' => [
+                'Articles' => [
+                    'type' => 'Simple',
+                    'limitToPages' => [3],
+                    'routePath' => '/{article}',
+                    'aspects' => [
+                        'article' => [
+                            'type' => 'PersistedAliasMapper',
+                            'tableName' => 'tx_typo3pagemetrics_manual_annotation',
+                            'routeFieldName' => 'text',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+    }
+
     private function countBotAgentRows(): int
     {
         return (int) $this->get(ConnectionPool::class)
@@ -705,6 +775,7 @@ final class ImportCommandTest extends FunctionalTestCase
             $this->unresolvedUrlRepository,
             $this->importStateRepository,
             $this->annotationRepository,
+            $this->get(RecordDailyMetricsRepository::class),
             $this->get(BotAgentDetailCollector::class),
             $this->get(ConnectionPool::class),
             $providers,

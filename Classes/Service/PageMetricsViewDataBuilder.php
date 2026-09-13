@@ -68,6 +68,20 @@ final readonly class PageMetricsViewDataBuilder
     private const MACHINE_SUMMARY_COLOR = '#868e96';
 
     /**
+     * The dimension the import writes beside a headline figure for the part
+     * of it that arrived on a record's own URL below the page rather than on
+     * the page's own address (see ImportCommand). Named here rather than
+     * spelled out at the call site because the same string is both the
+     * prefix the prefetch asks for and the key it is read back under.
+     *
+     * Only count tiles carry it. A rate is a ratio, and "12 of these 31%" is
+     * not a sentence; the machine summary is a tile this extension keeps off
+     * the footing of the audience metrics on purpose, and which crawler hit
+     * which record is not a question an editor acts on.
+     */
+    private const RECORD_DIMENSION = 'via_route_enhancer';
+
+    /**
      * Page types with no frontend content of their own - a folder, an
      * external URL/shortcut, or a spacer never receives visits, so metrics
      * tiles have nothing to show for them.
@@ -252,12 +266,25 @@ final readonly class PageMetricsViewDataBuilder
         // still not asked here: the answer is simply empty for the ones that
         // do not, which is what lets a provider name a channel this class has
         // never heard of.
+        $identifiers = array_map(static fn (MetricDefinition $definition): string => $definition->identifier, $definitions);
         $channelSums = $this->dailyMetricsRepository->sumsByMetricAndDimensionPrefix(
             $pageUids,
             $languageId,
-            array_map(static fn (MetricDefinition $definition): string => $definition->identifier, $definitions),
+            $identifiers,
             $tileRange,
             TrafficChannel::DIMENSION_PREFIX,
+        );
+
+        // One query for the whole row for the same reason, and not one per
+        // tile beside the three a tile already costs: this is a single
+        // dimension rather than a family of them, so what comes back is one
+        // number per metric.
+        $recordSums = $this->dailyMetricsRepository->sumsByMetricAndDimensionPrefix(
+            $pageUids,
+            $languageId,
+            $identifiers,
+            $tileRange,
+            self::RECORD_DIMENSION,
         );
 
         /** @var list<array{sortOrder: int, tile: MetricTile}> $ordered */
@@ -266,7 +293,7 @@ final readonly class PageMetricsViewDataBuilder
         foreach ($definitions as $definition) {
             $ordered[] = [
                 'sortOrder' => $definition->sortOrder,
-                'tile' => $this->buildCountTile($definition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null, $coverageByIdentifier[$definition->identifier] ?? null, $includeSubpages, $withBenchmark, $channelSums[$definition->identifier] ?? []),
+                'tile' => $this->buildCountTile($definition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null, $coverageByIdentifier[$definition->identifier] ?? null, $includeSubpages, $withBenchmark, $channelSums[$definition->identifier] ?? [], $recordSums[$definition->identifier][self::RECORD_DIMENSION] ?? 0),
             ];
         }
 
@@ -381,6 +408,18 @@ final readonly class PageMetricsViewDataBuilder
     }
 
     /**
+     * The previous period's own figure as the tile prints it, or nothing at
+     * all. The three tile kinds had a copy of this each, and all three agree
+     * on the rule: where no percentage was drawn, the figure behind it is
+     * not shown either, because a previous value on its own is a number the
+     * tile never claimed anything about.
+     */
+    private function previousFormatted(?int $deltaPercent, int $previousValue, MetricUnit $unit): string
+    {
+        return null === $deltaPercent ? '' : $this->valueFormatter->format($previousValue, $unit);
+    }
+
+    /**
      * The comparison against the previous period, or the refusal of one.
      * A period outside the imported window is not a smaller number, it is
      * no number: MetricTrend::none() reports nothing rather than reporting
@@ -407,8 +446,10 @@ final readonly class PageMetricsViewDataBuilder
     /**
      * @param list<int>          $pageUids
      * @param array<string, int> $channelSums dimension => total for this metric, fetched once for the whole row
+     * @param int                $recordValue how much of this metric arrived on a record below the page, same period
+     *                                        as the headline and fetched once for the whole row
      */
-    private function buildCountTile(MetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, bool $includeSubpages, bool $withBenchmark, array $channelSums): MetricTile
+    private function buildCountTile(MetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, bool $includeSubpages, bool $withBenchmark, array $channelSums, int $recordValue): MetricTile
     {
         $series = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
         $sparkline = $this->importCoverage->mask($series, $coverage);
@@ -437,7 +478,7 @@ final readonly class PageMetricsViewDataBuilder
             $trend,
             $redirectSharePercent,
             $externalLink,
-            null !== $deltaPercent ? $this->valueFormatter->format($previousValue, $definition->unit) : '',
+            $this->previousFormatted($deltaPercent, $previousValue, $definition->unit),
             $definition->polarity,
             // Where this metric's traffic came from, on the one metric per
             // provider that has an answer, and empty on every other, which
@@ -446,6 +487,12 @@ final readonly class PageMetricsViewDataBuilder
             $this->tileBenchmark($benchmark, $definition->unit),
             $previousPeriodCovered,
             $previousValue,
+            // Formatted through the same formatter as the headline above it,
+            // because the two are read as one sentence and a duration that
+            // says "3:20" cannot have "200" underneath it. Nothing at all
+            // where none of the metric arrived that way, which is almost
+            // every page: see MetricTile::$recordFormattedValue.
+            $recordValue > 0 ? $this->valueFormatter->format($recordValue, $definition->unit) : '',
         );
     }
 
@@ -577,7 +624,7 @@ final readonly class PageMetricsViewDataBuilder
             // deep-link into, and a summary spanning several metrics has no
             // single thing to point at even where a provider does.
             null,
-            null !== $deltaPercent ? $this->valueFormatter->format($previousValue, MetricUnit::Count) : '',
+            $this->previousFormatted($deltaPercent, $previousValue, MetricUnit::Count),
             // Neutral throughout: more crawler traffic is neither an
             // achievement nor a failure, and colouring it green or red would
             // tell an editor to act on something they cannot influence.
@@ -672,7 +719,7 @@ final readonly class PageMetricsViewDataBuilder
             $trend,
             0,
             $externalLink,
-            null !== $deltaPercent ? $this->valueFormatter->format($previousValue, $definition->unit) : '',
+            $this->previousFormatted($deltaPercent, $previousValue, $definition->unit),
             $definition->polarity,
             // No breakdown: a tile that stands for one metric has nothing to
             // break down. Only the machine-traffic summary does.

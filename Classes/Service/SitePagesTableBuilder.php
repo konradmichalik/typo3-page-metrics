@@ -23,6 +23,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 
 use function array_chunk;
+use function array_column;
 use function array_combine;
 use function array_fill_keys;
 use function array_filter;
@@ -81,7 +82,7 @@ final readonly class SitePagesTableBuilder
     /**
      * $sortKey is a metric identifier or SitePagesTable::SORT_DECAY; anything
      * else, including the empty string a reader who has never sorted arrives
-     * with, falls back to the site's first metric. Nothing else sorts:
+     * with, falls back to the site's primary metric. Nothing else sorts:
      * ordering by page title would need every title of the site loaded to
      * order by, where a metric column orders by figures that are in memory
      * already.
@@ -212,13 +213,14 @@ final readonly class SitePagesTableBuilder
         }
 
         // "decay" is not a metric, so resolveSortMetric() falls back to the
-        // site's first one, and that is exactly the metric a decay verdict
-        // has to be made on: the count every provider leads with. The trend
-        // column therefore keeps showing the fall the verdict was made from,
-        // which is half of what a reader needs to see why a row is where it
-        // is. The other half is the age, in its own column beside it.
+        // site's primary one, and that is exactly the metric a decay verdict
+        // has to be made on: the figure every other surface of this extension
+        // leads with, counted and about people. The trend column therefore
+        // keeps showing the fall the verdict was made from, which is half of
+        // what a reader needs to see why a row is where it is. The other half
+        // is the age, in its own column beside it.
         $decaySort = SitePagesTable::SORT_DECAY === $sortKey;
-        $sortMetric = $this->resolveSortMetric($metrics, $sortKey);
+        $sortMetric = $this->resolveSortMetric($metrics, $sortKey, $this->metricDefinitionCollector->primaryFor($this->providers, $site));
         $sortDirection = in_array($sortDirection, [SitePagesTable::DIRECTION_ASCENDING, SitePagesTable::DIRECTION_DESCENDING], true)
             ? $sortDirection
             : SitePagesTable::DIRECTION_DESCENDING;
@@ -697,7 +699,18 @@ final readonly class SitePagesTableBuilder
      */
     private function metricsFor(MetricProviderInterface $provider, Site $site): array
     {
-        $metrics = [...$this->metricDefinitionCollector->forSite($provider, $site), ...$provider->getRateMetricDefinitions()];
+        // Every supporting provider's counted metrics, not only the first
+        // one's. The primary metric spans them all, so building the column
+        // set from one provider would leave a table whose sort fell back to
+        // something the rest of the extension does not call primary, on
+        // exactly the multi-provider site this was built for.
+        $counted = [];
+
+        foreach ($this->metricDefinitionCollector->supporting($this->providers, $site) as $supporting) {
+            $counted = [...$counted, ...$this->metricDefinitionCollector->forSite($supporting, $site)];
+        }
+
+        $metrics = [...$counted, ...$provider->getRateMetricDefinitions()];
         usort($metrics, static fn (MetricDefinition|RateMetricDefinition $a, MetricDefinition|RateMetricDefinition $b): int => $a->sortOrder <=> $b->sortOrder);
 
         return $metrics;
@@ -705,20 +718,21 @@ final readonly class SitePagesTableBuilder
 
     /**
      * @param non-empty-list<MetricDefinition|RateMetricDefinition> $metrics
+     * @param MetricDefinition|null                                 $primary the site's primary metric (see MetricDefinitionCollector::primaryFor()), null where it counts nothing
      */
-    private function resolveSortMetric(array $metrics, string $sortKey): MetricDefinition|RateMetricDefinition
+    private function resolveSortMetric(array $metrics, string $sortKey, ?MetricDefinition $primary): MetricDefinition|RateMetricDefinition
     {
-        foreach ($metrics as $metric) {
-            if ($metric->identifier === $sortKey) {
-                return $metric;
-            }
-        }
+        /** @var array<string, MetricDefinition|RateMetricDefinition> $byIdentifier */
+        $byIdentifier = array_combine(array_column($metrics, 'identifier'), $metrics);
 
-        // The site's first metric, which is its own "page views" by
-        // convention (see SiteMetricsOverviewBuilder::primaryDefinition()):
-        // a table nobody has sorted yet opens on the figure the rest of the
-        // extension leads with.
-        return $metrics[0];
+        // The column that was asked for; else the site's primary metric,
+        // which is the figure the rest of the extension leads with and the
+        // one the decay order is judged on. A site with nothing countable has
+        // no primary metric and still gets its table, so it opens on the
+        // first of its own columns, which are all rates.
+        $primaryIdentifier = null !== $primary ? $primary->identifier : '';
+
+        return $byIdentifier[$sortKey] ?? $byIdentifier[$primaryIdentifier] ?? $metrics[0];
     }
 
     private function resolveProvider(Site $site): ?MetricProviderInterface

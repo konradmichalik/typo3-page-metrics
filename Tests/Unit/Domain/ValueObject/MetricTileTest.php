@@ -83,6 +83,24 @@ final class MetricTileTest extends TestCase
         self::assertSame(TrendSentiment::Neutral, $tile->sentiment);
     }
 
+    public function testATileWithNoRecordsBelowItCarriesNothingRatherThanAZero(): void
+    {
+        // The state almost every page is in. A formatted "0" beside the
+        // headline would be a statement about records that do not exist,
+        // and the surfaces that read this field hide it on the empty
+        // string rather than on a number they would have to interpret.
+        $tile = new MetricTile('matomo.pageviews', 'Page views', 'The number of times this page was viewed.', 'actions-view', '#0969da', MetricUnit::Count, 42, '42', [], 0, TrendDirection::Flat, 0, null, '42', MetricPolarity::HigherIsBetter, [], null, true);
+
+        self::assertSame('', $tile->recordFormattedValue);
+    }
+
+    public function testCarriesThePartOfTheFigureThatArrivedOnRecordsBelowThePage(): void
+    {
+        $tile = new MetricTile('matomo.pageviews', 'Page views', 'The number of times this page was viewed.', 'actions-view', '#0969da', MetricUnit::Count, 1240, '1240', [], 0, TrendDirection::Flat, 0, null, '1240', MetricPolarity::HigherIsBetter, [], null, true, 1240, '830');
+
+        self::assertSame('830', $tile->recordFormattedValue);
+    }
+
     public function testARisingLowerIsBetterMetricReadsAsADecline(): void
     {
         $tile = new MetricTile('matomo.bounce_rate', 'Bounce rate', 'Share of visits that left immediately.', 'actions-door-exit', '#cf222e', MetricUnit::Percent, 31, '31%', [], 11, TrendDirection::Up, 0, null, '28%', MetricPolarity::LowerIsBetter, [], null, true);

@@ -52,6 +52,35 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
         self::assertSame([], $overview->topPages);
     }
 
+    public function testASiteThatOnlyCountsMachineTrafficIsAnsweredLikeOneWithNoProvider(): void
+    {
+        // The widgets lead with the site's primary metric, and crawler counts
+        // are not one: a "most viewed pages" list ranked by what indexers
+        // fetched answers a question nobody asked of a dashboard (see #88).
+        $this->writeSiteConfiguration(['accesslog' => ['pathPattern' => '/var/log/nginx/access.log*', 'metrics' => ['machine']]]);
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'accesslog', new DateTimeImmutable('today'), 'bot.search', 10);
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7);
+
+        self::assertFalse($overview->hasProvider);
+        self::assertSame([], $overview->chartSeries);
+    }
+
+    public function testASiteThatDeclaresOnlyRatesIsAnsweredLikeOneWithNoProvider(): void
+    {
+        // A rate can never be primary: a chart whose area is a percentage
+        // says nothing. The site opted into a provider all the same, so this
+        // has to be an answer rather than a fatal.
+        $this->writeSiteConfiguration(['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x', 'metrics' => ['matomo.bounce_rate']]]);
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7);
+
+        self::assertFalse($overview->hasProvider);
+        self::assertNull($this->get(SiteMetricsOverviewBuilder::class)->buildTopPagesForSite($site, 0, 7));
+    }
+
     public function testChartSeriesSumsAcrossEveryPageInTheSite(): void
     {
         $this->writeSiteConfiguration();
@@ -227,7 +256,10 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
         self::assertContains('Manual note', $texts);
     }
 
-    private function writeSiteConfiguration(): void
+    /**
+     * @param array<string, array<string, mixed>> $providers what the site opts into, the Matomo default being the one every test that only needs "a site with numbers" uses
+     */
+    private function writeSiteConfiguration(array $providers = ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]): void
     {
         $this->get(SiteWriter::class)->write('main', [
             'rootPageId' => 1,
@@ -245,7 +277,7 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
             ],
             'errorHandling' => [],
             'routes' => [],
-            'pageMetrics' => ['providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
+            'pageMetrics' => ['providers' => $providers],
         ]);
     }
 

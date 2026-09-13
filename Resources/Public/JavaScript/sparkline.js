@@ -36,6 +36,7 @@ const FALLBACK_LABELS = {
   peak: 'Peak',
   average: 'Average',
   viaRedirects: 'Via redirects',
+  onRecords: 'On records below',
   typicalPage: 'Typical page',
   typicalPageHint: 'The median of the %1$s pages on this site with data in this period',
   typicalPageTopFifth: 'This page is in the top fifth',
@@ -48,6 +49,7 @@ const FALLBACK_LABELS = {
   peakHint: 'The highest value a single day reached',
   averageHint: 'The mean across the days that have data',
   viaRedirectsHint: 'The share of this metric that arrived through a redirect',
+  onRecordsHint: 'Part of the figure above, counted on a single record below this page rather than on the page itself',
   breakdown: 'Made up of',
   noData: 'No data',
   externalLink: 'Open in analytics tool',
@@ -93,6 +95,7 @@ const STAT_ICON_PATHS = {
   peak: ['M12 4l0 10', 'M12 4l4 4', 'M12 4l-4 4', 'M4 20l16 0'],
   average: ['M3 21l18 -18', 'M4 12a8 8 0 1 0 16 0a8 8 0 1 0 -16 0'],
   viaRedirects: ['M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0', 'M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4', 'M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5'],
+  onRecords: ['M13 5h8', 'M13 9h5', 'M13 15h8', 'M13 19h5', 'M3 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z', 'M3 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z'],
   typicalPage: ['M7 20l10 0', 'M6 6l6 -1l6 1', 'M12 3l0 17', 'M9 12l-3 -6l-3 6a3 3 0 0 0 6 0', 'M21 12l-3 -6l-3 6a3 3 0 0 0 6 0'],
 };
 
@@ -1061,6 +1064,12 @@ class PageMetricsTile {
     const peak = values.length > 0 ? Math.max(...values) : null;
     const average = values.length > 0 ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
     const redirectShare = parseInt(this.element.dataset.redirectShare || '0', 10);
+    // Already formatted in the tile's own unit by the server, and empty
+    // rather than "0" on a page with no records below it, which is almost
+    // every page. Kept as the string it arrives as: parsing a duration or a
+    // currency back into a number here only to print it again is how the
+    // two get to disagree.
+    const onRecords = this.element.dataset.recordValue || '';
     const unit = this.element.dataset.unit;
 
     this.popover = document.createElement('div');
@@ -1167,6 +1176,15 @@ class PageMetricsTile {
 
     if (redirectShare > 0) {
       statNodes.push(stat('viaRedirects', `${redirectShare}%`));
+    }
+
+    // The figure itself, not a second percentage: one share beside another
+    // reads as two of the same kind, and the question this one answers is
+    // how much of the headline is the page itself, which is a quantity. The
+    // chip is absent entirely where nothing arrived that way, so the row
+    // grows only on the handful of pages that list records at all.
+    if ('' !== onRecords) {
+      statNodes.push(stat('onRecords', onRecords));
     }
 
     // Last in the row, and the only chip that is about the other pages of the

@@ -122,9 +122,9 @@ final readonly class PageTrendCalculator
      * separate rows. MetricDefinition only, unlike the other ranking
      * methods: "most viewed pages" has no metric picker of its own, it
      * always ranks by the site's primary metric (see
-     * SiteMetricsOverviewBuilder::primaryDefinition(), whose return type is
-     * MetricDefinition, never RateMetricDefinition) - a rate metric here
-     * would be unreachable code, not a real capability.
+     * MetricDefinitionCollector::primaryFor(), which answers with a counted
+     * MetricDefinition or with nothing, never with a rate) - a rate metric
+     * here would be unreachable code, not a real capability.
      *
      * @param array<int, list<int>> $pageUidsByAnchor anchor page uid => every page uid whose data rolls up into it (including the anchor itself)
      *

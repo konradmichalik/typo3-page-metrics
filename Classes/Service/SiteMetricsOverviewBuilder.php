@@ -30,9 +30,9 @@ use function ucfirst;
  * The site-wide counterpart to PageMetricsViewDataBuilder - backs the four
  * dashboard widgets (chart, top pages, not-found pages, annotations) the
  * same way that class backs the PageHeader tiles. Ranks "most viewed pages"
- * by whichever metric a supporting provider declares first (lowest
- * sortOrder), the provider's own "pageviews"-equivalent by convention - the
- * chart can be pointed at a different metric via $preferredMetricIdentifier.
+ * by the site's primary metric (see MetricDefinitionCollector::primaryFor(),
+ * which is where every surface gets the same answer) - the chart can be
+ * pointed at a different metric via $preferredMetricIdentifier.
  * The "biggest trend" widget goes through buildTrendPages() instead, since
  * it has its own period and ranking axis independent of the others. Per-page
  * trend/ranking math itself lives in PageTrendCalculator, shared by both.
@@ -72,7 +72,11 @@ final readonly class SiteMetricsOverviewBuilder
             return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], [], null);
         }
 
-        $primary = $this->primaryDefinition($provider, $site);
+        // A site that counts nothing gets the same answer as a site with no
+        // provider at all, here and in the two builders below: there is no
+        // figure to lead with, and every widget on top of this one is built
+        // around one (see MetricDefinitionCollector::primaryFor()).
+        $primary = $this->metricDefinitionCollector->primaryFor($this->providers, $site);
 
         if (null === $primary) {
             return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], [], null);
@@ -82,7 +86,12 @@ final readonly class SiteMetricsOverviewBuilder
 
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
-        $coverage = $this->importCoverage->forProvider($provider->getIdentifier(), $site->getIdentifier());
+        // The provider the charted metric belongs to, not the site's first.
+        // Coverage is recorded per provider, so a site running the access log
+        // for its bot metrics and Matomo for its audience would otherwise mask
+        // matomo.pageviews against the access log's import window, which says
+        // nothing about it.
+        $coverage = $this->coverageFor($chartMetric->identifier, $site, $provider);
 
         return new SiteMetricsOverview(
             $site,
@@ -144,7 +153,7 @@ final readonly class SiteMetricsOverviewBuilder
             return null;
         }
 
-        $primary = $this->primaryDefinition($provider, $site);
+        $primary = $this->metricDefinitionCollector->primaryFor($this->providers, $site);
 
         if (null === $primary) {
             return null;
@@ -154,7 +163,7 @@ final readonly class SiteMetricsOverviewBuilder
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
 
-        return $this->trendCalculator->rankedByTrend($pageUids, $languageId, $metric, $currentRange, $previousRange, $sentiment, $limit, $this->previousPeriodCovered($provider, $site, $previousRange));
+        return $this->trendCalculator->rankedByTrend($pageUids, $languageId, $metric, $currentRange, $previousRange, $sentiment, $limit, $this->previousPeriodCovered($this->providerFor($metric->identifier, $site, $provider), $site, $previousRange));
     }
 
     /**
@@ -184,7 +193,7 @@ final readonly class SiteMetricsOverviewBuilder
             return null;
         }
 
-        $primary = $this->primaryDefinition($provider, $site);
+        $primary = $this->metricDefinitionCollector->primaryFor($this->providers, $site);
 
         if (null === $primary) {
             return null;
@@ -192,7 +201,7 @@ final readonly class SiteMetricsOverviewBuilder
 
         $goalMetric = $this->resolveGoalMetric($site, $goalMetricIdentifier);
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
-        $previousPeriodCovered = $this->previousPeriodCovered($provider, $site, $previousRange);
+        $previousPeriodCovered = $this->previousPeriodCovered($this->providerFor($primary->identifier, $site, $provider), $site, $previousRange);
 
         if (null !== $level && $includeSubpages) {
             $pageUidsByAnchor = [];
@@ -292,6 +301,23 @@ final readonly class SiteMetricsOverviewBuilder
      * compared with were never fetched, which is the same judgement the
      * page-module tiles make (see ImportCoverage::covers()).
      */
+    /**
+     * The provider that declares this metric, falling back to the site's
+     * first where nothing claims it. Coverage and the previous-period gate
+     * are recorded per provider, and the primary metric may come from a
+     * provider that is not the first one configured (see
+     * MetricDefinitionCollector::primaryFor()).
+     */
+    private function providerFor(string $identifier, Site $site, MetricProviderInterface $fallback): MetricProviderInterface
+    {
+        return $this->metricDefinitionCollector->providerOf($this->providers, $site, $identifier) ?? $fallback;
+    }
+
+    private function coverageFor(string $identifier, Site $site, MetricProviderInterface $fallback): ?DateRange
+    {
+        return $this->importCoverage->forProvider($this->providerFor($identifier, $site, $fallback)->getIdentifier(), $site->getIdentifier());
+    }
+
     private function previousPeriodCovered(MetricProviderInterface $provider, Site $site, DateRange $previousRange): bool
     {
         return $this->importCoverage->covers(
@@ -349,24 +375,6 @@ final readonly class SiteMetricsOverviewBuilder
     private function resolveProvider(Site $site): ?MetricProviderInterface
     {
         return $this->metricDefinitionCollector->supporting($this->providers, $site)[0] ?? null;
-    }
-
-    /**
-     * Null where the provider contributes no count metric to this site at
-     * all, which the per-provider `metrics` allow list made reachable: a
-     * list naming only rate metrics, or only identifiers no installed
-     * provider offers, is deliberately tolerated rather than refused (see
-     * docs/providers/accesslog.md), and supports() still says yes because a
-     * provider a site opted into supports it whatever its tiles come to.
-     * Treated exactly like a site with no provider, which is the same answer
-     * to the reader.
-     */
-    private function primaryDefinition(MetricProviderInterface $provider, Site $site): ?MetricDefinition
-    {
-        $definitions = $this->metricDefinitionCollector->forSite($provider, $site);
-        usort($definitions, static fn (MetricDefinition $a, MetricDefinition $b): int => $a->sortOrder <=> $b->sortOrder);
-
-        return $definitions[0] ?? null;
     }
 
     /**

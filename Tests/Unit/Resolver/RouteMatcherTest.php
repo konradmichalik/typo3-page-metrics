@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Resolver;
 
-use KonradMichalik\Typo3PageMetrics\Resolver\RouteMatcher;
+use KonradMichalik\Typo3PageMetrics\Resolver\{RecordArgumentExtractor, RouteEnhancerRecordTables, RouteMatcher};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -28,7 +28,7 @@ final class RouteMatcherTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new RouteMatcher();
+        $this->subject = new RouteMatcher(new RecordArgumentExtractor(new RouteEnhancerRecordTables()));
     }
 
     public function testSkipsRoutingEntirelyForASiteWithoutRouteEnhancers(): void

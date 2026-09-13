@@ -536,6 +536,50 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         self::assertSame(20, $tile->redirectSharePercent);
     }
 
+    public function testSaysHowMuchOfTheFigureArrivedOnRecordsBelowThePage(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 30, '');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 12, 'via_route_enhancer');
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7);
+
+        $tile = $this->tileFor($viewData, 'matomo.pageviews');
+        self::assertSame('12', $tile->recordFormattedValue);
+        // The part is a part: the headline is still the total the import
+        // wrote without a dimension, not that total plus its own share.
+        self::assertSame(30, $tile->value);
+    }
+
+    public function testAPageWithNoRecordsBelowItSaysNothingRatherThanZero(): void
+    {
+        // Which is nearly every page. A "0" would be an answer to a question
+        // this page never raised.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 30, '');
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7);
+
+        self::assertSame('', $this->tileFor($viewData, 'matomo.pageviews')->recordFormattedValue);
+    }
+
+    public function testRateTilesCarryNoRecordFigure(): void
+    {
+        // A share of a ratio is not a quantity: the import writes the
+        // dimension against the counts a rate is computed from, and adding
+        // them up would say "12 of these 31%".
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entry_bounces', 5);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entries', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entries', 4, 'via_route_enhancer');
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7);
+
+        self::assertSame('', $this->tileFor($viewData, 'matomo.bounce_rate')->recordFormattedValue);
+    }
+
     public function testComputesBounceRateAsARatioOfSumsNotAnAverageOfDailyRatios(): void
     {
         $this->writeSiteConfiguration(1, 'https://example.com/');
