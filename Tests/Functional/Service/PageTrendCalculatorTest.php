@@ -237,6 +237,68 @@ final class PageTrendCalculatorTest extends FunctionalTestCase
         self::assertSame([3, 2], array_map(static fn ($page): int => $page->pageUid, $declined));
     }
 
+    public function testRanksNothingByTrendWhileThePreviousPeriodIsNotFullyImported(): void
+    {
+        // A previous period the import only partly reached sums to less than
+        // it was, and every page rises by exactly that difference. A page
+        // with no previous row at all is already dropped by the significance
+        // threshold, which is why the partial window is the case that put
+        // fabricated risers at the top of the widget.
+        $this->upsert(2, 'matomo.pageviews', '2026-08-03', 100);
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 400);
+
+        $risen = $this->subject->rankedByTrend([2], 0, $this->flooredCountMetric(), $this->current, $this->previous, TrendSentiment::Positive, 10, false);
+
+        self::assertSame([], $risen);
+    }
+
+    public function testRanksTheSameMovementOnceTheWholePreviousPeriodIsImported(): void
+    {
+        $this->upsert(2, 'matomo.pageviews', '2026-08-03', 100);
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 400);
+
+        $risen = $this->subject->rankedByTrend([2], 0, $this->flooredCountMetric(), $this->current, $this->previous, TrendSentiment::Positive, 10);
+
+        self::assertSame([2], array_map(static fn ($page): int => $page->pageUid, $risen));
+    }
+
+    public function testStillRanksByValueWithoutAComparisonWhileThePreviousPeriodWasNeverImported(): void
+    {
+        // The current period's numbers are real, so the ranking stands. Only
+        // the comparison beside each row is the thing nobody can make.
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 5);
+        $this->upsert(3, 'matomo.pageviews', '2026-08-10', 20);
+
+        $ranked = $this->subject->rankedByValue([2, 3], 0, $this->countMetric(), $this->current, $this->previous, 10, false);
+
+        self::assertSame([3, 2], array_map(static fn ($page): int => $page->pageUid, $ranked));
+        self::assertTrue($ranked[0]->hasNoComparison);
+        self::assertNull($ranked[0]->deltaPercent);
+    }
+
+    public function testAGroupedRankingWithholdsTheSameComparison(): void
+    {
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 5);
+        $this->upsert(3, 'matomo.pageviews', '2026-08-10', 20);
+
+        $ranked = $this->subject->rankedByValueGrouped([2 => [2, 3]], 0, $this->countMetric(), $this->current, $this->previous, 10, false);
+
+        self::assertCount(1, $ranked);
+        self::assertSame('25', $ranked[0]->formattedValue);
+        self::assertTrue($ranked[0]->hasNoComparison);
+    }
+
+    public function testAnImportedPreviousPeriodStillProducesAComparison(): void
+    {
+        $this->upsert(2, 'matomo.pageviews', '2026-08-03', 10);
+        $this->upsert(2, 'matomo.pageviews', '2026-08-10', 20);
+
+        $ranked = $this->subject->rankedByValue([2], 0, $this->countMetric(), $this->current, $this->previous, 10);
+
+        self::assertFalse($ranked[0]->hasNoComparison);
+        self::assertSame(100, $ranked[0]->deltaPercent);
+    }
+
     private function flooredCountMetric(): MetricDefinition
     {
         return new MetricDefinition('matomo.pageviews', 'Page views', 'Views', 'actions-view', MetricUnit::Count, 10, '#0969da', MetricPolarity::HigherIsBetter, MetricGroup::Audience, new MetricSignificance(0.1, 10));

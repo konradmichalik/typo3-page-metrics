@@ -58,6 +58,16 @@ final class MetricTrendTest extends TestCase
         self::assertSame(TrendDirection::Flat, $trend->direction);
     }
 
+    public function testAnUnimportedPreviousPeriodPointsNowhereAtAll(): void
+    {
+        // Not an upward trend the way a previous period of zero is: nothing
+        // was measured, so there is no direction to report either.
+        $trend = MetricTrend::none();
+
+        self::assertNull($trend->deltaPercent);
+        self::assertSame(TrendDirection::Flat, $trend->direction);
+    }
+
     public function testAnUnchangedValueIsFlat(): void
     {
         $trend = MetricTrend::between(100, 100);

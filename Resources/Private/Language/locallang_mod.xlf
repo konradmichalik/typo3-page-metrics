@@ -147,11 +147,11 @@
             <trans-unit id="trend.movement.unchanged" resname="trend.movement.unchanged">
                 <source>Unchanged</source>
             </trans-unit>
-            <trans-unit id="trend.explanation.current" resname="trend.explanation.current">
-                <source>This period (%1$s): %2$s</source>
+            <trans-unit id="trend.explanation.comparison" resname="trend.explanation.comparison">
+                <source>%1$s against %2$s in the previous period</source>
             </trans-unit>
-            <trans-unit id="trend.explanation.previous" resname="trend.explanation.previous">
-                <source>Previous period (%1$s): %2$s</source>
+            <trans-unit id="trend.explanation.periods" resname="trend.explanation.periods">
+                <source>This period: %1$s. Previous period: %2$s.</source>
             </trans-unit>
             <trans-unit id="trend.explanation.new" resname="trend.explanation.new">
                 <source>No data in the previous period (%1$s) to compare against</source>
@@ -353,6 +353,36 @@
             </trans-unit>
             <trans-unit id="unresolved.reason.unknown" resname="unresolved.reason.unknown">
                 <source>Unknown</source>
+            </trans-unit>
+            <trans-unit id="day.title" resname="day.title">
+                <source>Day detail</source>
+            </trans-unit>
+            <trans-unit id="day.close" resname="day.close">
+                <source>Close</source>
+            </trans-unit>
+            <trans-unit id="day.events" resname="day.events">
+                <source>What happened</source>
+            </trans-unit>
+            <trans-unit id="day.metrics" resname="day.metrics">
+                <source>That day</source>
+            </trans-unit>
+            <trans-unit id="day.comparison.window" resname="day.comparison.window">
+                <source>%1$s days before (%2$s) against %1$s days after (%3$s)</source>
+            </trans-unit>
+            <trans-unit id="day.comparison.metric" resname="day.comparison.metric">
+                <source>Metric</source>
+            </trans-unit>
+            <trans-unit id="day.comparison.before" resname="day.comparison.before">
+                <source>Before</source>
+            </trans-unit>
+            <trans-unit id="day.comparison.after" resname="day.comparison.after">
+                <source>After</source>
+            </trans-unit>
+            <trans-unit id="day.comparison.change" resname="day.comparison.change">
+                <source>Change</source>
+            </trans-unit>
+            <trans-unit id="day.comparison.insufficient" resname="day.comparison.insufficient">
+                <source>Not enough data yet: %1$s of %2$s days before and %3$s of %2$s days after this marker are imported.</source>
             </trans-unit>
         </body>
     </file>

@@ -1146,3 +1146,283 @@
     clip-path: inset(50%);
     white-space: nowrap;
 }
+/* ==========================================================================
+   Day detail: the marker as a button, and the panel behind it
+   ========================================================================== */
+
+/* The clickable marker. A transparent column over the 1px line the SVG
+   draws, because that line is neither a focus stop nor a target a pointer
+   can reasonably hit. Narrow on purpose: the plot it sits on is about 116px
+   wide, so a target of the usual size would cover a quarter of the chart and
+   swallow its neighbour. The keyboard path to the same panel is the reason
+   this stays acceptable. */
+.pagemetrics-annotation-trigger {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    transform: translateX(-50%);
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    /* The tile's accent, which is also what the marker under it is drawn in
+       inside a popover (see .pagemetrics-popover .pagemetrics-sparkline-annotation):
+       the highlight has to belong to the mark it covers, not to the text
+       around it. */
+    color: var(--pm-accent, currentColor);
+    cursor: pointer;
+}
+
+/* A band marker spans its own days, so it is anchored at its left edge
+   rather than centred on a single one. */
+.pagemetrics-annotation-trigger-band {
+    min-width: 20px;
+    transform: none;
+}
+
+.pagemetrics-annotation-trigger:hover,
+.pagemetrics-annotation-trigger:focus-visible {
+    background: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.pagemetrics-annotation-trigger:focus-visible {
+    outline: 2px solid var(--typo3-component-primary-color, #0b5fff);
+    outline-offset: 1px;
+}
+
+/* Above the tile popover (z-index 2000), because it is opened from inside
+   one and that popover deliberately stays open underneath: it owns the
+   marker button focus returns to when the panel closes. */
+.pagemetrics-day-backdrop {
+    position: fixed;
+    z-index: 2100;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.32);
+}
+
+.pagemetrics-day-panel {
+    width: min(480px, 100%);
+    max-height: 100%;
+    overflow: hidden auto;
+    border: 1px solid var(--typo3-component-border-color, #cbcbcb);
+    border-radius: var(--typo3-component-border-radius, 4px);
+    background: var(--typo3-component-bg, #fff);
+    box-shadow: var(--typo3-component-box-shadow-flyout, 0 2px 8px rgba(0, 0, 0, 0.15));
+}
+
+.pagemetrics-day-panel:focus-visible {
+    outline: 2px solid var(--typo3-component-primary-color, #0b5fff);
+    outline-offset: -2px;
+}
+
+.pagemetrics-day-loading {
+    height: 120px;
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 6%, transparent);
+}
+
+/* Motion is opted into rather than switched off again: nothing animates
+   until the visitor has said they do not mind it. */
+@media (prefers-reduced-motion: no-preference) {
+    .pagemetrics-day-panel {
+        animation: pagemetrics-day-appear 120ms ease-out;
+    }
+
+    .pagemetrics-day-loading {
+        animation: pagemetrics-day-pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pagemetrics-day-appear {
+        from {
+            opacity: 0;
+            transform: translateY(4px);
+        }
+    }
+
+    @keyframes pagemetrics-day-pulse {
+        50% {
+            opacity: 0.45;
+        }
+    }
+}
+
+.pagemetrics-day {
+    padding: 12px 16px 16px;
+    font-size: 0.8125rem;
+}
+
+.pagemetrics-day-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.pagemetrics-day-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.pagemetrics-day-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.pagemetrics-day-close:hover,
+.pagemetrics-day-close:focus-visible {
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 8%, transparent);
+}
+
+.pagemetrics-day-close svg {
+    width: 16px;
+    height: 16px;
+}
+
+.pagemetrics-day-section {
+    margin-top: 16px;
+}
+
+.pagemetrics-day-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-day-events {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.pagemetrics-day-event {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid var(--typo3-component-border-color, #cbcbcb);
+}
+
+.pagemetrics-day-event-icon {
+    display: flex;
+    flex: 0 0 auto;
+    color: var(--pm-annotation-color, var(--typo3-text-color-variant, #6a7085));
+}
+
+.pagemetrics-day-event-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.pagemetrics-day-event-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 6px;
+}
+
+/* The kind of event in words. The marker's colour says it too and says it
+   to nobody using a screen reader or a forced-colours mode. */
+.pagemetrics-day-event-kind {
+    font-weight: 600;
+    color: var(--pm-annotation-color, var(--typo3-text-color-variant, #6a7085));
+}
+
+.pagemetrics-day-event-range {
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-day-metrics {
+    margin: 0;
+}
+
+/* The grid lives on the pair, not on the <dl>: WebKit drops list semantics
+   from a description list whose display is not a list value, the same reason
+   the popover's breakdown is built this way. */
+.pagemetrics-day-metric {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 5px 0;
+    border-top: 1px solid var(--typo3-component-border-color, #cbcbcb);
+}
+
+.pagemetrics-day-metric-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pagemetrics-day-metric-icon {
+    display: flex;
+    color: var(--pm-accent, currentColor);
+}
+
+.pagemetrics-day-metric-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.pagemetrics-day-metric-value {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.pagemetrics-day-metric-nodata {
+    font-weight: 400;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-day-comparison-window {
+    margin: 0 0 6px;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-day-comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.pagemetrics-day-comparison-table th,
+.pagemetrics-day-comparison-table td {
+    padding: 5px 6px 5px 0;
+    border-top: 1px solid var(--typo3-component-border-color, #cbcbcb);
+    text-align: left;
+    vertical-align: baseline;
+}
+
+.pagemetrics-day-comparison-table thead th {
+    border-top: 0;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-day-comparison-value {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.pagemetrics-day-comparison-insufficient {
+    color: var(--typo3-text-color-variant, #6a7085);
+}

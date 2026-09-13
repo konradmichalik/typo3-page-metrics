@@ -40,6 +40,14 @@ final class AnnotationTest extends TestCase
         self::assertTrue($annotation->includeSubpages);
     }
 
+    public function testAMarkerStandsForItselfUnlessItSaysHowManyItStandsFor(): void
+    {
+        $date = new DateTimeImmutable('2026-08-01');
+
+        self::assertSame(0, (new Annotation('1', $date, 'Release 2.0'))->collapsedCount);
+        self::assertSame(14, (new Annotation('c', $date, '14 pages updated', AnnotationCategory::Content, null, 0, false, 14))->collapsedCount);
+    }
+
     public function testDefaultsToASiteWideSingleDayRelease(): void
     {
         // What every annotation in this extension was before it could be

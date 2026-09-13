@@ -36,6 +36,17 @@ final readonly class TopPage
     public bool $isNew;
 
     /**
+     * Why the row has no percentage, where the reason is not the page: the
+     * period ranked against lies outside the imported window, so its sum is
+     * built out of days that were never fetched (see
+     * ImportCoverage::covers()). Same precomputed shape as $isNew and for
+     * the same reason, and the counterpart of MetricTile::$hasNoComparison -
+     * the widget tables render no badge where it is true, because "new" is
+     * a claim about the page and this is a claim about the import.
+     */
+    public bool $hasNoComparison;
+
+    /**
      * Same reasoning as MetricTile::$sentiment: the row's colour has to say
      * "better / worse", which direction alone cannot for a metric where a
      * rise is the bad outcome.
@@ -49,8 +60,16 @@ final readonly class TopPage
         public ?int $deltaPercent,
         public TrendDirection $trend,
         public MetricPolarity $polarity,
+        bool $previousPeriodCovered,
     ) {
-        $this->isNew = null === $deltaPercent;
+        // And not covered: a row the import cannot speak for is not a new
+        // page, it is a page nobody asked about. The templates branch on
+        // $hasNoComparison first, so this only decides what a row that does
+        // have a comparison says, but leaving the two collapsed here would
+        // hand the next reader of this object the same trap MetricTile just
+        // got out of.
+        $this->isNew = null === $deltaPercent && $previousPeriodCovered;
+        $this->hasNoComparison = !$previousPeriodCovered;
         $this->sentiment = TrendSentiment::of($trend, $polarity);
     }
 }

@@ -5,6 +5,15 @@ on:
       - '**'
   pull_request: ~
 
+concurrency:
+  # `head_ref || ref_name` is the branch name under both events, so the push and
+  # the pull_request run for the same branch share one group and deduplicate.
+  # `github.ref` would not: it is refs/pull/<n>/merge on a pull request.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  # Never cancel a run for the default branch, not even one started by a fork
+  # pull request whose head branch happens to be named `main`.
+  cancel-in-progress: ${{ (github.head_ref || github.ref_name) != 'main' }}
+
 jobs:
   security:
     uses: konradmichalik/reusable-github-actions/.github/workflows/security.yml@c460c0166a646cb65fd059c8d2f7d895ff3c787b # 0.1.0

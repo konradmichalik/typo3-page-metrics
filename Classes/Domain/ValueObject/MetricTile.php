@@ -39,6 +39,18 @@ final readonly class MetricTile
     public bool $isNew;
 
     /**
+     * The third state, and the reason $isNew alone was not enough: a null
+     * $deltaPercent used to mean both "new since the previous period" and
+     * "the previous period was never imported", which are different facts
+     * about the page and only one of them is about the page at all. A period
+     * outside the imported window sums to a zero nobody measured, and the
+     * tile said "new" about a page that has existed for years. Precomputed
+     * like $isNew, for a template that cannot ask the question itself, and
+     * the badge is left out entirely where it is true.
+     */
+    public bool $hasNoComparison;
+
+    /**
      * @param array<string, int|null>                            $sparkline              Y-m-d => value, covers the same period as the tile
      *                                                                                   itself; null for a day with no data at all, which is
      *                                                                                   not the same as a day with no traffic
@@ -58,6 +70,14 @@ final readonly class MetricTile
      * @param TileBenchmark|null                                 $benchmark              what the rest of this site did on the same metric over
      *                                                                                   the same period, null where the site has too few pages
      *                                                                                   with data for the comparison to say anything
+     * @param bool                                               $previousPeriodCovered  whether the period compared against lies inside the
+     *                                                                                   imported window, which is what makes the comparison
+     *                                                                                   sayable at all (see ImportCoverage::covers()). Defaults
+     *                                                                                   to true because a tile built by a listener rather than by
+     *                                                                                   the import pipeline brought its own numbers and knows no
+     *                                                                                   import window, and because this is an `@api` constructor
+     *                                                                                   a required parameter here would break every existing
+     *                                                                                   ModifyMetricTilesEvent listener
      */
     public function __construct(
         public string $identifier,
@@ -77,8 +97,10 @@ final readonly class MetricTile
         public MetricPolarity $polarity = MetricPolarity::HigherIsBetter,
         public array $breakdown = [],
         public ?TileBenchmark $benchmark = null,
+        bool $previousPeriodCovered = true,
     ) {
         $this->sentiment = TrendSentiment::of($trend, $polarity);
-        $this->isNew = null === $deltaPercent;
+        $this->hasNoComparison = !$previousPeriodCovered;
+        $this->isNew = null === $deltaPercent && $previousPeriodCovered;
     }
 }

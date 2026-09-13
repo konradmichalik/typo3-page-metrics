@@ -44,16 +44,21 @@ final readonly class PageTrendCalculator
     ) {}
 
     /**
+     * $previousPeriodCovered is the caller's answer to whether the period
+     * ranked against was imported at all (see ImportCoverage::covers()).
+     * The ranking itself stands either way - the current period's numbers
+     * are real - and only the comparison beside each row is withheld.
+     *
      * @param list<int> $pageUids
      *
      * @return list<TopPage>
      */
-    public function rankedByValue(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit): array
+    public function rankedByValue(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit, bool $previousPeriodCovered = true): array
     {
-        $trends = $this->computeTrends($pageUids, $languageId, $metric, $currentRange, $previousRange);
+        $trends = $this->computeTrends($pageUids, $languageId, $metric, $currentRange, $previousRange, $previousPeriodCovered);
         usort($trends, static fn (PageTrend $a, PageTrend $b): int => $b->value <=> $a->value);
 
-        return $this->toTopPages(array_slice($trends, 0, $limit), $metric);
+        return $this->toTopPages(array_slice($trends, 0, $limit), $metric, $previousPeriodCovered);
     }
 
     /**
@@ -61,11 +66,21 @@ final readonly class PageTrendCalculator
      *
      * @return list<TopPage>
      */
-    public function rankedByTrend(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, TrendSentiment $sentiment, int $limit): array
+    public function rankedByTrend(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, TrendSentiment $sentiment, int $limit, bool $previousPeriodCovered = true): array
     {
+        if (!$previousPeriodCovered) {
+            // Nothing to rank rather than everything: this list is movement,
+            // and a period the import did not cover produces a movement for
+            // every page, sized by how much of it happened to be fetched. A
+            // page with no previous row at all is already dropped by the
+            // significance threshold, so it is the partly covered period that
+            // used to fill the widget with risers nobody can account for.
+            return [];
+        }
+
         $polarity = $metric->polarity;
         $significance = $metric->significance ?? MetricSignificance::default();
-        $trends = $this->computeTrends($pageUids, $languageId, $metric, $currentRange, $previousRange);
+        $trends = $this->computeTrends($pageUids, $languageId, $metric, $currentRange, $previousRange, $previousPeriodCovered);
 
         // Both thresholds, not just the direction. Filtering on direction
         // alone puts a page that went from two views to four at the top of
@@ -90,7 +105,7 @@ final readonly class PageTrendCalculator
             static fn (PageTrend $a, PageTrend $b): int => $b->weight() <=> $a->weight(),
         );
 
-        return $this->toTopPages(array_slice($trends, 0, $limit), $metric);
+        return $this->toTopPages(array_slice($trends, 0, $limit), $metric, $previousPeriodCovered);
     }
 
     /**
@@ -111,12 +126,12 @@ final readonly class PageTrendCalculator
      *
      * @return list<TopPage>
      */
-    public function rankedByValueGrouped(array $pageUidsByAnchor, int $languageId, MetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit): array
+    public function rankedByValueGrouped(array $pageUidsByAnchor, int $languageId, MetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, int $limit, bool $previousPeriodCovered = true): array
     {
-        $trends = $this->computeGroupedTrends($pageUidsByAnchor, $languageId, $metric->identifier, $currentRange, $previousRange);
+        $trends = $this->computeGroupedTrends($pageUidsByAnchor, $languageId, $metric->identifier, $currentRange, $previousRange, $previousPeriodCovered);
         usort($trends, static fn (PageTrend $a, PageTrend $b): int => $b->value <=> $a->value);
 
-        return $this->toTopPages(array_slice($trends, 0, $limit), $metric);
+        return $this->toTopPages(array_slice($trends, 0, $limit), $metric, $previousPeriodCovered);
     }
 
     /**
@@ -144,11 +159,11 @@ final readonly class PageTrendCalculator
      *
      * @return list<PageTrend>
      */
-    private function computeTrends(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange): array
+    private function computeTrends(array $pageUids, int $languageId, MetricDefinition|RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, bool $previousPeriodCovered): array
     {
         return $metric instanceof MetricDefinition
-            ? $this->computePageTrends($pageUids, $languageId, $metric->identifier, $currentRange, $previousRange)
-            : $this->computePageTrendsForRate($pageUids, $languageId, $metric, $currentRange, $previousRange);
+            ? $this->computePageTrends($pageUids, $languageId, $metric->identifier, $currentRange, $previousRange, $previousPeriodCovered)
+            : $this->computePageTrendsForRate($pageUids, $languageId, $metric, $currentRange, $previousRange, $previousPeriodCovered);
     }
 
     /**
@@ -162,10 +177,13 @@ final readonly class PageTrendCalculator
      *
      * @return list<PageTrend>
      */
-    private function computePageTrends(array $pageUids, int $languageId, string $metric, DateRange $currentRange, DateRange $previousRange): array
+    private function computePageTrends(array $pageUids, int $languageId, string $metric, DateRange $currentRange, DateRange $previousRange, bool $previousPeriodCovered): array
     {
         $currentSums = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric, $currentRange);
-        $previousSums = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric, $previousRange);
+        // Not asked for outside the imported window: the sum would be made of
+        // days that were never fetched, which is not a smaller number, it is
+        // no number at all.
+        $previousSums = $previousPeriodCovered ? $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric, $previousRange) : [];
 
         $trends = [];
         foreach (array_unique([...array_keys($currentSums), ...array_keys($previousSums)]) as $pageUid) {
@@ -176,7 +194,7 @@ final readonly class PageTrendCalculator
                 continue;
             }
 
-            $metricTrend = MetricTrend::between($value, $previousValue);
+            $metricTrend = $previousPeriodCovered ? MetricTrend::between($value, $previousValue) : MetricTrend::none();
             // The count itself is the volume: a page's traffic is both what
             // moved and the scale it moved at.
             $trends[] = new PageTrend($pageUid, $value, $previousValue, max($value, $previousValue), $metricTrend->deltaPercent, $metricTrend->direction);
@@ -190,11 +208,11 @@ final readonly class PageTrendCalculator
      *
      * @return list<PageTrend>
      */
-    private function computeGroupedTrends(array $pageUidsByAnchor, int $languageId, string $metric, DateRange $currentRange, DateRange $previousRange): array
+    private function computeGroupedTrends(array $pageUidsByAnchor, int $languageId, string $metric, DateRange $currentRange, DateRange $previousRange, bool $previousPeriodCovered): array
     {
         $allPageUids = $this->flattenAnchorPageUids($pageUidsByAnchor);
         $currentSums = $this->dailyMetricsRepository->sumsByPage($allPageUids, $languageId, $metric, $currentRange);
-        $previousSums = $this->dailyMetricsRepository->sumsByPage($allPageUids, $languageId, $metric, $previousRange);
+        $previousSums = $previousPeriodCovered ? $this->dailyMetricsRepository->sumsByPage($allPageUids, $languageId, $metric, $previousRange) : [];
 
         $trends = [];
         foreach ($pageUidsByAnchor as $anchorUid => $pageUids) {
@@ -205,7 +223,7 @@ final readonly class PageTrendCalculator
                 continue;
             }
 
-            $metricTrend = MetricTrend::between($value, $previousValue);
+            $metricTrend = $previousPeriodCovered ? MetricTrend::between($value, $previousValue) : MetricTrend::none();
             $trends[] = new PageTrend($anchorUid, $value, $previousValue, max($value, $previousValue), $metricTrend->deltaPercent, $metricTrend->direction);
         }
 
@@ -246,12 +264,12 @@ final readonly class PageTrendCalculator
      *
      * @return list<PageTrend>
      */
-    private function computePageTrendsForRate(array $pageUids, int $languageId, RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange): array
+    private function computePageTrendsForRate(array $pageUids, int $languageId, RateMetricDefinition $metric, DateRange $currentRange, DateRange $previousRange, bool $previousPeriodCovered): array
     {
         $currentNumerator = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->numerator, $currentRange);
         $currentDenominator = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->denominator, $currentRange);
-        $previousNumerator = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->numerator, $previousRange);
-        $previousDenominator = $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->denominator, $previousRange);
+        $previousNumerator = $previousPeriodCovered ? $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->numerator, $previousRange) : [];
+        $previousDenominator = $previousPeriodCovered ? $this->dailyMetricsRepository->sumsByPage($pageUids, $languageId, $metric->denominator, $previousRange) : [];
 
         $trends = [];
         foreach (array_unique([...array_keys($currentDenominator), ...array_keys($previousDenominator)]) as $pageUid) {
@@ -265,7 +283,7 @@ final readonly class PageTrendCalculator
             $value = $this->rateSeriesCalculator->ratio($currentNumerator[$pageUid] ?? 0, $denominator, $metric->unit);
             $previousValue = $this->rateSeriesCalculator->ratio($previousNumerator[$pageUid] ?? 0, $previousDenominatorValue, $metric->unit);
 
-            $metricTrend = MetricTrend::between($value, $previousValue);
+            $metricTrend = $previousPeriodCovered ? MetricTrend::between($value, $previousValue) : MetricTrend::none();
             // The denominator, not the rate: a bounce rate is a share, and a
             // share of four visits is not a movement of the same size as the
             // same share of four thousand.
@@ -280,7 +298,7 @@ final readonly class PageTrendCalculator
      *
      * @return list<TopPage>
      */
-    private function toTopPages(array $trends, MetricDefinition|RateMetricDefinition $metric): array
+    private function toTopPages(array $trends, MetricDefinition|RateMetricDefinition $metric, bool $previousPeriodCovered): array
     {
         $titlesByUid = $this->pageUidRepository->titlesFor(array_map(static fn (PageTrend $trend): int => $trend->pageUid, $trends));
 
@@ -292,6 +310,7 @@ final readonly class PageTrendCalculator
                 $trend->deltaPercent,
                 $trend->direction,
                 $metric->polarity,
+                $previousPeriodCovered,
             ),
             $trends,
         );

@@ -1,0 +1,113 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:comment>
+    The whole panel, chrome included, comes from here rather than being
+    assembled in sparkline.js: the heading, the close button and every label
+    below are translated, and the JavaScript has no LanguageService. It only
+    builds the dialog around this and drops the markup in, which also means a
+    failed request never leaves an unlabelled close button behind.
+
+    The heading carries the id the dialog points its aria-labelledby at, so
+    what gets announced on open is the day this panel is about.
+</f:comment>
+<div class="pagemetrics-day">
+    <div class="pagemetrics-day-head">
+        <h2 class="pagemetrics-day-title" id="pagemetrics-day-title">
+            <span class="pagemetrics-visually-hidden"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.title" default="Day detail" />:</span>
+            <f:format.date format="Y-m-d">{date}</f:format.date>
+        </h2>
+        <button type="button" class="pagemetrics-day-close" data-day-close aria-label="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.close', default: 'Close')}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+        </button>
+    </div>
+    <f:if condition="{annotations}">
+        <section class="pagemetrics-day-section">
+            <h3 class="pagemetrics-day-section-title"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.events" default="What happened" /></h3>
+            <ul class="pagemetrics-day-events">
+                <f:for each="{annotations}" as="annotation">
+                    <li class="pagemetrics-day-event pagemetrics-annotation-{annotation.category.value}">
+                        <span class="pagemetrics-day-event-icon" aria-hidden="true"><core:icon identifier="{annotation.categoryIcon}" size="small" alternativeMarkupIdentifier="inline" /></span>
+                        <span class="pagemetrics-day-event-body">
+                            <f:comment>
+                                The kind is spelled out rather than left to the
+                                marker's colour, exactly as the chart tooltip
+                                does it: colour alone says nothing to a screen
+                                reader or in a forced-colours mode.
+                            </f:comment>
+                            <span class="pagemetrics-day-event-kind"><f:translate key="{annotation.categoryLabel}" default="{annotation.category.value}" /></span>
+                            <span class="pagemetrics-day-event-text">{annotation.text}</span>
+                            <f:if condition="{annotation.isRange}">
+                                <span class="pagemetrics-day-event-range"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:annotation.until" default="until" /> <f:format.date format="Y-m-d">{annotation.dateUntil}</f:format.date></span>
+                            </f:if>
+                        </span>
+                    </li>
+                </f:for>
+            </ul>
+        </section>
+    </f:if>
+    <f:if condition="{metrics}">
+        <section class="pagemetrics-day-section">
+            <h3 class="pagemetrics-day-section-title"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.metrics" default="That day" /></h3>
+            <dl class="pagemetrics-day-metrics">
+                <f:for each="{metrics}" as="metric">
+                    <div class="pagemetrics-day-metric" style="--pm-accent: {metric.color}">
+                        <dt class="pagemetrics-day-metric-label"><span class="pagemetrics-day-metric-icon" aria-hidden="true"><core:icon identifier="{metric.icon}" size="small" alternativeMarkupIdentifier="inline" /></span>{metric.label}</dt>
+                        <dd class="pagemetrics-day-metric-value"><f:if condition="{metric.hasValue}"><f:then>{metric.formattedValue}</f:then><f:else><span class="pagemetrics-day-metric-nodata"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.noData" default="No data" /></span></f:else></f:if></dd>
+                    </div>
+                </f:for>
+            </dl>
+        </section>
+    </f:if>
+    <f:comment>
+        One block per page-scoped marker. A site-wide marker gets none: it
+        says nothing about this page in particular, and a per-page figure
+        under it would read as a causal claim nobody made.
+    </f:comment>
+    <f:for each="{comparisons}" as="comparison">
+        <section class="pagemetrics-day-section pagemetrics-day-comparison">
+            <h3 class="pagemetrics-day-section-title">
+                <span class="pagemetrics-day-event-icon" aria-hidden="true"><core:icon identifier="{comparison.markerCategoryIcon}" size="small" alternativeMarkupIdentifier="inline" /></span>
+                {comparison.markerText}
+            </h3>
+            <p class="pagemetrics-day-comparison-window"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.comparison.window" arguments="{0: comparison.windowDays, 1: comparison.beforeLabel, 2: comparison.afterLabel}" default="%1$s days before (%2$s) against %1$s days after (%3$s)" /></p>
+            <table class="pagemetrics-day-comparison-table">
+                <thead>
+                    <tr>
+                        <th scope="col"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.comparison.metric" default="Metric" /></th>
+                        <th scope="col"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.comparison.before" default="Before" /></th>
+                        <th scope="col"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.comparison.after" default="After" /></th>
+                        <th scope="col"><span class="pagemetrics-visually-hidden"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.comparison.change" default="Change" /></span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <f:for each="{comparison.rows}" as="row">
+                        <tr>
+                            <th scope="row" class="pagemetrics-day-comparison-metric">{row.label}</th>
+                            <f:if condition="{row.isComplete}">
+                                <f:then>
+                                    <td class="pagemetrics-day-comparison-value">{row.formattedBefore}</td>
+                                    <td class="pagemetrics-day-comparison-value">{row.formattedAfter}</td>
+                                    <td class="pagemetrics-day-comparison-change">
+                                        <f:variable name="comparisonDeltaText"><f:if condition="{row.isNew}"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:then><f:else>{row.deltaPercent}%</f:else></f:if></f:variable>
+                                        <f:render partial="TrendBadge" arguments="{trend: row.direction, sentiment: row.sentiment, deltaText: comparisonDeltaText, isNew: row.isNew}" />
+                                    </td>
+                                </f:then>
+                                <f:else>
+                                    <f:comment>
+                                        The two figures are deliberately not
+                                        printed here. Four of fourteen days
+                                        after a marker is not a smaller version
+                                        of the claim, it is a different one,
+                                        and it looks exactly like the real
+                                        thing on the page.
+                                    </f:comment>
+                                    <td colspan="3" class="pagemetrics-day-comparison-insufficient"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.comparison.insufficient" arguments="{0: row.availableBeforeDays, 1: comparison.windowDays, 2: row.availableAfterDays}" default="Not enough data yet: %1$s of %2$s days before and %3$s of %2$s days after this marker are imported." /></td>
+                                </f:else>
+                            </f:if>
+                        </tr>
+                    </f:for>
+                </tbody>
+            </table>
+        </section>
+    </f:for>
+</div>
+</html>

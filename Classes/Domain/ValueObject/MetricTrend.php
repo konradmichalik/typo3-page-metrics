@@ -43,6 +43,16 @@ final readonly class MetricTrend
         public TrendDirection $direction,
     ) {}
 
+    /**
+     * The previous period cannot be compared against at all, because the
+     * import never covered it (see ImportCoverage::covers()). Not the same
+     * as a previous period of zero: that one was measured.
+     */
+    public static function none(): self
+    {
+        return new self(null, TrendDirection::Flat);
+    }
+
     public static function between(int $value, int $previousValue): self
     {
         if (0 === $previousValue) {

@@ -219,7 +219,7 @@ final readonly class PageMetricsViewDataBuilder
 
     private function formatRangeLabel(DateRange $range): string
     {
-        return sprintf('%s – %s', $range->from->format('Y-m-d'), $range->until->format('Y-m-d'));
+        return sprintf('%s to %s', $range->from->format('Y-m-d'), $range->until->format('Y-m-d'));
     }
 
     /**
@@ -367,6 +367,30 @@ final readonly class PageMetricsViewDataBuilder
     }
 
     /**
+     * The comparison against the previous period, or the refusal of one.
+     * A period outside the imported window is not a smaller number, it is
+     * no number: MetricTrend::none() reports nothing rather than reporting
+     * the page as new against days that were never fetched.
+     */
+    private function compare(int $value, int $previousValue, bool $previousPeriodCovered): MetricTrend
+    {
+        return $previousPeriodCovered ? MetricTrend::between($value, $previousValue) : MetricTrend::none();
+    }
+
+    /**
+     * The previous period's total, and not even asked for where that period
+     * lies outside the imported window - the sum would be made of the same
+     * fabricated zeros the sparkline leaves blank, and nothing downstream
+     * may use it.
+     *
+     * @param list<int> $pageUids
+     */
+    private function previousSum(array $pageUids, int $languageId, string $metric, DateRange $previousRange, bool $previousPeriodCovered): int
+    {
+        return $previousPeriodCovered ? array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $metric, $previousRange)) : 0;
+    }
+
+    /**
      * @param list<int> $pageUids
      */
     private function buildCountTile(MetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, bool $includeSubpages, bool $withBenchmark): MetricTile
@@ -374,10 +398,11 @@ final readonly class PageMetricsViewDataBuilder
         $series = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
         $sparkline = $this->importCoverage->mask($series, $coverage);
         $value = array_sum($series);
-        $previousValue = array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $previousRange));
+        $previousPeriodCovered = $this->importCoverage->covers($coverage, $previousRange);
+        $previousValue = $this->previousSum($pageUids, $languageId, $definition->identifier, $previousRange, $previousPeriodCovered);
         $redirectValue = array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange, 'via_redirect'));
 
-        $metricTrend = MetricTrend::between($value, $previousValue);
+        $metricTrend = $this->compare($value, $previousValue, $previousPeriodCovered);
         $deltaPercent = $metricTrend->deltaPercent;
         $trend = $metricTrend->direction;
         $redirectSharePercent = $value > 0 ? (int) round($redirectValue / $value * 100) : 0;
@@ -403,6 +428,7 @@ final readonly class PageMetricsViewDataBuilder
             // break down. Only the machine-traffic summary does.
             [],
             $this->tileBenchmark($benchmark, $definition->unit),
+            $previousPeriodCovered,
         );
     }
 
@@ -426,6 +452,7 @@ final readonly class PageMetricsViewDataBuilder
         $previousValue = 0;
         $redirectValue = 0;
         $breakdown = [];
+        $previousPeriodCovered = $this->importCoverage->covers($coverage, $previousRange);
 
         foreach ($definitions as $definition) {
             [$series, $previousValue, $redirectValue, $breakdown] = $this->foldBucket(
@@ -438,11 +465,12 @@ final readonly class PageMetricsViewDataBuilder
                 $previousValue,
                 $redirectValue,
                 $breakdown,
+                $previousPeriodCovered,
             );
         }
 
         $value = array_sum($series);
-        $metricTrend = MetricTrend::between($value, $previousValue);
+        $metricTrend = $this->compare($value, $previousValue, $previousPeriodCovered);
         $deltaPercent = $metricTrend->deltaPercent;
         $trend = $metricTrend->direction;
         $redirectSharePercent = $value > 0 ? (int) round($redirectValue / $value * 100) : 0;
@@ -475,6 +503,11 @@ final readonly class PageMetricsViewDataBuilder
             // tell an editor to act on something they cannot influence.
             MetricPolarity::Neutral,
             $breakdown,
+            // No benchmark: the summary has no single metric to rank this
+            // page against the rest of the site on. Spelled out only because
+            // the covered flag behind it has to be reached positionally.
+            null,
+            $previousPeriodCovered,
         );
     }
 
@@ -493,7 +526,7 @@ final readonly class PageMetricsViewDataBuilder
      *
      * @return array{0: array<string, int>, 1: int, 2: int, 3: list<array{label: string, formattedValue: string}>}
      */
-    private function foldBucket(MetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, array $series, int $previousValue, int $redirectValue, array $breakdown): array
+    private function foldBucket(MetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, array $series, int $previousValue, int $redirectValue, array $breakdown, bool $previousPeriodCovered): array
     {
         $bucketSeries = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
 
@@ -508,7 +541,7 @@ final readonly class PageMetricsViewDataBuilder
 
         return [
             $series,
-            $previousValue + array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $previousRange)),
+            $previousValue + $this->previousSum($pageUids, $languageId, $definition->identifier, $previousRange, $previousPeriodCovered),
             $redirectValue + array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange, 'via_redirect')),
             $breakdown,
         ];
@@ -528,13 +561,14 @@ final readonly class PageMetricsViewDataBuilder
             array_sum($denominatorSparkline),
             $definition->unit,
         );
+        $previousPeriodCovered = $this->importCoverage->covers($coverage, $previousRange);
         $previousValue = $this->rateSeriesCalculator->ratio(
-            array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->numerator, $previousRange)),
-            array_sum($this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->denominator, $previousRange)),
+            $this->previousSum($pageUids, $languageId, $definition->numerator, $previousRange, $previousPeriodCovered),
+            $this->previousSum($pageUids, $languageId, $definition->denominator, $previousRange, $previousPeriodCovered),
             $definition->unit,
         );
 
-        $metricTrend = MetricTrend::between($value, $previousValue);
+        $metricTrend = $this->compare($value, $previousValue, $previousPeriodCovered);
         $deltaPercent = $metricTrend->deltaPercent;
         $trend = $metricTrend->direction;
         $benchmark = $withBenchmark ? $this->siteBenchmark->forRateMetric($site, $pageId, $languageId, $definition, $tileRange, $value) : null;
@@ -559,6 +593,7 @@ final readonly class PageMetricsViewDataBuilder
             // break down. Only the machine-traffic summary does.
             [],
             $this->tileBenchmark($benchmark, $definition->unit),
+            $previousPeriodCovered,
         );
     }
 

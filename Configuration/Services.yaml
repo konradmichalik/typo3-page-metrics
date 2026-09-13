@@ -198,3 +198,15 @@ services:
             - name: console.command
               command: 'page-metrics:analyze'
               description: 'Analyze access logs ad hoc, without writing to the database'
+
+    # The tagged iterator has to be named, like every other consumer of the
+    # metric providers. Public so functional tests can fetch it directly via
+    # $this->get() instead of dispatching a real AJAX route request.
+    KonradMichalik\Typo3PageMetrics\Service\DayDetailBuilder:
+        arguments:
+            $providers: !tagged_iterator page_metrics.metric_provider
+        public: true
+
+    # Public for the same reason as the tiles controller above.
+    KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsDayController:
+        public: true

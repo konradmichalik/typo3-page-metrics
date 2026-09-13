@@ -287,6 +287,105 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         self::assertNotContains(null, $tile->sparkline);
     }
 
+    public function testNoComparisonAtAllWhenThePreviousPeriodWasNeverImported(): void
+    {
+        // The import only ever reached back seven days, so the seven days
+        // before this tile's own period were never fetched. Summing them
+        // gives a zero nobody measured, against which a page that has
+        // existed for years compares as new.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today, new DateRange($today->modify('-6 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 40);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7), 'matomo.pageviews');
+
+        self::assertTrue($tile->hasNoComparison);
+        // Not the same fact, and the one the tile used to report instead.
+        self::assertFalse($tile->isNew);
+        self::assertNull($tile->deltaPercent);
+        self::assertSame('', $tile->previousFormattedValue);
+    }
+
+    public function testAPartiallyImportedPreviousPeriodRefusesTheComparisonToo(): void
+    {
+        // The window reaches three days into the previous period, so its sum
+        // understates by exactly the amount nobody can quantify.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today, new DateRange($today->modify('-9 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 40);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-8 days'), 'matomo.pageviews', 10);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7), 'matomo.pageviews');
+
+        self::assertTrue($tile->hasNoComparison);
+        self::assertNull($tile->deltaPercent);
+    }
+
+    public function testTheComparisonStandsOnceTheWholePreviousPeriodIsImported(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today, new DateRange($today->modify('-13 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 30);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-8 days'), 'matomo.pageviews', 20);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7), 'matomo.pageviews');
+
+        self::assertFalse($tile->hasNoComparison);
+        self::assertSame(50, $tile->deltaPercent);
+        self::assertSame(TrendDirection::Up, $tile->trend);
+        self::assertSame('20', $tile->previousFormattedValue);
+    }
+
+    public function testTheComparisonStandsWhenNothingHasEverBeenImported(): void
+    {
+        // Same claim as the sparkline's: without import state there is no
+        // window to measure the previous period against, so nothing is
+        // withheld either - data seeded straight into the fact table (demo
+        // fixtures, a restore) would otherwise lose every comparison.
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 30);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-8 days'), 'matomo.pageviews', 20);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7), 'matomo.pageviews');
+
+        self::assertFalse($tile->hasNoComparison);
+        self::assertSame(50, $tile->deltaPercent);
+    }
+
+    public function testARateTileRefusesTheUnimportedComparisonTheSameWay(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today, new DateRange($today->modify('-6 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entries', 4);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entry_bounces', 1);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7), 'matomo.bounce_rate');
+
+        self::assertTrue($tile->hasNoComparison);
+        self::assertFalse($tile->isNew);
+        self::assertNull($tile->deltaPercent);
+        self::assertSame('', $tile->previousFormattedValue);
+    }
+
+    public function testTheMachineSummaryRefusesTheUnimportedComparisonTheSameWay(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('accesslog', 'main', $today, new DateRange($today->modify('-6 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.ai_crawler', 7);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7), 'machine.summary.accesslog');
+
+        self::assertTrue($tile->hasNoComparison);
+        self::assertNull($tile->deltaPercent);
+        self::assertSame('', $tile->previousFormattedValue);
+    }
+
     public function testReportsTheLastDayTheImportHasNumbersFor(): void
     {
         $this->writeSiteConfiguration(1, 'https://example.com/');
@@ -361,11 +460,11 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 7);
 
         self::assertSame(
-            sprintf('%s – %s', $today->modify('-6 days')->format('Y-m-d'), $today->format('Y-m-d')),
+            sprintf('%s to %s', $today->modify('-6 days')->format('Y-m-d'), $today->format('Y-m-d')),
             $viewData->currentRangeLabel,
         );
         self::assertSame(
-            sprintf('%s – %s', $today->modify('-13 days')->format('Y-m-d'), $today->modify('-7 days')->format('Y-m-d')),
+            sprintf('%s to %s', $today->modify('-13 days')->format('Y-m-d'), $today->modify('-7 days')->format('Y-m-d')),
             $viewData->previousRangeLabel,
         );
     }

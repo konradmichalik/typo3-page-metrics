@@ -51,6 +51,30 @@ final class ImportCoverage
     }
 
     /**
+     * Whether a comparison against $range can be made at all: every one of
+     * its days has to be inside the imported window. The sum of an uncovered
+     * range is built out of the same fabricated zeros mask() blanks out of
+     * the sparkline, and a tile comparing against one reports a page that has
+     * existed for years as new.
+     *
+     * A partly covered range is refused too. The honest default: a partial
+     * sum understates by exactly the amount nobody can quantify, so the
+     * comparison would be wrong by an unknown margin, and a comparison that
+     * is wrong by an unknown margin is worse than none.
+     */
+    public function covers(?DateRange $coverage, DateRange $range): bool
+    {
+        if (null === $coverage) {
+            // Same claim as mask(): without import state the extension knows
+            // nothing about its own window, so it withholds nothing either.
+            return true;
+        }
+
+        return $range->from->format('Y-m-d') >= $coverage->from->format('Y-m-d')
+            && $range->until->format('Y-m-d') <= $coverage->until->format('Y-m-d');
+    }
+
+    /**
      * @param array<string, int> $series Y-m-d => value, zero-filled
      *
      * @return array<string, int|null> the same series with every uncovered day replaced by null

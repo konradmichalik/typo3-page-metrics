@@ -39,10 +39,14 @@ parameters:
 			# almost every UrlMetric has no dimension. Removing the default would
 			# force every call site, including third-party providers and tile
 			# listeners, to spell out that common case for no correctness
-			# benefit - the constructor is not ambiguous, it has a single obvious
-			# optional trailing field. Accepted as an intentional, already-tested
-			# API shape rather than a defect. TopPage, which is not `@api` and has
-			# exactly one call site, deliberately does not get a default.
+			# benefit - the constructor is not ambiguous, its optional fields are
+			# a trailing tail. Accepted as an intentional, already-tested
+			# API shape rather than a defect. MetricTile's fourth is
+			# previousPeriodCovered, which defaults for the same reason again: a
+			# listener-built tile brought its own numbers and knows no import
+			# window, and making it required would break every existing
+			# ModifyMetricTilesEvent listener. TopPage, which is not `@api` and
+			# has exactly one call site, deliberately does not get a default.
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
 			count: 3
 			path: ../../Classes/Domain/ValueObject/MetricDefinition.php
@@ -52,22 +56,23 @@ parameters:
 			path: ../../Classes/Domain/ValueObject/RateMetricDefinition.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
-			count: 3
+			count: 4
 			path: ../../Classes/Domain/ValueObject/MetricTile.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
 			count: 1
 			path: ../../Classes/Domain/ValueObject/UrlMetric.php
 		-
-			# Annotation, same reasoning, four times over: category, dateUntil,
-			# pageUid and includeSubpages all default to what every annotation
-			# in this extension was before they existed - a site-wide release on
-			# a single day. Without the defaults every existing provider and
-			# every test fixture would have to restate that, and a third-party
+			# Annotation, same reasoning, five times over: category, dateUntil,
+			# pageUid, includeSubpages and collapsedCount all default to what
+			# every annotation in this extension was before they existed - a
+			# site-wide release on a single day, standing for itself alone.
+			# Without the defaults every existing provider and every test
+			# fixture would have to restate that, and a third-party
 			# AnnotationProviderInterface implementation would break on upgrade
 			# for describing exactly the case it already described.
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
-			count: 4
+			count: 5
 			path: ../../Classes/Domain/ValueObject/Annotation.php
 		-
 			# LogLine has 10 same-shaped scalar/nullable-scalar parameters

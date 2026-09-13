@@ -481,6 +481,244 @@ function annotationLineFor(annotations, date, labels) {
   return kind ? `${kind}: ${match.text}` : match.text;
 }
 
+// The day panel behind a marker: every marker on that day plus what each
+// metric did on it, and for a marker that belongs to this page the days
+// before it against the days after it.
+//
+// The markup arrives fully rendered from the page_metrics_day route, chrome
+// included, because every string in it is translated and this file has no
+// LanguageService. Only the dialog around it is built here.
+//
+// The URL comes from TYPO3's own inline settings rather than a data
+// attribute: backend AJAX routes are token-signed, and TYPO3.settings
+// carries the signed URL for every registered one. Without it there is no
+// route to call, so no marker becomes a button at all.
+function dayDetailUrl() {
+  return window.TYPO3?.settings?.ajaxUrls?.page_metrics_day ?? null;
+}
+
+// Which page the sparkline is about. The dashboard widgets render the same
+// tiles for a whole site, where "what happened to this page that day" is not
+// a question with an answer, so their markers stay decoration.
+function dayDetailContext(tileElement) {
+  const container = tileElement.closest('.pagemetrics-tiles');
+  const pageId = container?.dataset.pageId;
+
+  if (!pageId || pageId === '0' || !dayDetailUrl()) {
+    return null;
+  }
+
+  return { pageId, includeSubpages: container.dataset.includeSubpages === '1' ? '1' : '0' };
+}
+
+let openDay = null;
+
+const FOCUSABLE_IN_DIALOG = 'button:not([disabled]), a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+function closeDayDetail() {
+  if (!openDay) {
+    return;
+  }
+
+  const { backdrop, trigger } = openDay;
+  openDay = null;
+  backdrop.remove();
+  trigger.setAttribute('aria-expanded', 'false');
+
+  // Back where it came from, so a keyboard user is returned to the marker
+  // they opened rather than to the top of the document. The tile popover is
+  // deliberately left open underneath for exactly this reason.
+  if (trigger.isConnected) {
+    trigger.focus();
+  }
+}
+
+async function openDayDetail(trigger, date, context) {
+  const url = dayDetailUrl();
+
+  if (!url) {
+    return;
+  }
+
+  closeDayDetail();
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'pagemetrics-day-backdrop';
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) {
+      closeDayDetail();
+    }
+  });
+
+  const panel = document.createElement('div');
+  panel.className = 'pagemetrics-day-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-busy', 'true');
+  // The marker's own name until the panel has a heading of its own, so
+  // moving focus in here announces what is being opened rather than an
+  // unnamed dialog.
+  panel.setAttribute('aria-label', trigger.getAttribute('aria-label') || '');
+  panel.tabIndex = -1;
+
+  const loading = document.createElement('div');
+  loading.className = 'pagemetrics-day-loading';
+  loading.setAttribute('aria-hidden', 'true');
+  panel.appendChild(loading);
+
+  backdrop.appendChild(panel);
+  document.body.appendChild(backdrop);
+  trigger.setAttribute('aria-expanded', 'true');
+  openDay = { backdrop, panel, trigger };
+  panel.focus();
+
+  const requestUrl = new URL(url, window.location.origin);
+  requestUrl.searchParams.set('id', context.pageId);
+  requestUrl.searchParams.set('date', date);
+  requestUrl.searchParams.set('includeSubpages', context.includeSubpages);
+
+  // Whether this request still owns what is on screen. A slow or failing
+  // request must never tear down a panel the user opened after it: closing
+  // unconditionally would remove another marker's dialog and pull focus back
+  // to a trigger the user has since moved on from.
+  const stillOwnsPanel = () => null !== openDay && openDay.panel === panel;
+
+  let html;
+  try {
+    const response = await fetch(requestUrl, { credentials: 'same-origin' });
+    if (!response.ok) {
+      if (stillOwnsPanel()) {
+        closeDayDetail();
+      }
+
+      return;
+    }
+    html = await response.text();
+  } catch {
+    if (stillOwnsPanel()) {
+      closeDayDetail();
+    }
+
+    return;
+  }
+
+  if (!stillOwnsPanel()) {
+    return;
+  }
+
+  // An empty body is what the route answers with when it has nothing to say
+  // (no access, no such page, a date it will not accept). A dialog whose
+  // only content is a close button is worse than no dialog.
+  if (html.trim() === '') {
+    closeDayDetail();
+    return;
+  }
+
+  panel.innerHTML = html;
+  panel.removeAttribute('aria-busy');
+  panel.removeAttribute('aria-label');
+
+  const heading = panel.querySelector('.pagemetrics-day-title');
+  if (heading?.id) {
+    panel.setAttribute('aria-labelledby', heading.id);
+  }
+
+  panel.querySelector('[data-day-close]')?.addEventListener('click', () => closeDayDetail());
+  panel.querySelector('[data-day-close]')?.focus();
+}
+
+// Escape closes, Tab cycles inside. A modal that lets Tab walk out into the
+// page module behind it is modal in appearance only.
+document.addEventListener('keydown', (event) => {
+  if (!openDay) {
+    return;
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeDayDetail();
+    return;
+  }
+
+  if (event.key !== 'Tab') {
+    return;
+  }
+
+  const focusable = [...openDay.panel.querySelectorAll(FOCUSABLE_IN_DIALOG)];
+
+  if (focusable.length === 0) {
+    // Nothing to move to, so the panel itself keeps the focus rather than
+    // handing it back to the document.
+    event.preventDefault();
+    openDay.panel.focus();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+
+  if (event.shiftKey && (active === first || active === openDay.panel)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
+
+// A marker is a 1px SVG line: not a focus stop, and not a hit target either.
+// The thing you click is a real button laid over it in the wrapper's pixel
+// space - the same reason the hover dot is an HTML element rather than an
+// SVG circle - so it can be tabbed to, announced, and given an area a finger
+// can find.
+function buildAnnotationTrigger(svg, annotation, dates, step, width, labels, context) {
+  const index = dates.indexOf(annotation.date);
+
+  if (index === -1 && !annotation.dateUntil) {
+    return null;
+  }
+
+  const fromIndex = index === -1 ? 0 : index;
+  const untilIndex = annotation.dateUntil ? dates.indexOf(annotation.dateUntil) : -1;
+  const lastIndex = annotation.dateUntil ? (untilIndex === -1 ? dates.length - 1 : untilIndex) : fromIndex;
+  const category = annotation.category || 'release';
+  const kind = labels[`annotationCategory.${category}`];
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `pagemetrics-annotation-trigger pagemetrics-annotation-${category}`;
+  button.setAttribute('aria-haspopup', 'dialog');
+  button.setAttribute('aria-expanded', 'false');
+  // The date first: in a strip of markers it is the one thing that tells two
+  // of them apart before their text is read out.
+  button.setAttribute('aria-label', kind ? `${annotation.date}. ${kind}: ${annotation.text}` : `${annotation.date}. ${annotation.text}`);
+  button.style.left = `${((fromIndex * step) / width) * 100}%`;
+
+  if (lastIndex > fromIndex) {
+    button.classList.add('pagemetrics-annotation-trigger-band');
+    button.style.width = `${(((lastIndex - fromIndex) * step) / width) * 100}%`;
+  }
+
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    openDayDetail(button, annotation.date, context);
+  });
+
+  // The button covers the plot at exactly the x the value tooltip is most
+  // wanted at, and a pointer over it never reaches the SVG's own mousemove.
+  // Forwarded rather than given a second tooltip of its own, which would
+  // leave two mechanisms disagreeing about the same day.
+  button.addEventListener('mousemove', (event) => {
+    svg.dispatchEvent(new MouseEvent('mousemove', { clientX: event.clientX, clientY: event.clientY }));
+  });
+  button.addEventListener('mouseleave', () => {
+    svg.dispatchEvent(new MouseEvent('mouseleave'));
+  });
+
+  return button;
+}
+
 class PageMetricsTile {
   constructor(element) {
     this.element = element;
@@ -631,6 +869,16 @@ class PageMetricsTile {
     // its mark on a day the metric itself has no value for.
     annotations.forEach((annotation) => appendAnnotationMarker(svg, annotation, dates, step));
 
+    // Every mark also gets a button on top of it, wherever the sparkline
+    // knows which page it stands for (see dayDetailContext). That is what
+    // turns a marker from a label into the way into its day.
+    const dayContext = dayDetailContext(this.element);
+    const annotationTriggers = null === dayContext
+      ? []
+      : annotations
+          .map((annotation) => buildAnnotationTrigger(svg, annotation, dates, step, width, this.labels, dayContext))
+          .filter((trigger) => trigger !== null);
+
     // An HTML element rather than an SVG <circle>: the SVG uses
     // preserveAspectRatio="none" so the line fills the full width/height,
     // but that also stretches SVG shapes non-uniformly - a native circle
@@ -716,6 +964,7 @@ class PageMetricsTile {
     wrapper.setAttribute('role', 'img');
     wrapper.setAttribute('aria-label', buildChartSummary(this.labels, entries.map(([date]) => date), plotted.bounds, this.element.dataset.unit));
     wrapper.appendChild(svg);
+    annotationTriggers.forEach((trigger) => wrapper.appendChild(trigger));
     wrapper.appendChild(marker);
     wrapper.appendChild(tooltip);
 
@@ -1218,6 +1467,13 @@ async function loadTiles(container, period, includeSubpages) {
 }
 
 document.addEventListener('click', (event) => {
+  // The day panel lives on <body>, outside both the tile and its popover, so
+  // an unguarded click in it would close the popover the marker button that
+  // opened the panel sits in - and focus would have nowhere to return to.
+  if (event.target.closest('.pagemetrics-day-backdrop')) {
+    return;
+  }
+
   openTiles.forEach((tile) => {
     const insideTile = tile.element.contains(event.target);
     const insidePopover = tile.popover && tile.popover.contains(event.target);
@@ -1239,6 +1495,12 @@ window.addEventListener('resize', () => {
 window.addEventListener(
   'scroll',
   () => {
+    // Same reason as the click handler above: scrolling inside an open day
+    // panel must not take the marker its focus returns to with it.
+    if (openDay) {
+      return;
+    }
+
     openTiles.forEach((tile) => tile.closePopover());
   },
   { capture: true },

@@ -87,7 +87,7 @@ final readonly class SiteMetricsOverviewBuilder
             $chartMetric->color,
             $chartMetric->unit,
             $this->buildChartSeries($chartMetric, $pageUids, $languageId, $currentRange, $coverage),
-            $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT),
+            $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT, $this->importCoverage->covers($coverage, $previousRange)),
             $this->buildUnresolvedUrls($site),
             $this->buildAnnotations($site->getIdentifier(), $currentRange, $annotationCategory),
             $this->buildAdditionalChartSeries($provider, $site, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange, $coverage),
@@ -144,7 +144,7 @@ final readonly class SiteMetricsOverviewBuilder
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
         $pageUids = $this->pageUidRepository->descendantsOf($site->getRootPageId());
 
-        return $this->trendCalculator->rankedByTrend($pageUids, $languageId, $metric, $currentRange, $previousRange, $sentiment, $limit);
+        return $this->trendCalculator->rankedByTrend($pageUids, $languageId, $metric, $currentRange, $previousRange, $sentiment, $limit, $this->previousPeriodCovered($provider, $site, $previousRange));
     }
 
     /**
@@ -170,6 +170,7 @@ final readonly class SiteMetricsOverviewBuilder
 
         $primary = $this->primaryDefinition($provider, $site);
         [$currentRange, $previousRange] = $this->computeRanges($periodDays);
+        $previousPeriodCovered = $this->previousPeriodCovered($provider, $site, $previousRange);
 
         if (null !== $level && $includeSubpages) {
             $pageUidsByAnchor = [];
@@ -177,14 +178,14 @@ final readonly class SiteMetricsOverviewBuilder
                 $pageUidsByAnchor[$anchorUid] = $this->pageUidRepository->descendantsOf($anchorUid);
             }
 
-            return $this->trendCalculator->rankedByValueGrouped($pageUidsByAnchor, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT);
+            return $this->trendCalculator->rankedByValueGrouped($pageUidsByAnchor, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT, $previousPeriodCovered);
         }
 
         $pageUids = null !== $level
             ? $this->pageUidRepository->descendantsAtLevel($site->getRootPageId(), $level)
             : $this->pageUidRepository->descendantsOf($site->getRootPageId());
 
-        return $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT);
+        return $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT, $previousPeriodCovered);
     }
 
     /**
@@ -228,6 +229,20 @@ final readonly class SiteMetricsOverviewBuilder
         }
 
         return $metrics;
+    }
+
+    /**
+     * Whether the period every row is ranked against was imported at all.
+     * A widget must not report a page as a riser because the days it is
+     * compared with were never fetched, which is the same judgement the
+     * page-module tiles make (see ImportCoverage::covers()).
+     */
+    private function previousPeriodCovered(MetricProviderInterface $provider, Site $site, DateRange $previousRange): bool
+    {
+        return $this->importCoverage->covers(
+            $this->importCoverage->forProvider($provider->getIdentifier(), $site->getIdentifier()),
+            $previousRange,
+        );
     }
 
     /**

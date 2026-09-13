@@ -9,8 +9,8 @@ tx_typo3pagemetrics.disabled = 1
 ```
 
 This is enforced both where the tiles are injected into the page module and
-on the AJAX route that loads them, so a user without access cannot reach the
-data by calling that route directly either.
+on every AJAX route behind them, so a user without access cannot reach the
+data by calling one of those routes directly either.
 
 ## Who may create a marker
 

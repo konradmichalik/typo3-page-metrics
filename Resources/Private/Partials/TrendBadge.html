@@ -9,6 +9,8 @@
       sentiment  TrendSentiment, whether that is an improvement: drives the colour
       deltaText  the already formatted change, e.g. "12%" or "new"
       isNew      no comparable previous period, so deltaText reads "new"
+                 (a period that was never imported is a third state: the
+                 caller renders no badge at all, see MetricTile::$hasNoComparison)
       hintTitle  optional, the tooltip's heading: this period and its value
       hintText   optional, the tooltip's second line: the period compared against
       modifier   optional extra class, e.g. the tile's corner-pill geometry

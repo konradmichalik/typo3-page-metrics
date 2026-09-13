@@ -197,24 +197,77 @@ final class ImportCommand extends Command
         $covered = null !== $earliestWithData ? new DateRange($earliestWithData, $today) : null;
 
         $connection = $this->connectionPool->getConnectionForTable('tx_typo3pagemetrics_daily');
-        $connection->transactional(function () use ($aggregated, $identifier, $site, $configuration, $today, $covered, $lastImported): void {
-            foreach ($aggregated as $row) {
-                $this->dailyMetricsRepository->upsert($row['pageUid'], $row['languageUid'], $identifier, $row['date'], $row['metric'], $row['value'], $row['dimension']);
-            }
 
-            $this->botAgentDetailCollector->flush($site->getIdentifier(), $configuration->dropQueryString, $configuration->keepQueryParams);
+        // One transaction per day rather than one for the whole write phase.
+        // A first import asks for retentionDays (400 by default) and every
+        // upsert() is a SELECT plus an INSERT or UPDATE, so a single
+        // transaction around the run holds tens of thousands of round trips
+        // open: innodb_lock_wait_timeout territory, a very large undo log,
+        // and concurrent backend requests blocked on the same table for the
+        // duration. A day is the right batch unit rather than "every N rows"
+        // because its size is bounded by pages x metrics x dimensions instead
+        // of by the length of the range, and because a day is also what every
+        // reader queries, so no reader ever sees half of one.
+        //
+        // What the transaction is here for is the ordering, not atomicity of
+        // the whole run: within each day the rows and the state move
+        // together, so the state can never claim a day whose rows are not
+        // there. Days are written oldest first, so a run that dies halfway
+        // leaves a contiguous imported prefix that the state describes
+        // exactly, and the next run resumes at its end. Re-importing is
+        // harmless anyway because upsert() replaces rather than adds.
+        //
+        // The state has to move per day and not only at the end. The coverage
+        // window is what ImportCoverage::mask() uses to decide which days may
+        // be drawn as a number, and it treats "no window" as "withhold
+        // nothing": a first import that died after writing its oldest days
+        // would otherwise leave fact rows with no window at all, and every
+        // sparkline would draw the days nobody fetched as a genuine zero,
+        // which is the exact reading the coverage window exists to prevent.
+        $yesterday = $today->modify('-1 day');
 
-            // Mark yesterday, not today, as the last complete imported day: a
-            // scheduled run may only capture part of today's traffic, so today
-            // must always be revisited (and safely re-upserted) by the next run
-            // until it is genuinely a fully elapsed prior day.
-            //
-            // $covered, by contrast, is which days this site has an answer
-            // for at all (see ImportCoverage). The two are different
-            // questions: one is "where does the next run resume", the other
-            // is "which days may be drawn as a number".
-            $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $today->modify('-1 day'), $covered, null === $lastImported);
-        });
+        foreach ($this->groupByDay($aggregated) as $rowsForDay) {
+            $connection->transactional(function () use ($rowsForDay, $identifier, $site, $earliestWithData, $yesterday, $lastImported): void {
+                foreach ($rowsForDay as $row) {
+                    $this->dailyMetricsRepository->upsert($row['pageUid'], $row['languageUid'], $identifier, $row['date'], $row['metric'], $row['value'], $row['dimension']);
+                }
+
+                if (null === $earliestWithData) {
+                    return;
+                }
+
+                // Never past yesterday, for the same reason the final call
+                // below stops there: today is still being lived through, so
+                // it must stay re-fetchable however much of it is already
+                // written. A day absent from the aggregate needs no row and
+                // is still imported, the provider simply had nothing for it,
+                // which is why the day just committed stands for the whole
+                // range up to it.
+                $day = $rowsForDay[0]['date'];
+                $cursor = $day < $yesterday ? $day : $yesterday;
+
+                $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $cursor, new DateRange($earliestWithData, $day), null === $lastImported);
+            });
+        }
+
+        // Deliberately not wrapped in a transaction: flush() resolves every
+        // URL it collected before writing it (slug lookups, redirect hops),
+        // which is exactly the work that must not sit inside an open one. It
+        // needs no rollback either, for the same reason the days above do
+        // not: its upserts replace, and the cursor has not moved yet.
+        $this->botAgentDetailCollector->flush($site->getIdentifier(), $configuration->dropQueryString, $configuration->keepQueryParams);
+
+        // Last, once every aggregate above is committed. Mark yesterday, not
+        // today, as the last complete imported day: a scheduled run may only
+        // capture part of today's traffic, so today must always be revisited
+        // (and safely re-upserted) by the next run until it is genuinely a
+        // fully elapsed prior day.
+        //
+        // $covered, by contrast, is which days this site has an answer
+        // for at all (see ImportCoverage). The two are different
+        // questions: one is "where does the next run resume", the other
+        // is "which days may be drawn as a number".
+        $this->importStateRepository->markImported($identifier, $site->getIdentifier(), $yesterday, $covered, null === $lastImported);
 
         $output->writeln(sprintf('Imported "%s" for site "%s" from %s to %s.', $identifier, $site->getIdentifier(), $from->format('Y-m-d'), $today->format('Y-m-d')));
     }
@@ -249,6 +302,15 @@ final class ImportCommand extends Command
             $result = $this->resolver->resolve($urlMetric->url, $configuration->dropQueryString, $configuration->keepQueryParams);
 
             if (!$result instanceof ResolvedUrl) {
+                // Written here, outside every transaction the write phase
+                // opens, on purpose. These rows are diagnostic, not fact
+                // data: nothing draws a number from them, they only answer
+                // "which URLs did this run fail to place". A run whose write
+                // phase then dies is exactly the run whose trail is worth
+                // keeping, and record() is idempotent on
+                // (provider, date, url_hash, metric), so the next run
+                // replaces the row rather than duplicating it and the cap
+                // still holds.
                 $this->unresolvedUrlRepository->record($identifier, $urlMetric->date, $urlMetric->url, $urlMetric->metric, $result->reason, $urlMetric->value, self::UNRESOLVED_CAP_PER_DAY);
 
                 continue;
@@ -262,6 +324,27 @@ final class ImportCommand extends Command
         }
 
         return [$aggregated, $earliestWithData];
+    }
+
+    /**
+     * Splits the run's aggregate into one batch per day, oldest day first,
+     * which is the unit importOneProviderForSite() commits in.
+     *
+     * @param array<string, array{pageUid: int, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}> $aggregated
+     *
+     * @return list<list<array{pageUid: int, languageUid: int, date: DateTimeImmutable, metric: string, dimension: string, value: int}>>
+     */
+    private function groupByDay(array $aggregated): array
+    {
+        $byDay = [];
+
+        foreach ($aggregated as $row) {
+            $byDay[$row['date']->format('Y-m-d')][] = $row;
+        }
+
+        ksort($byDay);
+
+        return array_values($byDay);
     }
 
     /**

@@ -22,7 +22,7 @@ use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetr
 use KonradMichalik\Typo3PageMetrics\Provider\{AnnotationProviderInterface, MetricProviderInterface};
 use KonradMichalik\Typo3PageMetrics\Resolver\Resolver;
 use KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector;
-use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{BotAwareFailingMetricProvider, BotAwareStubMetricProvider, PartiallyFailingAnnotationProvider, PartiallyFailingMetricProvider, StubAnnotationProvider, StubMetricProvider, UnsupportedAnnotationProvider, UnsupportedMetricProvider};
+use KonradMichalik\Typo3PageMetrics\Tests\Functional\Command\Fixtures\{BotAwareFailingMetricProvider, BotAwareStubMetricProvider, FailingOnDateDailyMetricsRepository, PartiallyFailingAnnotationProvider, PartiallyFailingMetricProvider, StubAnnotationProvider, StubMetricProvider, UnsupportedAnnotationProvider, UnsupportedMetricProvider};
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -442,6 +442,91 @@ final class ImportCommandTest extends FunctionalTestCase
         self::assertSame(0, $this->countBotAgentRows());
     }
 
+    public function testAFailedWriteKeepsTheDaysCommittedBeforeItAndResumesAtTheLastOfThem(): void
+    {
+        // The import commits one transaction per day, rows and state
+        // together, so a write that dies on the final day must leave the
+        // earlier days durably imported with the cursor pointing at the last
+        // one that actually committed - never past it.
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricProvider([
+            new UrlMetric('https://example.com/about', $today->modify('-3 days'), 'stub.hits', 4),
+            new UrlMetric('https://example.com/about', $today, 'stub.hits', 7),
+        ]);
+
+        $exitCode = $this->runImport([$stub], false, [], new FailingOnDateDailyMetricsRepository($this->get(ConnectionPool::class), $today));
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        $series = $this->dailyMetricsRepository->dailySeries(2, 0, 'stub.hits', new DateRange($today->modify('-3 days'), $today));
+        self::assertSame(4, $series[$today->modify('-3 days')->format('Y-m-d')]);
+        self::assertSame(0, $series[$today->format('Y-m-d')]);
+        self::assertSame(
+            $today->modify('-3 days')->format('Y-m-d'),
+            $this->importStateRepository->getLastImportedDate('stub', 'main')?->format('Y-m-d'),
+        );
+    }
+
+    public function testAFailedFirstImportCoversOnlyTheDaysItManagedToWrite(): void
+    {
+        // Without a coverage window ImportCoverage::mask() withholds nothing,
+        // so the days this run never reached would be drawn as genuine zeros
+        // rather than as gaps. The window has to describe what committed, not
+        // what was asked for.
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricProvider([
+            new UrlMetric('https://example.com/about', $today->modify('-3 days'), 'stub.hits', 4),
+            new UrlMetric('https://example.com/about', $today, 'stub.hits', 7),
+        ]);
+
+        $this->runImport([$stub], false, [], new FailingOnDateDailyMetricsRepository($this->get(ConnectionPool::class), $today));
+
+        $coverage = $this->importStateRepository->getCoverage('stub', 'main');
+        self::assertNotNull($coverage);
+        self::assertSame($today->modify('-3 days')->format('Y-m-d'), $coverage->from->format('Y-m-d'));
+        self::assertSame($today->modify('-3 days')->format('Y-m-d'), $coverage->until->format('Y-m-d'));
+    }
+
+    public function testAFailedWriteDoesNotMoveTheCursorPastTheDaysItWrote(): void
+    {
+        $today = new DateTimeImmutable('today');
+        $this->importStateRepository->markImported('stub', 'main', $today->modify('-4 days'), null, true);
+        $stub = new StubMetricProvider([
+            new UrlMetric('https://example.com/about', $today->modify('-3 days'), 'stub.hits', 4),
+            new UrlMetric('https://example.com/about', $today, 'stub.hits', 7),
+        ]);
+
+        $this->runImport([$stub], false, [], new FailingOnDateDailyMetricsRepository($this->get(ConnectionPool::class), $today));
+
+        self::assertSame(
+            $today->modify('-3 days')->format('Y-m-d'),
+            $this->importStateRepository->getLastImportedDate('stub', 'main')?->format('Y-m-d'),
+        );
+    }
+
+    public function testUnresolvedUrlsSeenByAFailedRunAreKept(): void
+    {
+        // Deliberate: unresolved rows are diagnostic, are written outside
+        // the per-day transactions, and survive a run whose write phase
+        // failed, which is exactly the run whose trail is worth keeping. See
+        // the comment at the record() call site in ImportCommand.
+        $today = new DateTimeImmutable('today');
+        $stub = new StubMetricProvider([
+            new UrlMetric('https://example.com/gone-page', $today->modify('-3 days'), 'stub.hits', 7),
+            new UrlMetric('https://example.com/about', $today, 'stub.hits', 7),
+        ]);
+
+        $this->runImport([$stub], false, [], new FailingOnDateDailyMetricsRepository($this->get(ConnectionPool::class), $today));
+
+        $count = (int) $this->get(ConnectionPool::class)
+            ->getQueryBuilderForTable('tx_typo3pagemetrics_unresolved')
+            ->count('uid')
+            ->from('tx_typo3pagemetrics_unresolved')
+            ->executeQuery()
+            ->fetchOne();
+
+        self::assertSame(1, $count);
+    }
+
     private function countBotAgentRows(): int
     {
         return (int) $this->get(ConnectionPool::class)
@@ -484,13 +569,13 @@ final class ImportCommandTest extends FunctionalTestCase
      * @param list<MetricProviderInterface>     $providers
      * @param list<AnnotationProviderInterface> $annotationProviders
      */
-    private function runImport(array $providers, bool $force = false, array $annotationProviders = []): int
+    private function runImport(array $providers, bool $force = false, array $annotationProviders = [], ?DailyMetricsRepository $dailyMetricsRepository = null): int
     {
         $command = new ImportCommand(
             $this->get(SiteFinder::class),
             $this->get(SiteConfigurationReader::class),
             $this->get(Resolver::class),
-            $this->dailyMetricsRepository,
+            $dailyMetricsRepository ?? $this->dailyMetricsRepository,
             $this->unresolvedUrlRepository,
             $this->importStateRepository,
             $this->annotationRepository,

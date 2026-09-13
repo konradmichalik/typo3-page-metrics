@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-use KonradMichalik\Typo3PageMetrics\Controller\Ajax\{PageMetricsPreferencesController, PageMetricsTilesController};
+use KonradMichalik\Typo3PageMetrics\Controller\Ajax\{PageMetricsDayController, PageMetricsPreferencesController, PageMetricsTilesController};
 
 // Registered so PageHeaderMetricsRenderer can inject a lightweight placeholder
 // into the page module's own synchronous render and defer all data-fetching
@@ -24,6 +24,18 @@ return [
         'path' => '/page-metrics/tiles',
         'methods' => ['GET'],
         'target' => PageMetricsTilesController::class.'::handleRequest',
+        'inheritAccessFromModule' => 'web_layout',
+    ],
+    // The panel behind a marker in a sparkline: one day's markers, that
+    // day's figures, and the before/after comparison for a marker belonging
+    // to the page. Its own route rather than more payload on the tiles
+    // response, because it is opened for at most one of the days a period
+    // covers and computing it for all of them would cost a query per metric
+    // per marker on every page-module load.
+    'page_metrics_day' => [
+        'path' => '/page-metrics/day',
+        'methods' => ['GET'],
+        'target' => PageMetricsDayController::class.'::handleRequest',
         'inheritAccessFromModule' => 'web_layout',
     ],
     // Separate from the route above rather than a mode on it: that one is a

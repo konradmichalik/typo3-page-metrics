@@ -47,6 +47,14 @@ final readonly class Annotation
      *                                                that belongs to one page is noise on every other one
      * @param bool                   $includeSubpages whether a page-scoped marker also explains everything
      *                                                below it, for the section relaunch that touched a subtree
+     * @param int                    $collapsedCount  how many pages this one marker stands for on the
+     *                                                site-wide surfaces, 0 for a marker that stands only for
+     *                                                itself (see AnnotationRepository::forSiteAndRange()). A
+     *                                                count here rather than a separate collapsed-marker class:
+     *                                                a summary is still a marker on a day with a kind and a
+     *                                                text, and a second type would force every consumer - the
+     *                                                chart payload, the widget templates, the page tiles - to
+     *                                                handle two shapes to render the same tick
      */
     public function __construct(
         public string $id,
@@ -56,6 +64,7 @@ final readonly class Annotation
         public ?DateTimeImmutable $dateUntil = null,
         public int $pageUid = 0,
         public bool $includeSubpages = false,
+        public int $collapsedCount = 0,
     ) {
         $this->isRange = null !== $dateUntil && $dateUntil > $date;
     }

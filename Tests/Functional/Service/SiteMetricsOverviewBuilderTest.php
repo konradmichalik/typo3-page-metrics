@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\Annotation;
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{TrendSentiment, UnresolvedReason};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -132,6 +132,54 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
         self::assertSame('About', $overview->topPages[0]->title);
         self::assertSame('20', $overview->topPages[0]->formattedValue);
         self::assertSame(1, $overview->topPages[1]->pageUid);
+    }
+
+    public function testTheTrendWidgetRanksNothingWhileThePreviousPeriodIsNotFullyImported(): void
+    {
+        // The import reaches four days into the week the widget compares
+        // against, so that week's sum is short by three days nobody can
+        // quantify and the page rises by exactly that much.
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today, new DateRange($today->modify('-9 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 400);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-8 days'), 'matomo.pageviews', 100);
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $risen = $this->get(SiteMetricsOverviewBuilder::class)->buildTrendPages($site, 0, 7, TrendSentiment::Positive);
+
+        self::assertSame([], $risen);
+    }
+
+    public function testTheTrendWidgetRanksTheSameMovementOnceTheWholePreviousPeriodIsImported(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today, new DateRange($today->modify('-13 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 400);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-8 days'), 'matomo.pageviews', 100);
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $risen = $this->get(SiteMetricsOverviewBuilder::class)->buildTrendPages($site, 0, 7, TrendSentiment::Positive);
+
+        self::assertNotNull($risen);
+        self::assertCount(1, $risen);
+        self::assertSame(2, $risen[0]->pageUid);
+    }
+
+    public function testMostViewedPagesStillRankWithoutTheComparisonTheImportCannotSupport(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today, new DateRange($today->modify('-6 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 20);
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7);
+
+        self::assertCount(1, $overview->topPages);
+        self::assertSame('20', $overview->topPages[0]->formattedValue);
+        self::assertTrue($overview->topPages[0]->hasNoComparison);
     }
 
     public function testUnresolvedUrlsAreListedForTheSite(): void

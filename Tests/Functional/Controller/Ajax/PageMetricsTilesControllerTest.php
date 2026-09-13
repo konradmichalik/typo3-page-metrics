@@ -25,6 +25,10 @@ use TYPO3\CMS\Core\Http\{NormalizedParams, ServerRequest};
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
+use function explode;
+use function sprintf;
+use function str_contains;
+
 /**
  * PageMetricsTilesControllerTest.
  *
@@ -109,10 +113,10 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $this->writeSiteConfiguration('main', 1, 'https://example.com/');
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 42);
 
-        $response = $this->dispatch(['id' => '2']);
+        $tile = self::tileMarkup((string) $this->dispatch(['id' => '2'])->getBody(), 'matomo.pageviews');
 
-        self::assertStringContainsString('42', (string) $response->getBody());
-        self::assertStringContainsString('Page views', (string) $response->getBody());
+        self::assertStringContainsString('42', $tile);
+        self::assertStringContainsString('Page views', $tile);
     }
 
     public function testRendersTheExternalMatomoLinkAsADataAttribute(): void
@@ -134,16 +138,19 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 6, 'via_redirect');
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-10 days'), 'matomo.pageviews', 20);
 
-        $response = $this->dispatch(['id' => '2', 'period' => '7']);
+        $tile = self::tileMarkup((string) $this->dispatch(['id' => '2', 'period' => '7'])->getBody(), 'matomo.pageviews');
 
-        self::assertStringContainsString('pagemetrics-trend-positive', (string) $response->getBody());
-        self::assertStringContainsString('pagemetrics-trend-pill', (string) $response->getBody());
-        self::assertStringContainsString('50%', (string) $response->getBody());
-        self::assertStringContainsString('data-redirect-share="20"', (string) $response->getBody());
-        // Both periods behind the badge, in the same tooltip every other
-        // explained control in this extension uses.
-        self::assertStringContainsString('data-hint-title="This period', (string) $response->getBody());
-        self::assertStringContainsString('data-hint-text="Previous period', (string) $response->getBody());
+        self::assertStringContainsString('pagemetrics-trend-positive', $tile);
+        self::assertStringContainsString('pagemetrics-trend-pill', $tile);
+        self::assertStringContainsString('50%', $tile);
+        self::assertStringContainsString('data-redirect-share="20"', $tile);
+        // The badge's own claim first, in the same tooltip every other
+        // explained control in this extension uses: the heading names the two
+        // figures the percentage is drawn from, the second line the periods
+        // they belong to.
+        self::assertStringContainsString('data-hint-title="30 against 20 in the previous period"', $tile);
+        self::assertStringContainsString('data-hint-text="This period: ', $tile);
+        self::assertStringContainsString('Previous period: ', $tile);
     }
 
     public function testTheTrendBadgeSpellsOutTheMovementForAssistiveTechnology(): void
@@ -155,28 +162,65 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 30);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-10 days'), 'matomo.pageviews', 20);
 
-        $body = (string) $this->dispatch(['id' => '2', 'period' => '7'])->getBody();
+        $tile = self::tileMarkup((string) $this->dispatch(['id' => '2', 'period' => '7'])->getBody(), 'matomo.pageviews');
 
-        self::assertStringContainsString('pagemetrics-visually-hidden', $body);
-        self::assertStringContainsString('Improved by', $body);
+        self::assertStringContainsString('pagemetrics-visually-hidden', $tile);
+        self::assertStringContainsString('Improved by', $tile);
     }
 
     public function testRendersZeroPercentDeltaAsANumberRatherThanNew(): void
     {
-        // Regression test: Fluid's `!=` operator does a loose PHP comparison,
-        // under which `0 != null` is false (since `0 == null` is true) -
-        // the template must use the strict `!==` operator, or an exactly
-        // flat, non-empty previous period incorrectly renders "new".
+        // A page whose numbers did not move says so, the way the widget
+        // tables already do. It used to say nothing at all, and a tile with
+        // no badge is ambiguous between "unchanged" and "nothing to compare".
+        //
+        // Asserted against this tile's own markup: the response carries three
+        // more tiles with no data, and each of those renders a neutral badge
+        // and a percent sign of its own.
         $this->writeSiteConfiguration('main', 1, 'https://example.com/');
         $today = new DateTimeImmutable('today');
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 20);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-10 days'), 'matomo.pageviews', 20);
 
-        $response = $this->dispatch(['id' => '2', 'period' => '7']);
-        $body = (string) $response->getBody();
+        $tile = self::tileMarkup((string) $this->dispatch(['id' => '2', 'period' => '7'])->getBody(), 'matomo.pageviews');
 
-        self::assertStringContainsString('pagemetrics-trend-neutral', $body);
-        self::assertStringContainsString('0%', $body);
+        self::assertStringContainsString('pagemetrics-trend-neutral', $tile);
+        self::assertStringContainsString('0%', $tile);
+        // The arrow and the colour do not survive a screen reader.
+        self::assertStringContainsString('Unchanged by', $tile);
+    }
+
+    public function testATileWithNothingInAnImportedPreviousPeriodReadsNewRatherThanABarePercentSign(): void
+    {
+        // Fluid cannot compare against null (see MetricTile::$isNew), so the
+        // template asks the tile rather than the delta: `!== null` in an
+        // f:if condition is never false, and the badge used to render the
+        // percent sign of a percentage that does not exist.
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today, new DateRange($today->modify('-13 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 20);
+
+        $tile = self::tileMarkup((string) $this->dispatch(['id' => '2', 'period' => '7'])->getBody(), 'matomo.pageviews');
+
+        self::assertStringContainsString('data-hint-title="new"', $tile);
+        self::assertStringContainsString('No data in the previous period', $tile);
+        self::assertStringContainsString('No previous period to compare against', $tile);
+    }
+
+    public function testRendersNoBadgeAtAllWhenThePreviousPeriodWasNeverImported(): void
+    {
+        // A third state: "no comparison possible" is not "new since last
+        // period", and the tile makes no claim it has no data for.
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $today, new DateRange($today->modify('-6 days'), $today), true);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 20);
+
+        $tile = self::tileMarkup((string) $this->dispatch(['id' => '2', 'period' => '7'])->getBody(), 'matomo.pageviews');
+
+        self::assertStringContainsString('20', $tile);
+        self::assertStringNotContainsString('pagemetrics-trend', $tile);
     }
 
     public function testRendersTheBounceRateAndAvgTimeOnPageTilesWithTheirIconsAndUnitAttribute(): void
@@ -188,17 +232,18 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entry_bounces', 3);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.entries', 4);
 
-        $response = $this->dispatch(['id' => '2']);
-        $body = (string) $response->getBody();
+        $body = (string) $this->dispatch(['id' => '2'])->getBody();
+        $timeTile = self::tileMarkup($body, 'matomo.avg_time_on_page');
+        $bounceTile = self::tileMarkup($body, 'matomo.bounce_rate');
 
-        self::assertStringContainsString('Avg. time on page', $body);
-        self::assertStringContainsString('1:30', $body);
-        self::assertStringContainsString('data-unit="seconds"', $body);
-        self::assertStringContainsString('Bounce rate', $body);
-        self::assertStringContainsString('75%', $body);
-        self::assertStringContainsString('data-unit="percent"', $body);
-        self::assertStringContainsString('tabler-clock', $body);
-        self::assertStringContainsString('tabler-door-exit', $body);
+        self::assertStringContainsString('Avg. time on page', $timeTile);
+        self::assertStringContainsString('1:30', $timeTile);
+        self::assertStringContainsString('data-unit="seconds"', $timeTile);
+        self::assertStringContainsString('tabler-clock', $timeTile);
+        self::assertStringContainsString('Bounce rate', $bounceTile);
+        self::assertStringContainsString('75%', $bounceTile);
+        self::assertStringContainsString('data-unit="percent"', $bounceTile);
+        self::assertStringContainsString('tabler-door-exit', $bounceTile);
     }
 
     public function testRendersTheTrendTooltipForAPercentTileWithoutCrashing(): void
@@ -218,11 +263,10 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-10 days'), 'matomo.entry_bounces', 2);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-10 days'), 'matomo.entries', 10);
 
-        $response = $this->dispatch(['id' => '2', 'period' => '7']);
-        $body = (string) $response->getBody();
+        $tile = self::tileMarkup((string) $this->dispatch(['id' => '2', 'period' => '7'])->getBody(), 'matomo.bounce_rate');
 
-        self::assertStringContainsString('Previous period', $body);
-        self::assertStringContainsString('20%', $body);
+        self::assertStringContainsString('Previous period: ', $tile);
+        self::assertStringContainsString('20%', $tile);
     }
 
     public function testRendersAnnotationsAsADataAttributeOnTheTilesContainer(): void
@@ -244,11 +288,10 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 10);
         $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 32);
 
-        $response = $this->dispatch(['id' => '1', 'includeSubpages' => '1']);
-        $body = (string) $response->getBody();
+        $body = (string) $this->dispatch(['id' => '1', 'includeSubpages' => '1'])->getBody();
 
         self::assertStringContainsString('data-include-subpages="1"', $body);
-        self::assertStringContainsString('42', $body);
+        self::assertStringContainsString('42', self::tileMarkup($body, 'matomo.pageviews'));
     }
 
     public function testIncludeSubpagesHidesTheExternalLinkDataAttribute(): void
@@ -346,6 +389,24 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $response = $this->dispatch(['id' => '2']);
 
         self::assertSame('', (string) $response->getBody());
+    }
+
+    /**
+     * The response carries every tile the site's providers declare, and a
+     * tile with no data of its own still renders a value, a badge and a
+     * percent sign. An assertion against the whole body is satisfied by
+     * those whatever the tile under test does, so anything about one tile
+     * is asserted against that tile's own markup.
+     */
+    private static function tileMarkup(string $body, string $metricIdentifier): string
+    {
+        foreach (explode('<div class="pagemetrics-tile"', $body) as $tile) {
+            if (str_contains($tile, 'data-metric="'.$metricIdentifier.'"')) {
+                return $tile;
+            }
+        }
+
+        self::fail(sprintf('No tile for metric identifier "%s" in the rendered response.', $metricIdentifier));
     }
 
     /**

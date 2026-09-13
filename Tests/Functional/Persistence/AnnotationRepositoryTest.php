@@ -195,4 +195,118 @@ final class AnnotationRepositoryTest extends FunctionalTestCase
 
         self::assertCount(2, $this->subject->forSiteAndRange('main', $range));
     }
+
+    public function testDerivedMarkersOfOneDayCollapseIntoASingleSiteWideMarker(): void
+    {
+        $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+        $this->upsertPageMarker('home', 1);
+        $this->upsertPageMarker('about', 2);
+        $this->upsertPageMarker('services', 5);
+
+        $annotations = $this->subject->forSiteAndRange('main', $range);
+
+        self::assertCount(1, $annotations);
+        self::assertSame('3 pages updated (About, Home, Services)', $annotations[0]->text);
+        self::assertSame(3, $annotations[0]->collapsedCount);
+        self::assertSame(AnnotationCategory::Content, $annotations[0]->category);
+        // No longer a statement about one page, so it must not be filtered
+        // away as one on a surface that scopes by page.
+        self::assertSame(0, $annotations[0]->pageUid);
+    }
+
+    public function testACollapsedMarkerNamesTheFirstPagesAndCountsTheRest(): void
+    {
+        $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+
+        foreach ([1, 2, 3, 5, 6] as $pageUid) {
+            $this->upsertPageMarker('page-'.$pageUid, $pageUid);
+        }
+
+        $annotations = $this->subject->forSiteAndRange('main', $range);
+
+        self::assertCount(1, $annotations);
+        self::assertSame('5 pages updated (About, Home, Other Root and 2 more)', $annotations[0]->text);
+    }
+
+    public function testASingleDerivedMarkerKeepsItsOwnText(): void
+    {
+        $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+        $this->upsertPageMarker('about', 2);
+
+        $annotations = $this->subject->forSiteAndRange('main', $range);
+
+        self::assertSame(['Page updated'], array_map(static fn ($a): string => $a->text, $annotations));
+        self::assertSame(0, $annotations[0]->collapsedCount);
+        self::assertSame(2, $annotations[0]->pageUid);
+    }
+
+    public function testEachKindAndEachDayCollapsesOnItsOwn(): void
+    {
+        $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+        $this->upsertPageMarker('c1', 1);
+        $this->upsertPageMarker('c2', 2);
+        $this->upsertPageMarker('c3', 5, '2026-08-03');
+        $this->upsertPageMarker('c4', 6, '2026-08-03');
+        $this->subject->upsert('main', 'typo3', new Annotation('s1', new DateTimeImmutable('2026-08-02'), 'Redirect created', AnnotationCategory::Seo, null, 1));
+        $this->subject->upsert('main', 'typo3', new Annotation('s2', new DateTimeImmutable('2026-08-02'), 'Redirect created', AnnotationCategory::Seo, null, 2));
+
+        $annotations = $this->subject->forSiteAndRange('main', $range);
+
+        self::assertSame([
+            '2 pages updated (About, Home)',
+            'Redirects created for 2 pages (About, Home)',
+            '2 pages updated (Services, Team)',
+        ], array_map(static fn ($a): string => $a->text, $annotations));
+    }
+
+    public function testAnAuthoredSiteWideMarkerIsNeverFoldedIntoACount(): void
+    {
+        $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+        $this->subject->upsert('main', 'matomo', new Annotation('r1', new DateTimeImmutable('2026-08-02'), 'Release 2.0'));
+        $this->subject->upsert('main', 'matomo', new Annotation('r2', new DateTimeImmutable('2026-08-02'), 'Release 2.1'));
+
+        $annotations = $this->subject->forSiteAndRange('main', $range);
+
+        self::assertSame(['Release 2.0', 'Release 2.1'], array_map(static fn ($a): string => $a->text, $annotations));
+    }
+
+    public function testAMarkerCoveringASubtreeOrSeveralDaysKeepsItsOwnRow(): void
+    {
+        $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+        $this->upsertPageMarker('home', 1);
+        $this->upsertPageMarker('about', 2);
+        $this->subject->upsert('main', 'manual', new Annotation('section', new DateTimeImmutable('2026-08-02'), 'Section relaunch', AnnotationCategory::Content, null, 5, true));
+        $this->subject->upsert('main', 'manual', new Annotation('week', new DateTimeImmutable('2026-08-02'), 'Rewrite week', AnnotationCategory::Content, new DateTimeImmutable('2026-08-06'), 6));
+
+        $annotations = $this->subject->forSiteAndRange('main', $range);
+
+        self::assertSame(
+            ['2 pages updated (About, Home)', 'Section relaunch', 'Rewrite week'],
+            array_map(static fn ($a): string => $a->text, $annotations),
+        );
+    }
+
+    public function testThePageModuleSeesEveryMarkerUncollapsed(): void
+    {
+        $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
+        $range = new DateRange(new DateTimeImmutable('2026-08-01'), new DateTimeImmutable('2026-08-07'));
+        $this->upsertPageMarker('home', 1);
+        $this->upsertPageMarker('about', 2);
+
+        $annotations = $this->subject->forSiteAndRange('main', $range, 2);
+
+        self::assertSame(['Page updated'], array_map(static fn ($a): string => $a->text, $annotations));
+        self::assertSame(0, $annotations[0]->collapsedCount);
+    }
+
+    private function upsertPageMarker(string $id, int $pageUid, string $date = '2026-08-02'): void
+    {
+        $this->subject->upsert('main', 'typo3', new Annotation($id, new DateTimeImmutable($date), 'Page updated', AnnotationCategory::Content, null, $pageUid));
+    }
 }

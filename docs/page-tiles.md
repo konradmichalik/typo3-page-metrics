@@ -267,3 +267,53 @@ pageMetrics:
 
 Markers already written stay in the database; they simply stop being
 refreshed.
+
+### Opening a marker
+
+A marker is a label until you can ask it what it did. Clicking one on a
+tile's sparkline opens a day panel: every marker that explains that day, and
+what each metric did on that one day rather than over the period. It is
+loaded from its own AJAX route (`PageMetricsDayController`) when the marker
+is clicked, not shipped with the tiles, because it is opened for at most one
+of the days a period covers.
+
+The thing you click is a real button laid over the mark, so the panel is
+reachable by keyboard as well as by pointer. Tab cycles inside the open
+panel, Escape and the close button both dismiss it, and focus returns to the
+marker it was opened from.
+
+A day outside the [imported window](#days-without-data) reads "No data"
+rather than zero here too, and a rate with nothing in its denominator reads
+the same way: nobody arrived that day, so nobody bounced either.
+
+### Before and after
+
+For a marker that belongs to this page, the panel puts the 14 days before it
+against the 14 days after it, metric by metric. "14 days before the rewrite:
+420 views, 14 days after: 680" is the most direct evidence of a change that
+pure tracking data can produce.
+
+The marker's own day counts for neither side. A page rewritten at four in the
+afternoon changed half a day, and that half day is the one thing the claim
+cannot survive being asked about. A marker that spans days is measured from
+the day it ends, since a campaign has no aftermath while it is still running.
+
+Only counts are compared, never rates. The claim is "this many more people",
+and a rate has already divided exactly that away: a bounce rate holding
+steady while traffic doubled is a success the row would print as no change.
+Metrics with nothing on either side are left out rather than listed as zero
+against zero.
+
+Where either window still contains days nobody has imported, the row says so
+instead of showing a figure: "Not enough data yet: 14 of 14 days before and 3
+of 14 days after this marker are imported." Four of fourteen days after a
+marker is not a smaller version of the claim, it is a different and much
+weaker one, and it looks exactly like the real thing on the page. Whether the
+days are missing because the import has not reached them or because they have
+not happened yet makes no difference to what may be shown. Since coverage is
+recorded per provider, a site whose access log was added last week can still
+answer the question for Matomo, and each row says for itself which it is.
+
+A site-wide marker gets no comparison at all. It says nothing about this page
+in particular, and a per-page figure underneath it would read as a causal
+claim nobody made.

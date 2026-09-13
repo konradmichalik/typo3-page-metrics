@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Widgets;
 
 use DateTimeImmutable;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\AnnotationCategory;
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository};
 use KonradMichalik\Typo3PageMetrics\Widgets\{PageMetricsChartWidget, TopPagesWidget, TrendWidget};
@@ -129,6 +130,37 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('pagemetrics-widget-chart', $result->content);
         self::assertStringContainsString('data-sparkline="', $result->content);
         self::assertStringContainsString('&quot;Release 2.0&quot;', $result->content);
+    }
+
+    public function testChartWidgetDrawsOneMarkerForADaysDerivedPageMarkers(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 42);
+        $this->seedDerivedPageMarkers($today);
+
+        $annotations = $this->annotationsOf($this->renderChartWidget([]));
+
+        self::assertSame(['3 pages updated (About, Home, Team)'], array_column($annotations, 'text'));
+    }
+
+    public function testTheMarkerCategorySettingStillPicksOneKindOutOfTheCollapsedOnes(): void
+    {
+        // The setting narrows by kind and collapsing merges within a kind,
+        // so the two have to compose: filtering to "content" keeps the one
+        // collapsed content marker and drops the release, and filtering to
+        // "release" leaves the release alone.
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 42);
+        $this->seedDerivedPageMarkers($today);
+        $this->get(AnnotationRepository::class)->upsert('main', 'matomo', new Annotation('a1', $today, 'Release 2.0'));
+
+        $content = $this->annotationsOf($this->renderChartWidget(['annotationCategory' => 'content']));
+        $releases = $this->annotationsOf($this->renderChartWidget(['annotationCategory' => 'release']));
+
+        self::assertSame(['3 pages updated (About, Home, Team)'], array_column($content, 'text'));
+        self::assertSame(['Release 2.0'], array_column($releases, 'text'));
     }
 
     public function testChartWidgetPlotsTheConfiguredMetricInstead(): void
@@ -517,6 +549,25 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
     private function renderChartWidget(array $settings): string
     {
         return $this->renderChartWidgetResult($settings)->content;
+    }
+
+    private function seedDerivedPageMarkers(DateTimeImmutable $day): void
+    {
+        $repository = $this->get(AnnotationRepository::class);
+
+        foreach ([1 => 'home', 2 => 'about', 5 => 'team'] as $pageUid => $id) {
+            $repository->upsert('main', 'typo3', new Annotation($id, $day, 'Page updated', AnnotationCategory::Content, null, $pageUid));
+        }
+    }
+
+    /**
+     * @return list<array{date: string, dateUntil: ?string, category: string, text: string}>
+     */
+    private function annotationsOf(string $content): array
+    {
+        preg_match('/data-annotations="([^"]*)"/', $content, $matches);
+
+        return json_decode(html_entity_decode($matches[1] ?? '[]'), true, 512, \JSON_THROW_ON_ERROR);
     }
 
     /**

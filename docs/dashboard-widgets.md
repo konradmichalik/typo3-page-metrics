@@ -32,10 +32,31 @@ kind, for a dashboard that only wants to line releases up against the curve.
 Left empty it shows all of them. Under the chart, a key names the categories
 actually drawn rather than every category that exists.
 
-That setting is worth using once
-[automatic markers](page-tiles.md#automatic-markers) are on: an active
-editorial team produces a `content` marker per edited page per day, and on a
-site-wide chart those add up.
+## Collapsed markers
+
+With [automatic markers](page-tiles.md#automatic-markers) on, an active
+editorial team produces a `content` marker per edited page per day. Ten pages
+touched on a Tuesday would be ten ticks on the chart and ten rows in the
+annotations widget, all saying the same thing.
+
+Site-wide they are collapsed instead: the markers of one day and one kind
+become a single marker that counts the pages and names the first three of
+them, `14 pages updated (About, Home, Imprint and 11 more)`. It draws one
+tick, takes one row, and its tooltip reads the same sentence.
+
+Only a marker about exactly one page on exactly one day is collapsed. One
+that covers a subtree or runs for several days keeps its own tick and its own
+row, and so does an authored site-wide marker such as a release or a
+campaign: counting those would lose what they were written to say.
+
+Collapsing and the **Marker category** setting compose, because a day is
+collapsed per kind. Narrowing a chart to `content` leaves that day's one
+collapsed content marker, and narrowing it to `release` leaves the release
+markers untouched.
+
+The page module is not affected. There a marker belongs to the page in front
+of you, and one marker a day on that page is the signal it was derived for
+(see [Automatic markers](page-tiles.md#automatic-markers)).
 
 ## Data age
 

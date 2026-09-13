@@ -42,11 +42,23 @@
                                                         <td class="text-end">
                                                             <div class="pagemetrics-widget-value-trend">
                                                                 {topPage.formattedValue}
-                                                                <f:if condition="{topPage.isNew}">
-                                                                    <f:then><f:variable name="deltaText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable></f:then>
-                                                                    <f:else><f:variable name="deltaText">{topPage.deltaPercent}%</f:variable></f:else>
+                                                                <f:comment>
+                                                                    No badge where the period ranked against was never
+                                                                    imported: the row's own number is real, the
+                                                                    comparison beside it would be against days nobody
+                                                                    fetched. Same rule and same reason as the page
+                                                                    module's tile, so the two surfaces say the same
+                                                                    thing about the same page.
+                                                                </f:comment>
+                                                                <f:if condition="{topPage.hasNoComparison}">
+                                                                    <f:else>
+                                                                        <f:if condition="{topPage.isNew}">
+                                                                            <f:then><f:variable name="deltaText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable></f:then>
+                                                                            <f:else><f:variable name="deltaText">{topPage.deltaPercent}%</f:variable></f:else>
+                                                                        </f:if>
+                                                                        <f:render partial="TrendBadge" arguments="{trend: topPage.trend, sentiment: topPage.sentiment, deltaText: deltaText, isNew: topPage.isNew}" />
+                                                                    </f:else>
                                                                 </f:if>
-                                                                <f:render partial="TrendBadge" arguments="{trend: topPage.trend, sentiment: topPage.sentiment, deltaText: deltaText, isNew: topPage.isNew}" />
                                                             </div>
                                                         </td>
                                                     </tr>

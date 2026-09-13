@@ -58,21 +58,54 @@
                 <div class="pagemetrics-tile-text">
                     <span class="pagemetrics-tile-main">
                         <span class="pagemetrics-tile-value">{tile.formattedValue}</span>
-                        <f:if condition="{tile.deltaPercent} !== 0">
-                            <f:then>
-                                <f:if condition="{tile.deltaPercent} !== null">
+                        <f:comment>
+                            No badge at all where the previous period lies
+                            outside the imported window: a percentage against
+                            days nobody fetched is not a smaller number, it is
+                            not a number. "Unchanged" and "new" are both
+                            claims about the page, and this one would be a
+                            claim about the import.
+
+                            An unchanged page does get its badge, neutral and
+                            at 0%, the way the widget tables have always shown
+                            it. No badge at all reads as "nothing to compare",
+                            which is the state directly above and a different
+                            fact.
+
+                            The tile is asked rather than the delta: Fluid's
+                            boolean parser has no null literal, so
+                            `{tile.deltaPercent} !== null` is never false (see
+                            MetricTile::$isNew).
+                        </f:comment>
+                        <f:if condition="{tile.hasNoComparison}">
+                            <f:else>
+                                <f:if condition="{tile.isNew}">
                                     <f:then>
-                                        <f:variable name="trendHintTitle"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.current" arguments="{0: currentRangeLabel, 1: tile.formattedValue}" default="This period (%1$s): %2$s" /></f:variable>
-                                        <f:variable name="trendHintText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.previous" arguments="{0: previousRangeLabel, 1: tile.previousFormattedValue}" default="Previous period (%1$s): %2$s" /></f:variable>
-                                    </f:then>
-                                    <f:else>
                                         <f:variable name="trendHintTitle"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable>
                                         <f:variable name="trendHintText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.new" arguments="{0: previousRangeLabel}" default="No data in the previous period (%1$s) to compare against" /></f:variable>
+                                        <f:variable name="trendDeltaText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable>
+                                    </f:then>
+                                    <f:else>
+                                        <f:comment>
+                                            The badge is what the reader is
+                                            pointing at, so the heading
+                                            answers the question it raises:
+                                            a percentage of what. Naming both
+                                            numbers says it without needing
+                                            the sign stripped off the delta,
+                                            which Fluid cannot do. The dates
+                                            are the least urgent part and
+                                            move to the second line, where
+                                            they no longer push the two
+                                            figures apart.
+                                        </f:comment>
+                                        <f:variable name="trendHintTitle"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.comparison" arguments="{0: tile.formattedValue, 1: tile.previousFormattedValue}" default="%1$s against %2$s in the previous period" /></f:variable>
+                                        <f:variable name="trendHintText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.periods" arguments="{0: currentRangeLabel, 1: previousRangeLabel}" default="This period: %1$s. Previous period: %2$s." /></f:variable>
+                                        <f:variable name="trendDeltaText">{tile.deltaPercent}%</f:variable>
                                     </f:else>
                                 </f:if>
-                                <f:variable name="trendDeltaText"><f:if condition="{tile.deltaPercent} !== null"><f:then>{tile.deltaPercent}%</f:then><f:else><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:else></f:if></f:variable>
                                 <f:render partial="TrendBadge" arguments="{trend: tile.trend, sentiment: tile.sentiment, deltaText: trendDeltaText, isNew: tile.isNew, hintTitle: trendHintTitle, hintText: trendHintText, modifier: 'pagemetrics-trend-pill'}" />
-                            </f:then>
+                            </f:else>
                         </f:if>
                     </span>
                     <span class="pagemetrics-tile-label">{tile.label}</span>

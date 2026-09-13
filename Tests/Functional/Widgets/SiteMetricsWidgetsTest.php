@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Widgets;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\UnresolvedReason;
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, UnresolvedReason};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\Annotation;
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Widgets\{AbstractSiteMetricsWidget, AnnotationsWidget, NotFoundPagesWidget};
@@ -70,6 +70,22 @@ final class SiteMetricsWidgetsTest extends FunctionalTestCase
         $content = $this->renderWidget('dashboard.widget.pageMetricsAnnotations', AnnotationsWidget::class);
 
         self::assertStringContainsString('Release 2.0', $content);
+    }
+
+    public function testAnnotationsWidgetListsADaysDerivedPageMarkersAsOneRow(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(AnnotationRepository::class);
+
+        foreach ([1 => 'home', 2 => 'about', 5 => 'team'] as $pageUid => $id) {
+            $repository->upsert('main', 'typo3', new Annotation($id, $today, 'Page updated', AnnotationCategory::Content, null, $pageUid));
+        }
+
+        $content = $this->renderWidget('dashboard.widget.pageMetricsAnnotations', AnnotationsWidget::class);
+
+        self::assertSame(1, substr_count($content, '<tr>'));
+        self::assertStringContainsString('3 pages updated (About, Home, Team)', $content);
     }
 
     public function testEveryWidgetRendersTheEmptyStateWhenNoSiteIsConfigured(): void
