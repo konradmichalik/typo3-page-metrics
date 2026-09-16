@@ -14,13 +14,38 @@
     attributes sparkline.js binds everywhere, rather than the title attribute
     it replaced: that one waits about a second and cannot be styled to match
     the backend.
+
+    The hover says the date and then what the date means. A bare "2026-09-15"
+    is only readable as current by someone who already knows today's date and
+    how often the import runs, which is precisely the reader this mark exists
+    for. The age sentence is the answer to the question the date raises, so
+    it is the text rather than a second thing to work out.
 </f:comment>
 <f:if condition="{freshness}">
     <f:variable name="freshnessDate"><f:format.date date="{freshness.date}" format="Y-m-d" /></f:variable>
-    <f:variable name="freshnessLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.asOf" arguments="{0: freshnessDate}">As of {freshnessDate}</f:translate></f:variable>
+    <f:variable name="freshnessLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.asOf" arguments="{0: freshnessDate}">Data through {freshnessDate}</f:translate></f:variable>
+    <f:variable name="ageLabel">
+        <f:if condition="{freshness.daysBehind} == 0">
+            <f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.age.today" default="The import has already covered today." /></f:then>
+            <f:else>
+                <f:if condition="{freshness.daysBehind} == 1">
+                    <f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.age.yesterday" default="That is yesterday. Today is not imported yet." /></f:then>
+                    <f:else><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.age.days" arguments="{0: freshness.daysBehind}" default="That is {freshness.daysBehind} days ago. Newer days are not imported yet." /></f:else>
+                </f:if>
+            </f:else>
+        </f:if>
+    </f:variable>
     <f:variable name="staleLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.stale" default="import may have stopped" /></f:variable>
-    <f:variable name="freshnessTitle"><f:if condition="{freshness.isStale}"><f:then>{freshnessLabel}, {staleLabel}</f:then><f:else>{freshnessLabel}</f:else></f:if></f:variable>
-    <span class="pagemetrics-freshness{f:if(condition: freshness.isStale, then: ' pagemetrics-freshness-stale')}" data-hint-title="{freshnessLabel}"<f:if condition="{freshness.isStale}"> data-hint-text="{staleLabel}"</f:if>>
+    <f:variable name="staleHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:freshness.stale.hint" default="The import may have stopped." /></f:variable>
+    <f:comment>
+        A stale import earns the extra sentence and nothing else does: the
+        age sentence above already says the gap, and repeating it as a
+        diagnosis on a healthy installation is how a footnote gets read as a
+        finding.
+    </f:comment>
+    <f:variable name="hintText"><f:if condition="{freshness.isStale}"><f:then>{ageLabel -> f:format.trim()} {staleHint -> f:format.trim()}</f:then><f:else>{ageLabel -> f:format.trim()}</f:else></f:if></f:variable>
+    <f:variable name="freshnessTitle">{freshnessLabel}. {hintText -> f:format.trim()}</f:variable>
+    <span class="pagemetrics-freshness{f:if(condition: freshness.isStale, then: ' pagemetrics-freshness-stale')}" data-hint-title="{freshnessLabel}" data-hint-text="{hintText -> f:format.trim()}">
         <span class="pagemetrics-freshness-icon" aria-hidden="true">
             <f:if condition="{freshness.isStale}">
                 <f:then><core:icon identifier="tabler-clock" size="small" alternativeMarkupIdentifier="inline" /></f:then>

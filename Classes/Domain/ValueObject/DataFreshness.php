@@ -41,10 +41,34 @@ final readonly class DataFreshness
 
     public bool $isStale;
 
+    /**
+     * How far behind today the last covered day is, in whole days: 0 for
+     * today, 1 for yesterday, and so on upwards.
+     *
+     * A bare date said what the figures cover without saying what that
+     * means, and "2026-09-15" is only readable as current by someone who
+     * knows today's date and how the import is scheduled. The age is the
+     * part a reader can act on, so it is derived here rather than left for
+     * each surface to work out from the date it was handed.
+     *
+     * Compared at day granularity, with both times dropped: the date comes
+     * from the import's own cursor and carries whatever time the run wrote,
+     * and an hour's difference must not turn "today" into a day behind.
+     *
+     * Never negative. A cursor ahead of today is a clock or timezone
+     * disagreement between the importing process and the rendering one, not
+     * data from the future, and "0" reads as the "up to date" it effectively
+     * is rather than as a day count pointing the wrong way.
+     */
+    public int $daysBehind;
+
     public function __construct(
         public DateTimeImmutable $date,
         DateTimeImmutable $today,
     ) {
         $this->isStale = $this->date < $today->modify(sprintf('-%d days', self::STALE_AFTER_DAYS));
+
+        $difference = $this->date->setTime(0, 0)->diff($today->setTime(0, 0));
+        $this->daysBehind = 1 === $difference->invert ? 0 : $difference->days;
     }
 }

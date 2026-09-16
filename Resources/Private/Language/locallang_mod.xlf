@@ -43,10 +43,22 @@
                 <source>All page metrics widgets: tiles, chart, most viewed pages, trend, not found pages and annotations.</source>
             </trans-unit>
             <trans-unit id="freshness.asOf" resname="freshness.asOf">
-                <source>As of %1$s</source>
+                <source>Data through %1$s</source>
+            </trans-unit>
+            <trans-unit id="freshness.age.today" resname="freshness.age.today">
+                <source>The import has already covered today.</source>
+            </trans-unit>
+            <trans-unit id="freshness.age.yesterday" resname="freshness.age.yesterday">
+                <source>That is yesterday. Today is not imported yet.</source>
+            </trans-unit>
+            <trans-unit id="freshness.age.days" resname="freshness.age.days">
+                <source>That is %1$s days ago. Newer days are not imported yet.</source>
             </trans-unit>
             <trans-unit id="freshness.stale" resname="freshness.stale">
                 <source>import may have stopped</source>
+            </trans-unit>
+            <trans-unit id="freshness.stale.hint" resname="freshness.stale.hint">
+                <source>The import may have stopped.</source>
             </trans-unit>
             <trans-unit id="slider.previous" resname="slider.previous">
                 <source>Previous</source>

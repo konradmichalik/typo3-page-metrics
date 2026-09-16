@@ -75,8 +75,14 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         self::assertStringNotContainsString('pagemetrics-freshness-stale', $body);
         // The extension's own tooltip, not the browser's: a title attribute
         // waits about a second and cannot be styled to match the backend.
-        self::assertStringContainsString('data-hint-title="As of', $body);
+        self::assertStringContainsString('data-hint-title="Data through', $body);
         self::assertStringNotContainsString('<span class="pagemetrics-freshness" title=', $body);
+        // The date alone was only readable by someone who already knew
+        // today's, so the hover also says how old that is.
+        self::assertStringContainsString('That is yesterday.', $body);
+        // No diagnosis on a healthy installation: the age sentence is the
+        // whole text until the import actually stops.
+        self::assertStringNotContainsString('The import may have stopped.', $body);
     }
 
     public function testMarksTheDateStaleOnceTheImportIsMoreThanTwoDaysBehind(): void
@@ -89,6 +95,11 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         $body = (string) $this->dispatch(['id' => '2', 'period' => '30'])->getBody();
 
         self::assertStringContainsString('pagemetrics-freshness-stale', $body);
+        // The age is still said, and the stale state adds the diagnosis to
+        // it rather than replacing it: how far behind the import is is what
+        // makes "may have stopped" worth acting on.
+        self::assertStringContainsString('That is 4 days ago.', $body);
+        self::assertStringContainsString('The import may have stopped.', $body);
     }
 
     public function testRendersNoDateBeforeAnythingHasBeenImported(): void
