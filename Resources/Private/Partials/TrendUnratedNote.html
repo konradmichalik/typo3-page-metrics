@@ -1,0 +1,29 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:comment>
+    Why a badge is grey while its arrow points up, which is the question a
+    neutral metric raises every time somebody meets one: the colour answers
+    "did this get better", and for page views the answer is yes, while for
+    crawler hits or average time on page the provider has no basis to say.
+    Grey is that abstention, not a disabled state.
+
+    A partial rather than a line in each of the two places that need it: the
+    badge puts it in its tooltip, the backend module prints it as prose
+    beside the figure, and the condition deciding whether it applies at all
+    has to be the same on both.
+
+    Only where the number actually moved. A flat badge is grey because
+    nothing happened, and explaining the polarity there answers a question
+    the reader did not ask. Not on a "new" badge either: there is no change
+    to rate yet.
+
+    Arguments:
+      trend      TrendDirection, which way the number moved
+      sentiment  TrendSentiment, whether that counts as an improvement
+      isNew      no comparable previous period, so there is no change yet
+</f:comment>
+<f:if condition="{sentiment.value} == 'neutral' && {trend.value} != 'flat'">
+    <f:if condition="{isNew}">
+        <f:else><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.unrated" default="For this metric neither more nor less is better, so the change is shown but not rated." /></f:else>
+    </f:if>
+</f:if>
+</html>

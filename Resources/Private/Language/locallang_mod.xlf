@@ -156,6 +156,15 @@
             <trans-unit id="trend.movement.declined" resname="trend.movement.declined">
                 <source>Declined</source>
             </trans-unit>
+            <trans-unit id="trend.movement.rose" resname="trend.movement.rose">
+                <source>Rose</source>
+            </trans-unit>
+            <trans-unit id="trend.movement.fell" resname="trend.movement.fell">
+                <source>Fell</source>
+            </trans-unit>
+            <trans-unit id="trend.movement.unrated" resname="trend.movement.unrated">
+                <source>For this metric neither more nor less is better, so the change is shown but not rated.</source>
+            </trans-unit>
             <trans-unit id="trend.movement.unchanged" resname="trend.movement.unchanged">
                 <source>Unchanged</source>
             </trans-unit>

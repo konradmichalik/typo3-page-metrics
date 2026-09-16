@@ -15,7 +15,21 @@
       hintText   optional, the tooltip's second line: the period compared against
       modifier   optional extra class, e.g. the tile's corner-pill geometry
 </f:comment>
-<f:variable name="movement"><f:switch expression="{sentiment.value}"><f:case value="positive"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.improved" default="improved" /></f:case><f:case value="negative"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.declined" default="declined" /></f:case><f:defaultCase><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.unchanged" default="unchanged" /></f:defaultCase></f:switch></f:variable>
+<f:comment>
+    Sentiment where there is one, direction where there is not. Neutral used
+    to fall through to "unchanged", which is a claim about the number rather
+    than about how it is rated: a crawler count up by 18% announced itself as
+    "unchanged by 18%" to anyone reading it rather than seeing it. Only a
+    flat trend is unchanged.
+</f:comment>
+<f:variable name="movement"><f:switch expression="{sentiment.value}"><f:case value="positive"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.improved" default="improved" /></f:case><f:case value="negative"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.declined" default="declined" /></f:case><f:defaultCase><f:switch expression="{trend.value}"><f:case value="up"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.rose" default="Rose" /></f:case><f:case value="down"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.fell" default="Fell" /></f:case><f:defaultCase><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.movement.unchanged" default="unchanged" /></f:defaultCase></f:switch></f:defaultCase></f:switch></f:variable>
+<f:comment>
+    The note explaining a grey badge on a metric that moved, which the
+    backend module prints as prose instead. Same partial on both sides, so
+    the two surfaces cannot disagree about when it applies.
+</f:comment>
+<f:variable name="unratedNote"><f:render partial="TrendUnratedNote" arguments="{trend: trend, sentiment: sentiment, isNew: isNew}" /></f:variable>
+<f:variable name="hintTextFull">{hintText} {unratedNote -> f:format.trim()}</f:variable>
 <f:comment>
     The extension's own tooltip rather than the title attribute: that one
     waits about a second, cannot be styled to match the backend, and runs a
@@ -23,7 +37,7 @@
     data attributes every other explained control in this extension uses, so
     sparkline.js binds it without knowing what a trend badge is.
 </f:comment>
-<span class="pagemetrics-trend pagemetrics-trend-{sentiment.value}{f:if(condition: modifier, then: ' {modifier}')}"<f:if condition="{hintTitle}"> data-hint-title="{hintTitle}" data-hint-text="{hintText}"</f:if>>
+<span class="pagemetrics-trend pagemetrics-trend-{sentiment.value}{f:if(condition: modifier, then: ' {modifier}')}"<f:if condition="{hintTitle}"> data-hint-title="{hintTitle}" data-hint-text="{hintTextFull -> f:format.trim()}"</f:if>>
     <f:if condition="{trend.value} == 'up'"><f:then><core:icon identifier="tabler-trending-up" size="small" alternativeMarkupIdentifier="inline" /></f:then></f:if>
     <f:if condition="{trend.value} == 'down'"><f:then><core:icon identifier="tabler-trending-down" size="small" alternativeMarkupIdentifier="inline" /></f:then></f:if>
     <f:if condition="{trend.value} == 'flat'"><f:then><core:icon identifier="tabler-minus" size="small" alternativeMarkupIdentifier="inline" /></f:then></f:if>

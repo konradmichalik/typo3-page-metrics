@@ -76,6 +76,8 @@ Those five now fold into one **Bot traffic** tile carrying their total, in grey 
 
 The tile sits at the end of the row, after the rate metrics, whatever sort order the buckets themselves declare. It is the one tile that is not about the site's readers, so it reads as a footnote to the row rather than as a member of it.
 
+Its change badge stays grey even when the number rises. Colour says whether a metric got better, and no provider can claim that more crawler hits are an improvement; the arrow still says which way it moved.
+
 Nothing about the import changes. Each bucket is still fetched, resolved and stored under its own identifier exactly as before, and the summary is assembled when the tiles are built. See [bot traffic metrics](providers/accesslog.md#bot-traffic-metrics) for what each bucket counts.
 
 A provider decides which side of this its metrics fall on, see [Audience and machine metrics](extending.md#audience-and-machine-metrics).
