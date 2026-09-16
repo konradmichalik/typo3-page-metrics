@@ -299,12 +299,14 @@ final readonly class PageMetricsViewDataBuilder
 
         foreach ($machineDefinitionsByProvider as $providerIdentifier => $machineDefinitions) {
             $ordered[] = [
-                // Where the provider's earliest machine metric would have sat,
-                // so the summary keeps the place the buckets had rather than
-                // being pushed to an end the provider never asked for. The
-                // lowest sortOrder, not the first declared: nothing obliges a
-                // provider to list them in order.
-                'sortOrder' => min(array_column($machineDefinitions, 'sortOrder')),
+                // Always last, whatever the buckets' own sortOrder says. It
+                // used to inherit their earliest position, which put crawler
+                // counts between the two figures an editor came for and the
+                // rates that qualify them: the bundled bot.* buckets start at
+                // 30, and so do Matomo's and GA4's rate metrics. This is the
+                // one tile that is not about the site's readers, so it reads
+                // as a footnote to the row rather than as a member of it.
+                'sortOrder' => \PHP_INT_MAX,
                 'tile' => $this->buildMachineSummaryTile($providerIdentifier, $machineDefinitions, $pageUids, $languageId, $tileRange, $previousRange, $coverageByIdentifier[$machineDefinitions[0]->identifier] ?? null),
             ];
         }

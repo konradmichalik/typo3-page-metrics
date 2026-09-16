@@ -74,6 +74,8 @@ A page's tiles answer how it performs with people. Crawler traffic is a differen
 
 Those five now fold into one **Bot traffic** tile carrying their total, in grey rather than a colour of its own, and the popover lists what it is made of. Every bucket is listed, including the ones at zero: a bucket that is absent and a bucket reading zero answer different questions.
 
+The tile sits at the end of the row, after the rate metrics, whatever sort order the buckets themselves declare. It is the one tile that is not about the site's readers, so it reads as a footnote to the row rather than as a member of it.
+
 Nothing about the import changes. Each bucket is still fetched, resolved and stored under its own identifier exactly as before, and the summary is assembled when the tiles are built. See [bot traffic metrics](providers/accesslog.md#bot-traffic-metrics) for what each bucket counts.
 
 A provider decides which side of this its metrics fall on, see [Audience and machine metrics](extending.md#audience-and-machine-metrics).
