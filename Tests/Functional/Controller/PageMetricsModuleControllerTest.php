@@ -95,7 +95,7 @@ final class PageMetricsModuleControllerTest extends FunctionalTestCase
         self::assertStringContainsString('data-period="30"', $body);
     }
 
-    public function testListsEveryMetricAsAReadableRowRatherThanAHover(): void
+    public function testListsEveryMetricAsAReadableBlockRatherThanAHover(): void
     {
         $this->writeSiteConfiguration();
         $today = new DateTimeImmutable('today');
@@ -109,7 +109,44 @@ final class PageMetricsModuleControllerTest extends FunctionalTestCase
         // behind a mouse and the reason this view exists.
         self::assertStringContainsString('Page views', $body);
         self::assertStringContainsString('The number of times this page was viewed', $body);
-        self::assertStringContainsString('pagemetrics-module-table', $body);
+        self::assertStringContainsString('pagemetrics-module-metric-block', $body);
+    }
+
+    public function testPrintsTheQualifyingFiguresTheTilePopoverKeepsBehindAHover(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-1 day'), 'matomo.pageviews', 40);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-2 days'), 'matomo.pageviews', 20);
+
+        $body = (string) $this->dispatch(['id' => '2'])->getBody();
+
+        // Each figure with the sentence that says what it is, which is the
+        // part a tooltip could only ever give one at a time.
+        self::assertStringContainsString('pagemetrics-module-metric-stats', $body);
+        self::assertStringContainsString('Peak', $body);
+        self::assertStringContainsString('The highest value a single day reached', $body);
+        self::assertStringContainsString('Average', $body);
+        self::assertStringContainsString('The mean across the days that have data', $body);
+        // The peak of the two days that carry data, not of the period's
+        // empty days counted as zero.
+        self::assertStringContainsString('<dd>40</dd>', $body);
+    }
+
+    public function testExplainsAnUnratedTrendInWordsRatherThanLeavingItGrey(): void
+    {
+        $this->writeSiteConfiguration();
+        $today = new DateTimeImmutable('today');
+        // A rate metric with no polarity: neither more nor less is better,
+        // which is what makes its badge grey while its arrow points up.
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.time_spent_seconds', 600);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.visits', 10);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.time_spent_seconds', 200);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today->modify('-40 days'), 'matomo.visits', 10);
+
+        $body = (string) $this->dispatch(['id' => '2'])->getBody();
+
+        self::assertStringContainsString('neither more nor less is better', $body);
     }
 
     public function testDrawsTheChartWithTheSamePayloadTheWidgetsUse(): void

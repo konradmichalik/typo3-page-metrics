@@ -453,12 +453,6 @@
             <trans-unit id="module.page.metric" resname="module.page.metric">
                 <source>Metric</source>
             </trans-unit>
-            <trans-unit id="module.page.thisPeriod" resname="module.page.thisPeriod">
-                <source>This period</source>
-            </trans-unit>
-            <trans-unit id="module.page.previousPeriod" resname="module.page.previousPeriod">
-                <source>Previous period</source>
-            </trans-unit>
             <trans-unit id="module.page.change" resname="module.page.change">
                 <source>Change</source>
             </trans-unit>
@@ -683,6 +677,9 @@
             </trans-unit>
             <trans-unit id="module.compare.overlap" resname="module.compare.overlap">
                 <source>These two periods share days, because a baseline moves only its start back and this period is longer than the step. The figures below still compare the two totals, but there is no chart: drawing them would lay part of this period over itself. Pick a baseline further back, or a shorter period, to see one.</source>
+            </trans-unit>
+            <trans-unit id="module.page.previous" resname="module.page.previous">
+                <source>Previous period (%1$s): %2$s</source>
             </trans-unit>
             <trans-unit id="module.page.onRecords" resname="module.page.onRecords">
                 <source>of which %1$s on records below this page</source>

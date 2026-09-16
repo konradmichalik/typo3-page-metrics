@@ -11,20 +11,34 @@ did, and a site that only wants those can ignore it.
 ## What it shows
 
 **Page.** What the tiles in **Web > Page** show, in a form you can sit and read:
-the chart across the full width, every metric as a labelled row with its figure,
-the previous period's figure and the change, and the period's markers as a list
-with their kind and text.
+the chart across the full width, every metric as its own block, and the period's
+markers as a list with their kind and text.
 
-The difference from the tile popover is deliberate. Each metric carries the
-provider's own description as text beside it rather than behind a hover. The
-reason to have a module at all is room for explanation, and putting it back
-behind a mouse would be the same problem in a new place.
+A metric block carries what the tile keeps behind a hover. The provider's own
+description, the figure with its change badge, the period it is measured
+against, and the qualifying figures the popover shows as chips: the last day of
+the period and the one before it, the peak, the average across the days that
+have data, the share that arrived through a redirect, the part counted on
+records below the page, and what the typical page of this site did. Each one
+with the sentence that says what it is, which is the part a tooltip can only
+ever give one at a time. The crawler summary also lists what it is made of.
 
-Three states in the change column, the same three the tiles draw and for the
-same reasons: a percentage where there is something to compare against, `new`
-where the page had no figures in the previous period, and a dash where that
+The difference from the tile popover is deliberate. The reason to have a module
+at all is room for explanation, and putting it back behind a mouse would be the
+same problem in a new place. It is blocks rather than a wide table for the same
+reason: seven figures as seven columns is a horizontal scroll on every backend
+narrower than a desktop, and a column header cannot carry a sentence.
+
+Three states for the change, the same three the tiles draw and for the same
+reasons: a percentage where there is something to compare against, `new` where
+the page had no figures in the previous period, and no badge at all where that
 period was never imported, because a percentage against days nobody fetched is
 not a smaller number, it is not a number.
+
+A change badge is coloured by whether the metric got better, not by which way it
+moved, so a metric where neither direction is an improvement stays grey with its
+arrow pointing up. The module says so in words under the figure; the tile says
+it in the badge's tooltip.
 
 **Compare.** Two periods of the same page held against each other, metric by
 metric, with a chart of the site's primary metric over both.

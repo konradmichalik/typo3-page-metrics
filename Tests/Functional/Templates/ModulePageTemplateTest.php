@@ -15,11 +15,13 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Templates;
 
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricPolarity, MetricUnit, ModuleView, TrendDirection};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{MetricTile, PageMetricsViewData};
+use KonradMichalik\Typo3PageMetrics\Service\TileStatsCalculator;
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
 use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\View\{ViewFactoryData, ViewFactoryInterface};
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
+use function array_map;
 use function substr_count;
 
 /**
@@ -87,11 +89,22 @@ final class ModulePageTemplateTest extends FunctionalTestCase
             null,
             $request,
         ));
+        $viewData = $this->viewData();
+        $calculator = $this->get(TileStatsCalculator::class);
+
         $view->assignMultiple([
             'pageId' => 2,
             'period' => 30,
             'activeView' => ModuleView::Page,
-            'viewData' => $this->viewData(),
+            'viewData' => $viewData,
+            // The same pairing the controller builds: a metric identifier
+            // contains a dot, which Fluid reads as a step into a nested
+            // array, so the stats travel beside their tile rather than in a
+            // map the template looks into.
+            'tileBlocks' => array_map(
+                static fn (MetricTile $tile): array => ['tile' => $tile, 'stats' => $calculator->forTile($tile)],
+                $viewData->tiles,
+            ),
             'chartSeries' => [],
             'sparklineLabels' => [],
             'annotations' => [],

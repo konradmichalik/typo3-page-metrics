@@ -130,6 +130,13 @@ services:
             $providers: !tagged_iterator page_metrics.metric_provider
         public: true
 
+    # Public so a functional test can pin the rules it shares with
+    # sparkline.js, which derives the same four figures from the same series
+    # in the browser. Nothing can be shared between the two implementations,
+    # so the test is what keeps them from drifting apart.
+    KonradMichalik\Typo3PageMetrics\Service\TileStatsCalculator:
+        public: true
+
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming widget references it.
     KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder:

@@ -45,87 +45,145 @@
             </f:if>
 
             <h2><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.metrics" default="Metrics" /></h2>
-            <div class="table-fit">
-                <table class="table table-striped pagemetrics-module-table">
-                    <thead>
-                        <tr>
-                            <th scope="col"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.metric" default="Metric" /></th>
-                            <th scope="col" class="text-end"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.thisPeriod" default="This period" /></th>
-                            <th scope="col" class="text-end"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.previousPeriod" default="Previous period" /></th>
-                            <th scope="col" class="text-end"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.change" default="Change" /></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <f:for each="{viewData.tiles}" as="tile">
-                            <tr>
-                                <th scope="row">
-                                    <span class="pagemetrics-module-metric">
-                                        <span class="pagemetrics-module-metric-icon" aria-hidden="true" style="--pm-accent: {tile.color}"><core:icon identifier="{tile.icon}" size="small" alternativeMarkupIdentifier="inline" /></span>
-                                        {tile.label}
-                                    </span>
-                                    <f:comment>
-                                        The description the provider declares,
-                                        read rather than hovered. Same text as
-                                        the tile popover carries, in the place
-                                        this view exists for.
-                                    </f:comment>
-                                    <span class="pagemetrics-module-metric-description">{tile.description}</span>
-                                </th>
-                                <td class="text-end">
-                                    {tile.formattedValue}
-                                    <f:comment>
-                                        Beside the figure it is part of, and
-                                        as a figure rather than as the share
-                                        the tile popover has room for: read
-                                        with the number above it this says
-                                        "1240, of which 830 on records below
-                                        this page", which is the sentence an
-                                        editor of an overview page needs
-                                        before they read the number as their
-                                        page doing well.
+            <f:comment>
+                One block per metric rather than one row: the page-header
+                tile keeps seven qualifying figures, a breakdown and a
+                description behind a hover, which is the right trade on a
+                strip of tiles above somebody's content and the wrong one
+                here. This view exists because there is room, so the figures
+                that explain a number are printed beside it, under the same
+                icon the tile carries, and an editor who saw something in the
+                popover can find it again.
 
-                                        Nothing at all where no record
-                                        traffic arrived, which is almost
-                                        every page and every metric: an
-                                        empty string, not a zero, see
-                                        MetricTile::$recordFormattedValue.
-                                    </f:comment>
-                                    <f:if condition="{tile.recordFormattedValue}">
-                                        <span class="pagemetrics-module-metric-note"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.onRecords" arguments="{0: tile.recordFormattedValue}" default="of which %1$s on records below this page" /></span>
+                Not a wide table: seven figures as seven columns is a
+                horizontal scroll on every backend narrower than a desktop,
+                and a column header cannot carry the sentence each figure
+                needs.
+            </f:comment>
+            <div class="pagemetrics-module-metrics">
+                <f:for each="{tileBlocks}" as="block">
+                    <f:variable name="tile" value="{block.tile}" />
+                    <section class="pagemetrics-module-metric-block" style="--pm-accent: {tile.color}">
+                        <h3 class="pagemetrics-module-metric-heading">
+                            <span class="pagemetrics-module-metric-icon" aria-hidden="true"><core:icon identifier="{tile.icon}" size="medium" alternativeMarkupIdentifier="inline" /></span>
+                            {tile.label}
+                        </h3>
+                        <f:comment>
+                            The description the provider declares, read
+                            rather than hovered. Same text as the tile
+                            popover carries, in the place this view exists
+                            for.
+                        </f:comment>
+                        <p class="pagemetrics-module-metric-description">{tile.description}</p>
+                        <p class="pagemetrics-module-metric-figure">
+                            <span class="pagemetrics-module-metric-value">{tile.formattedValue}</span>
+                            <f:comment>
+                                The same three states the tile draws, and the
+                                same reason for each: no badge where the
+                                previous period was never imported, "new"
+                                where there is nothing to compare against, a
+                                percentage otherwise.
+                            </f:comment>
+                            <f:if condition="{tile.hasNoComparison}">
+                                <f:else>
+                                    <f:variable name="deltaText"><f:if condition="{tile.isNew}"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:then><f:else>{tile.deltaPercent}%</f:else></f:if></f:variable>
+                                    <f:render partial="TrendBadge" arguments="{trend: tile.trend, sentiment: tile.sentiment, deltaText: deltaText, isNew: tile.isNew}" />
+                                </f:else>
+                            </f:if>
+                        </p>
+                        <f:comment>
+                            What the figure is measured against, as a
+                            sentence rather than as two more columns. The
+                            three states are the badge's own, said in words:
+                            a period nobody imported is a fact about the
+                            import, not about the page.
+                        </f:comment>
+                        <p class="pagemetrics-module-metric-comparison">
+                            <f:if condition="{tile.hasNoComparison}">
+                                <f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.notImported" default="The previous period was never imported, so there is nothing to compare against." /></f:then>
+                                <f:else>
+                                    <f:if condition="{tile.isNew}">
+                                        <f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.explanation.new" arguments="{0: viewData.previousRangeLabel}" default="No data in the previous period (%1$s) to compare against" /></f:then>
+                                        <f:else><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.previous" arguments="{0: viewData.previousRangeLabel, 1: tile.previousFormattedValue}" default="Previous period (%1$s): %2$s" /></f:else>
                                     </f:if>
-                                </td>
-                                <td class="text-end">
-                                    <f:if condition="{tile.hasNoComparison}">
-                                        <f:then><span class="text-body-secondary">&#8212;</span></f:then>
-                                        <f:else>
-                                            <f:if condition="{tile.isNew}">
-                                                <f:then><span class="text-body-secondary">&#8212;</span></f:then>
-                                                <f:else>{tile.previousFormattedValue}</f:else>
-                                            </f:if>
-                                        </f:else>
-                                    </f:if>
-                                </td>
-                                <td class="text-end">
+                                </f:else>
+                            </f:if>
+                        </p>
+                        <f:comment>
+                            Why the badge beside a neutral metric is grey
+                            although the arrow points up. In the tile row it
+                            is a tooltip on the badge; here it is printed,
+                            from the same partial, so the two cannot come to
+                            say different things.
+                        </f:comment>
+                        <f:variable name="unratedNote"><f:render partial="TrendUnratedNote" arguments="{trend: tile.trend, sentiment: tile.sentiment, isNew: tile.isNew}" /></f:variable>
+                        <f:if condition="{unratedNote -> f:format.trim()}">
+                            <p class="pagemetrics-module-metric-note">{unratedNote -> f:format.trim()}</p>
+                        </f:if>
+                        <f:comment>
+                            Beside the figure it is part of, and as a figure
+                            rather than as the share the tile popover has
+                            room for: read with the number above it this says
+                            "1240, of which 830 on records below this page",
+                            which is the sentence an editor of an overview
+                            page needs before they read the number as their
+                            page doing well.
+
+                            Nothing at all where no record traffic arrived,
+                            which is almost every page and every metric: an
+                            empty string, not a zero, see
+                            MetricTile::$recordFormattedValue.
+                        </f:comment>
+                        <f:if condition="{tile.recordFormattedValue}">
+                            <p class="pagemetrics-module-metric-note"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.onRecords" arguments="{0: tile.recordFormattedValue}" default="of which %1$s on records below this page" /></p>
+                        </f:if>
+                        <f:comment>
+                            The qualifying figures the tile popover shows on
+                            hover, each with the sentence that says what it
+                            is. A definition list because that is what they
+                            are, and the hint sits inside the term rather
+                            than beside it: nothing but dt and dd may live in
+                            a dl's own rows.
+                        </f:comment>
+                        <dl class="pagemetrics-module-metric-stats">
+                            <f:for each="{block.stats}" as="stat">
+                                <div class="pagemetrics-module-metric-stat">
+                                    <dt>
+                                        {stat.label}
+                                        <f:if condition="{stat.hint}">
+                                            <span class="pagemetrics-module-metric-stat-hint">{stat.hint}</span>
+                                        </f:if>
+                                    </dt>
                                     <f:comment>
-                                        The same three states the tile draws,
-                                        and the same reason for each: no badge
-                                        where the previous period was never
-                                        imported, "new" where there is nothing
-                                        to compare against, a percentage
-                                        otherwise.
+                                        Null, not zero, where the period
+                                        holds no day this figure could be
+                                        read from: a formatted "0" would be a
+                                        measurement nobody took.
                                     </f:comment>
-                                    <f:if condition="{tile.hasNoComparison}">
-                                        <f:then><span class="text-body-secondary" title="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.notImported', default: 'The previous period was never imported, so there is nothing to compare against.')}">&#8212;</span></f:then>
-                                        <f:else>
-                                            <f:variable name="deltaText"><f:if condition="{tile.isNew}"><f:then><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:then><f:else>{tile.deltaPercent}%</f:else></f:if></f:variable>
-                                            <f:render partial="TrendBadge" arguments="{trend: tile.trend, sentiment: tile.sentiment, deltaText: deltaText, isNew: tile.isNew}" />
-                                        </f:else>
-                                    </f:if>
-                                </td>
-                            </tr>
-                        </f:for>
-                    </tbody>
-                </table>
+                                    <dd><f:if condition="{stat.value}"><f:then>{stat.value}</f:then><f:else><span class="text-body-secondary"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.noData" default="No data" /></span></f:else></f:if></dd>
+                                </div>
+                            </f:for>
+                        </dl>
+                        <f:comment>
+                            Empty for every tile that stands for one metric,
+                            which is all of them except the machine-traffic
+                            summary: that one folds a provider's whole
+                            crawler set into a single headline, and the parts
+                            are the only way back to which crawler did what.
+                        </f:comment>
+                        <f:if condition="{tile.breakdown}">
+                            <h4 class="pagemetrics-module-metric-breakdown-heading"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.breakdown" default="Made up of" /></h4>
+                            <dl class="pagemetrics-module-metric-breakdown">
+                                <f:for each="{tile.breakdown}" as="part">
+                                    <div class="pagemetrics-module-metric-breakdown-part">
+                                        <dt>{part.label}</dt>
+                                        <dd>{part.formattedValue}</dd>
+                                    </div>
+                                </f:for>
+                            </dl>
+                        </f:if>
+                    </section>
+                </f:for>
             </div>
 
             <h2><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.page.markers" default="Markers in this period" /></h2>

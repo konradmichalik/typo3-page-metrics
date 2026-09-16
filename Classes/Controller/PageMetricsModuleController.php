@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Controller;
 
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\ModuleView;
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\PageMetricsViewData;
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{MetricTile, PageMetricsViewData, TileStat};
 use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface};
-use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsAccessChecker, PageMetricsViewDataBuilder, PeriodComparisonBuilder, SitePagesTableBuilder, SparklineLabelProvider};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsAccessChecker, PageMetricsViewDataBuilder, PeriodComparisonBuilder, SitePagesTableBuilder, SparklineLabelProvider, TileStatsCalculator};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Backend\Module\ModuleData;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
@@ -85,6 +85,7 @@ final readonly class PageMetricsModuleController
         private SitePagesTableBuilder $sitePagesTableBuilder,
         private IconFactory $iconFactory,
         private MetricDefinitionCollector $metricDefinitionCollector,
+        private TileStatsCalculator $tileStatsCalculator,
         private iterable $providers,
     ) {}
 
@@ -164,6 +165,11 @@ final readonly class PageMetricsModuleController
             'viewData' => $viewData,
             'chartSeries' => $this->chartSeriesOf($viewData, $site instanceof Site ? $site : null),
             'sparklineLabels' => $this->labelProvider->all(),
+            // Each tile paired with its own qualifying figures, rather than
+            // a map the template looks into: a metric identifier contains a
+            // dot, and Fluid reads a dot in a variable path as a step into a
+            // nested array. Built only for the view that draws them.
+            'tileBlocks' => ModuleView::Page === $activeView ? $this->tileBlocksOf($viewData) : [],
             'annotations' => $this->annotationPayloadBuilder->build($viewData->annotations),
             // Only the view that reads it. The comparison is a second pass
             // over the same repositories, and paying for it on the page view
@@ -191,6 +197,27 @@ final readonly class PageMetricsModuleController
         ]);
 
         return $view->renderResponse($activeView->templateName());
+    }
+
+    /**
+     * Every tile beside its own qualifying figures.
+     *
+     * Derived here rather than on MetricTile: that constructor is `@api` and
+     * carries the numbers a tile is made of, while these are a reading of
+     * them that only two surfaces want, one of which computes its own copy
+     * in the browser.
+     *
+     * @return list<array{tile: MetricTile, stats: list<TileStat>}>
+     */
+    private function tileBlocksOf(PageMetricsViewData $viewData): array
+    {
+        $blocks = [];
+
+        foreach ($viewData->tiles as $tile) {
+            $blocks[] = ['tile' => $tile, 'stats' => $this->tileStatsCalculator->forTile($tile)];
+        }
+
+        return $blocks;
     }
 
     /**

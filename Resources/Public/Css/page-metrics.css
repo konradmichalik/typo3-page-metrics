@@ -1769,3 +1769,135 @@
     font-size: 0.8125rem;
     color: var(--typo3-text-color-variant, #515151);
 }
+
+/* ------------------------------------------------------------------------
+   The module's metric blocks. What the page-header tile keeps behind a
+   hover, printed: the description, the seven qualifying figures and the
+   crawler breakdown. Issue #93.
+   ------------------------------------------------------------------------ */
+
+/* A wall of cards rather than a single column: a block is about 24rem of
+   readable width, and on a wide backend two or three sit side by side
+   without any of them being stretched to a line nobody can scan. The module
+   itself is capped at 72rem, so this tops out at three. */
+.pagemetrics-module-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(24rem, 100%), 1fr));
+    gap: 1rem;
+    margin-block-end: 1.5rem;
+}
+
+/* The accent is the metric's own colour, carried on the left edge the way
+   the tile carries it behind its icon: the block and the tile are the same
+   metric, and recognising that is the whole reason this view repeats what
+   the popover said. */
+.pagemetrics-module-metric-block {
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--typo3-component-border-color, #d7d7d7);
+    border-inline-start: 3px solid var(--pm-accent, currentColor);
+    border-radius: 4px;
+    background: var(--typo3-component-bg, #fff);
+}
+
+.pagemetrics-module-metric-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.pagemetrics-module-metric-block .pagemetrics-module-metric-description {
+    margin-block: 0.375rem 0;
+    max-width: 48ch;
+}
+
+/* The headline and its badge on one line, sized so it is read as the
+   block's answer and the figures below it as the qualification. */
+.pagemetrics-module-metric-figure {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-block: 0.75rem 0;
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.pagemetrics-module-metric-comparison {
+    margin-block: 0.25rem 0;
+    font-size: 0.8125rem;
+    color: var(--typo3-text-color-variant, #515151);
+}
+
+/* Each figure with the sentence that says what it is, which is the part a
+   tooltip could only give one at a time. Two columns at the block's own
+   width, one on a narrow backend. */
+.pagemetrics-module-metric-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
+    gap: 0.75rem;
+    margin-block: 1rem 0;
+}
+
+.pagemetrics-module-metric-stat dt {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--typo3-text-color-variant, #515151);
+}
+
+.pagemetrics-module-metric-stat dd {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.pagemetrics-module-metric-stat-hint {
+    display: block;
+    margin-block-start: 0.125rem;
+    font-weight: 400;
+    font-size: 0.75rem;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.pagemetrics-module-metric-breakdown-heading {
+    margin-block: 1rem 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--typo3-text-color-variant, #515151);
+}
+
+/* Label and figure on one row with the gap between them doing the aligning,
+   the way the popover draws the same list: these are parts of one number,
+   so they are read down the right edge rather than across. */
+.pagemetrics-module-metric-breakdown {
+    margin: 0;
+}
+
+.pagemetrics-module-metric-breakdown-part {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.25rem;
+    border-block-start: 1px solid var(--typo3-component-border-color, #d7d7d7);
+}
+
+.pagemetrics-module-metric-breakdown-part dt {
+    font-weight: 400;
+    color: var(--typo3-text-color-variant, #515151);
+}
+
+.pagemetrics-module-metric-breakdown-part dd {
+    margin: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
