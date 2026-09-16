@@ -126,22 +126,32 @@ final readonly class PageHeaderMetricsRenderer
         $altLabel = $languageService->sL(self::LL.($collapsed ? 'collapse.hide' : 'collapse.show'));
         $altHint = $languageService->sL(self::LL.($collapsed ? 'collapse.hide.hint' : 'collapse.show.hint'));
 
+        $icon = $collapsed ? self::ICON_METRICS : self::ICON_CHEVRON_UP;
+        $altIcon = $collapsed ? self::ICON_CHEVRON_UP : self::ICON_METRICS;
+
         // Icon only, so the words live in the accessible name and in the
-        // tooltip rather than being optional extras on a visible label. Both
-        // pairs travel with the element: pressing it makes it mean the
+        // tooltip rather than being optional extras on a visible label. All
+        // three pairs travel with the element: pressing it makes it mean the
         // opposite, and the client swaps them without another round trip.
+        //
+        // The icon is in that set because it is the only part of the control
+        // that says which way it points. It used to be rendered here alone,
+        // so a header folded away in the browser kept the chevron that had
+        // just pointed up at an open block, and only a reload put the right
+        // glyph back.
         return sprintf(
             '<button type="button" class="pagemetrics-options-trigger pagemetrics-collapse-toggle" data-collapse-toggle'
             .' data-hint-title="%s" data-hint-text="%s" data-hint-title-alt="%s" data-hint-text-alt="%s"'
-            .' aria-expanded="%s" aria-controls="%s" aria-label="%s">%s</button>',
+            .' data-icon-alt="%s" aria-expanded="%s" aria-controls="%s" aria-label="%s">%s</button>',
             htmlspecialchars($label, \ENT_QUOTES),
             htmlspecialchars($hint, \ENT_QUOTES),
             htmlspecialchars($altLabel, \ENT_QUOTES),
             htmlspecialchars($altHint, \ENT_QUOTES),
+            htmlspecialchars($altIcon, \ENT_QUOTES),
             $collapsed ? 'false' : 'true',
             htmlspecialchars($bodyId, \ENT_QUOTES),
             htmlspecialchars($label, \ENT_QUOTES),
-            $collapsed ? self::ICON_METRICS : self::ICON_CHEVRON_UP,
+            $icon,
         );
     }
 

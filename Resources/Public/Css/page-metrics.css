@@ -50,10 +50,14 @@
 }
 
 /* Collapsed there is nothing but the button, which is absolutely positioned
-   and so contributes no height of its own. */
+   and so contributes no height of its own.
+
+   It keeps the open state's margin rather than dropping to zero: the control
+   is the whole region at that point, and with nothing below it the panel that
+   follows sat directly under the button. The gap is what says the two are not
+   the same thing. */
 .pagemetrics-header-collapsed {
     min-height: 28px;
-    margin-bottom: 0;
 }
 
 .pagemetrics-options-menu-icon {

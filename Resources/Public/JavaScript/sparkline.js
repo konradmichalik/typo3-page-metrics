@@ -1621,13 +1621,28 @@ document.addEventListener('click', (event) => {
   toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
 
   // The control now does the opposite of what it did a moment ago, so its
-  // name and its explanation have to swap with it.
-  const swapped = { title: toggle.dataset.hintTitleAlt, text: toggle.dataset.hintTextAlt };
+  // name, its explanation and its glyph have to swap with it. The icon was
+  // missing from that set, which left a chevron still pointing up at a block
+  // that was no longer there.
+  //
+  // innerHTML, and the only place in this file that takes markup from a data
+  // attribute: the value is one of the two SVG constants in
+  // PageHeaderMetricsRenderer, emitted by the same request that emitted the
+  // button, and never anything a user or a language pack can reach.
+  const swapped = {
+    title: toggle.dataset.hintTitleAlt,
+    text: toggle.dataset.hintTextAlt,
+    icon: toggle.dataset.iconAlt,
+  };
   toggle.dataset.hintTitleAlt = toggle.dataset.hintTitle;
   toggle.dataset.hintTextAlt = toggle.dataset.hintText;
+  toggle.dataset.iconAlt = toggle.innerHTML;
   toggle.dataset.hintTitle = swapped.title || '';
   toggle.dataset.hintText = swapped.text || '';
   toggle.setAttribute('aria-label', toggle.dataset.hintTitle);
+  if (swapped.icon) {
+    toggle.innerHTML = swapped.icon;
+  }
   hideHintTooltip();
 
   if (collapsed) {
