@@ -24,3 +24,14 @@ pageMetrics:
       endpoint: 'https://matomo.example.invalid/'
       siteId: 1
       tokenAuth: 'dev-placeholder-token'
+    accesslog:
+      # Matches nothing by design, the same way the Matomo endpoint above
+      # never resolves: the bot rows are seeded into tx_typo3pagemetrics_daily
+      # by page_metrics_demo.sql. Drop a real log at this path to import one.
+      pathPattern: '/var/www/html/.Build/__VERSION__/var/log/access.log*'
+      # Matomo already answers "how many page views", and a second provider
+      # offering its own would put two differently-numbered "Page views" tiles
+      # side by side. This is the pairing the provider docs recommend: Matomo
+      # for the audience numbers, the access log for the bot buckets only.
+      metrics:
+        - machine

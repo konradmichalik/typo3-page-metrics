@@ -5,7 +5,9 @@
 -- page_metrics_demo.xml (page tree: Home/About/Services/Blog/Contact) and
 -- Tests/Acceptance/Fixtures/sites/main/config.yaml (Matomo provider enabled
 -- against a non-resolving placeholder endpoint, so no real API call ever
--- happens).
+-- happens, plus the access log provider against a path pattern that matches
+-- no file, restricted to its machine metrics so it contributes the bot
+-- buckets and no second "Page views" tile).
 --
 -- Values are deterministic (no RAND()), so re-running `ddev install` always
 -- produces the same numbers, and dates are relative to CURDATE() so the
@@ -126,6 +128,116 @@ SELECT * FROM (
 ) sub
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
+-- 60 days x the same 5 pages x the access log provider's 5 bot buckets, so
+-- the page module's "Bot traffic" tile has something to total and to break
+-- down when opened. Seeded rather than imported for the same reason the
+-- Matomo rows are: sites/main/config.yaml points the provider at a path
+-- pattern that matches nothing, so no log is ever read.
+--
+-- The buckets are stored under their own identifiers (bot.search, not
+-- accesslog.bot.search) against provider 'accesslog' - that is what
+-- AccessLogMetricProvider::getMetricDefinitions() declares and what the tile
+-- reads back.
+--
+-- Same deterministic three-sine noise as the block above, with different
+-- frequencies and phases so the bot curves do not trace the audience ones.
+-- page_weight replaces that block's flat "100 - page_uid * 20": a crawler
+-- budget falls off far less steeply across a five-page tree than human
+-- traffic does, and the bigger buckets should fall off faster than the
+-- small ones. GREATEST(0, ...), not GREATEST(1, ...): a bucket legitimately
+-- reads zero on a quiet day, and the tile lists zero buckets rather than
+-- hiding them.
+INSERT INTO tx_typo3pagemetrics_daily (date, page_uid, sys_language_uid, provider, metric, dimension, value)
+SELECT * FROM (
+    WITH RECURSIVE days AS (
+        SELECT 0 AS day_offset
+        UNION ALL
+        SELECT day_offset + 1 FROM days WHERE day_offset < 59
+    )
+    SELECT
+        DATE_SUB(CURDATE(), INTERVAL day_offset DAY) AS date,
+        pages.page_uid,
+        0 AS sys_language_uid,
+        'accesslog' AS provider,
+        buckets.metric,
+        '' AS dimension,
+        GREATEST(0, buckets.base + (5 - pages.page_uid) * buckets.page_weight
+            -- Applied as-is for the recent 30 days and inverted for the 30
+            -- before, matching how the audience block builds its trends: the
+            -- AI buckets climb, link previews fade, search and tooling sit
+            -- flat. That is the story the tile is there to tell.
+            + (CASE WHEN day_offset < 30 THEN buckets.trend_delta ELSE -buckets.trend_delta END)
+            + ROUND(buckets.spread * (
+                0.5
+                + 0.25 * SIN(day_offset * 0.31 + pages.page_uid * 1.7)
+                + 0.15 * SIN(day_offset * 0.83 + pages.page_uid * 2.9)
+                + 0.10 * SIN(day_offset * 1.47 + pages.page_uid * 4.1)
+            ))) AS value
+    FROM days
+    CROSS JOIN (
+        SELECT 1 AS page_uid UNION ALL
+        SELECT 2 UNION ALL
+        SELECT 3 UNION ALL
+        SELECT 4 UNION ALL
+        SELECT 5
+    ) pages
+    CROSS JOIN (
+        SELECT 'bot.search' AS metric, 22 AS base, 4 AS page_weight, 12 AS spread, 0 AS trend_delta UNION ALL
+        SELECT 'bot.ai_crawler', 13, 3, 10, 9 UNION ALL
+        SELECT 'bot.tool', 8, 2, 6, 0 UNION ALL
+        SELECT 'bot.ai_chatbot', 6, 1, 4, 2 UNION ALL
+        SELECT 'bot.social', 2, 1, 3, -2
+    ) buckets
+) sub
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+-- The bot agent detail a real access log import would have written alongside
+-- the buckets above: one row per page, day, bucket and crawler. Nothing
+-- renders it yet (see docs/providers/accesslog.md#bot-traffic-metrics), so it
+-- is seeded for the last 14 days only and for two agents per bucket - enough
+-- to query the table and see the shape, without another 60-day cross join.
+--
+-- hits are a share of the bucket total rather than an independent series, so
+-- the detail never claims more hits than the tile above shows. Only the two
+-- buckets whose agents plausibly spoof carry hits_suspicious.
+INSERT INTO tx_typo3pagemetrics_bot_agent_daily (date, site_identifier, page_uid, sys_language_uid, bucket, agent, agent_hash, hits, hits_suspicious)
+SELECT * FROM (
+    WITH RECURSIVE days AS (
+        SELECT 0 AS day_offset
+        UNION ALL
+        SELECT day_offset + 1 FROM days WHERE day_offset < 13
+    )
+    SELECT
+        DATE_SUB(CURDATE(), INTERVAL day_offset DAY) AS date,
+        'main' AS site_identifier,
+        daily.page_uid,
+        0 AS sys_language_uid,
+        agents.bucket,
+        agents.agent,
+        LEFT(SHA2(agents.agent, 256), 40) AS agent_hash,
+        GREATEST(1, ROUND(daily.value * agents.share)) AS hits,
+        FLOOR(GREATEST(1, ROUND(daily.value * agents.share)) * agents.suspicious_share) AS hits_suspicious
+    FROM days
+    INNER JOIN (
+        SELECT 'bot.search' AS bucket, 'Googlebot' AS agent, 0.6 AS share, 0.0 AS suspicious_share UNION ALL
+        SELECT 'bot.search', 'bingbot', 0.3, 0.15 UNION ALL
+        SELECT 'bot.ai_crawler', 'GPTBot', 0.65, 0.0 UNION ALL
+        SELECT 'bot.ai_crawler', 'ClaudeBot', 0.3, 0.0 UNION ALL
+        SELECT 'bot.ai_chatbot', 'ChatGPT-User', 0.7, 0.0 UNION ALL
+        SELECT 'bot.ai_chatbot', 'Perplexity-User', 0.25, 0.0 UNION ALL
+        SELECT 'bot.social', 'facebookexternalhit', 0.6, 0.2 UNION ALL
+        SELECT 'bot.social', 'Slackbot-LinkExpanding', 0.35, 0.0 UNION ALL
+        SELECT 'bot.tool', 'AhrefsBot', 0.55, 0.0 UNION ALL
+        SELECT 'bot.tool', 'curl', 0.4, 0.0
+    ) agents
+    INNER JOIN tx_typo3pagemetrics_daily daily
+        ON daily.provider = 'accesslog'
+        AND daily.metric = agents.bucket
+        AND daily.dimension = ''
+        AND daily.date = DATE_SUB(CURDATE(), INTERVAL day_offset DAY)
+) sub
+ON DUPLICATE KEY UPDATE hits = VALUES(hits), hits_suspicious = VALUES(hits_suspicious);
+
 -- The import state a real run over the rows above would have produced: the
 -- window starts where the data starts. Without it the backend cannot tell
 -- "no traffic that day" from "never imported", and a 90-day period over this
@@ -133,7 +245,8 @@ ON DUPLICATE KEY UPDATE value = VALUES(value);
 -- leaving them blank (see ImportCoverage).
 INSERT INTO tx_typo3pagemetrics_import (provider, site_identifier, covered_from_date, covered_until_date, last_imported_date, tstamp)
 VALUES
-    ('matomo', 'main', DATE_SUB(CURDATE(), INTERVAL 59 DAY), CURDATE(), DATE_SUB(CURDATE(), INTERVAL 1 DAY), UNIX_TIMESTAMP())
+    ('matomo', 'main', DATE_SUB(CURDATE(), INTERVAL 59 DAY), CURDATE(), DATE_SUB(CURDATE(), INTERVAL 1 DAY), UNIX_TIMESTAMP()),
+    ('accesslog', 'main', DATE_SUB(CURDATE(), INTERVAL 59 DAY), CURDATE(), DATE_SUB(CURDATE(), INTERVAL 1 DAY), UNIX_TIMESTAMP())
 ON DUPLICATE KEY UPDATE covered_from_date = VALUES(covered_from_date), covered_until_date = VALUES(covered_until_date), last_imported_date = VALUES(last_imported_date), tstamp = VALUES(tstamp);
 
 -- Authored markers within the 30-day window above, so the sparkline markers
