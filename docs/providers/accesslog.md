@@ -131,7 +131,7 @@ human metrics - there is no bucket for a bot nobody has a name for.
   URLs.
 - **`bot.tool`**: SEO tools, monitoring services and generic HTTP clients.
 
-All five are declared as machine metrics, so the page module folds them into a single **Bot traffic** tile that breaks itself down when opened, rather than putting five crawler counts beside the two numbers an editor came for. See [Bot traffic](../page-tiles.md#bot-traffic). The storage is untouched: each bucket keeps its own identifier and its own rows.
+All five are declared as machine metrics, so the page module folds them into a single **Bot traffic** tile that breaks itself down when opened, rather than putting five crawler counts beside the two numbers an editor came for. The two AI buckets additionally get a tile of their own beside it, and are counted in both. See [Bot traffic](../page-tiles.md#bot-traffic). The storage is untouched: each bucket keeps its own identifier and its own rows.
 
 These are counted differently from `accesslog.pageviews` on purpose:
 pageviews only count successful (2xx) and not-modified (304) `GET`
@@ -146,13 +146,19 @@ differ slightly (for example pageviews also excludes `.pdf`/`.xml`/`.json`/
 can still be bucketed as bot traffic even though it is excluded from
 pageviews.
 
-The five tiles only show a total per page per day. Which specific bot
+A bucket metric only carries a total per page per day. Which specific bot
 made those hits, and whether its request path looked spoofed (a known
 bot's user agent paired with a path pattern real bots do not use), is
 recorded separately in the `tx_typo3pagemetrics_bot_agent_daily` table -
 one row per site/page/day/bucket/agent, with a `hits_suspicious` column
-for the spoofing count. This detail is not yet surfaced in any tile or
-backend view; today it is only queryable directly in the database.
+for the spoofing count.
+
+The two AI buckets read that detail back: their tiles list the crawlers
+and chatbots behind the number, see
+[AI chatbots and AI crawlers](../page-tiles.md#ai-chatbots-and-ai-crawlers).
+The agents of the other three buckets, and the spoofing count of all five,
+are not surfaced anywhere yet; today they are only queryable directly in
+the database.
 
 For ad-hoc inspection of a log file without touching the database at all -
 useful for checking what a bucket or the spoofing signal would look like

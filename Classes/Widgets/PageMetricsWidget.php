@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
-use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, ModuleLinkBuilder, PageMetricsViewDataBuilder, SparklineLabelProvider};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsViewDataBuilder, SparklineLabelProvider};
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
@@ -45,7 +45,6 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
         private readonly BackendViewFactory $backendViewFactory,
         private readonly SparklineLabelProvider $labelProvider,
         private readonly AnnotationPayloadBuilder $annotationPayloadBuilder,
-        private readonly ModuleLinkBuilder $moduleLinkBuilder,
     ) {}
 
     public function setRequest(ServerRequestInterface $request): void
@@ -63,7 +62,6 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
             'sites' => $this->collectSiteTiles(),
             'sparklineLabels' => $this->labelProvider->all(),
             'configuration' => $this->configuration,
-            'moduleUrls' => $this->moduleLinkBuilder->forSites($this->siteFinder->getAllSites()),
         ]);
 
         return $view->render('Widget/PageMetrics');

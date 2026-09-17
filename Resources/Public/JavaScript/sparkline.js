@@ -9,9 +9,9 @@ const PLOT_INSET_TOP = 3;
 const PLOT_INSET_BOTTOM = 9;
 
 // The period strip's thickness, in the same user units as the plot, so it
-// keeps its proportion whether it is drawn in a 52px popover sparkline or a
-// 260px dashboard chart. The curve's lowest point sits PLOT_INSET_BOTTOM
-// above the floor, so the strip never runs underneath it.
+// keeps its proportion in a popover sparkline of 52px and in a dashboard
+// chart of whatever height its card has left. The curve's lowest point sits
+// PLOT_INSET_BOTTOM above the floor, so the strip never runs underneath it.
 const ANNOTATION_BAND_HEIGHT = 3;
 // Fixed total width regardless of how many days are plotted (7/30/90, per
 // the period selector): points get closer together for a longer period
@@ -53,12 +53,14 @@ const FALLBACK_LABELS = {
   breakdown: 'Made up of',
   noData: 'No data',
   externalLink: 'Open in analytics tool',
+  externalLinkNamed: 'Open in %s',
+  source: 'Data source',
+  sourceHint: "Where this tile's numbers were imported from",
   sliderPrevious: 'Previous',
   sliderNext: 'Next',
   sliderPage: 'Page %1$s',
   chartSummary: 'Chart from %1$s to %2$s, values from %3$s to %4$s',
   chartSummaryDates: 'Chart from %1$s to %2$s',
-  chartScaleShared: 'Both lines are drawn to one shared scale, so their heights can be compared.',
   chartScaleSeparate: 'Each line is drawn to its own scale, so only the shapes can be compared, not the heights.',
   'annotationCategory.release': 'Release',
   'annotationCategory.campaign': 'Campaign',
@@ -99,7 +101,29 @@ const STAT_ICON_PATHS = {
   typicalPage: ['M7 20l10 0', 'M6 6l6 -1l6 1', 'M12 3l0 17', 'M9 12l-3 -6l-3 6a3 3 0 0 0 6 0', 'M21 12l-3 -6l-3 6a3 3 0 0 0 6 0'],
 };
 
-function statIconSvg(paths) {
+// The categories a marker can stand for, for the tooltip line naming one.
+// Since a marker takes its chart's colour rather than its category's, the
+// icon is the only thing about that line that is not a word.
+const CATEGORY_ICON_PATHS = {
+  release: ['M4 13a8 8 0 0 1 7 7a6 6 0 0 0 3 -5a9 9 0 0 0 6 -8a3 3 0 0 0 -3 -3a9 9 0 0 0 -8 6a6 6 0 0 0 -5 3', 'M7 14a6 6 0 0 0 -3 6a6 6 0 0 0 6 -3', 'M14 9a1 1 0 1 0 2 0a1 1 0 1 0 -2 0'],
+  campaign: ['M18 8a3 3 0 0 1 0 6', 'M10 8v11a1 1 0 0 1 -1 1h-1a1 1 0 0 1 -1 -1v-5', 'M12 8l4.524 -3.77a.9 .9 0 0 1 1.476 .692v12.156a.9 .9 0 0 1 -1.476 .692l-4.524 -3.77h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h8'],
+  content: ['M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4', 'M13.5 6.5l4 4'],
+  redesign: ['M5 4h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1', 'M5 16h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1', 'M15 12h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1', 'M15 4h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1'],
+  incident: ['M12 9v4', 'M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0', 'M12 16h.01'],
+  seo: ['M21 12a9 9 0 1 0 -9 9', 'M3.6 9h16.8', 'M3.6 15h7.9', 'M11.5 3a17 17 0 0 0 0 18', 'M12.5 3a16.984 16.984 0 0 1 2.574 8.62', 'M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0', 'M20.2 20.2l1.8 1.8'],
+  external: ['M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6', 'M11 13l9 -9', 'M15 4h5v5'],
+};
+
+// The source marker's own icon. Not in STAT_ICON_PATHS: that table is keyed
+// by the chips' label keys, and this one is not a chip - it sits in the
+// heading, where the external link would be on a tile that has one.
+const SOURCE_ICON_PATHS = [
+  'M4 6a8 3 0 1 0 16 0a8 3 0 1 0 -16 0',
+  'M4 6v6a8 3 0 0 0 16 0v-6',
+  'M4 12v6a8 3 0 0 0 16 0v-6',
+];
+
+function iconSvg(paths) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${paths.map((path) => `<path d="${path}" />`).join('')}</svg>`;
 }
 
@@ -147,11 +171,7 @@ function segmentsOf(points) {
   return segments;
 }
 
-// `dashed` marks a series as the subordinate one: same colour, broken line.
-// A dash is geometry rather than colour, which is the only kind of difference
-// that survives a forced-colours mode, where every stroke on the chart is
-// repainted in the one system colour.
-function appendSeriesPath(svg, points, { stroke, withArea, dashed = false }) {
+function appendSeriesPath(svg, points, { stroke, withArea }) {
   segmentsOf(points).forEach((segment) => {
     // A single day surrounded by gaps has no line to draw, so it becomes a
     // dot: a zero-length stroke with a round cap, which non-scaling-stroke
@@ -192,9 +212,6 @@ function appendSeriesPath(svg, points, { stroke, withArea, dashed = false }) {
     polyline.setAttribute('fill', 'none');
     polyline.setAttribute('stroke', stroke);
     polyline.setAttribute('stroke-width', '1');
-    if (dashed) {
-      polyline.setAttribute('stroke-dasharray', '3 2');
-    }
     polyline.setAttribute('vector-effect', 'non-scaling-stroke');
     svg.appendChild(polyline);
   });
@@ -238,14 +255,8 @@ function boundsOf(values) {
 // The axis is therefore truncated and carries no scale of its own: the chart
 // is a silhouette of the period, and the numbers that give it magnitude are
 // on the row directly above it.
-//
-// sharedBounds, when given, is the band another caller already computed over
-// several series taken together (see sharedScaleBounds()), so every line of an
-// overlay maps against the same two numbers. It is still a scaleBounds() band,
-// just taken over more values: the percentile reasoning above holds whether
-// the outlier day belongs to one series or another.
-function plotAgainstBounds(values, step, sharedBounds = null) {
-  const [scaleLow, scaleHigh] = sharedBounds ?? scaleBounds(values.filter((value) => value !== null));
+function plotAgainstBounds(values, step) {
+  const [scaleLow, scaleHigh] = scaleBounds(values.filter((value) => value !== null));
   const range = scaleHigh - scaleLow;
   // Inset so neither edge clips what is drawn on it. A 1px stroke sitting on
   // the viewBox boundary loses half its width to the SVG's own clip, and the
@@ -296,11 +307,9 @@ function buildDateAxis(dates) {
   // Year. Truncated from the left rather than reformatted, so the reading
   // order stays the one every other date in the backend uses.
   //
-  // Only for an axis that is actually made of dates. A chart overlaying two
-  // periods of one metric is keyed by the day's position in the period
-  // instead (see PeriodComparison), because a date would be right for one of
-  // its two lines and wrong for the other, and truncating those labels would
-  // leave "Day 1" and "Day 30" reading as "1" and "0".
+  // Only for an axis that is actually made of dates, which every payload
+  // drawn today is. Anything keyed otherwise keeps its label whole rather
+  // than having four characters cut off the front of it.
   const isDate = (label) => /^\d{4}-\d{2}-\d{2}$/.test(label);
   const sameYear = shown.every(isDate) && shown[0].slice(0, 4) === shown[shown.length - 1].slice(0, 4);
 
@@ -351,7 +360,7 @@ let hintTooltipFor = null;
 function showHintTooltip(element, name, hint) {
   if (!hintTooltip) {
     hintTooltip = document.createElement('div');
-    hintTooltip.className = 'pagemetrics-stat-tooltip';
+    hintTooltip.className = 'pagemetrics-tooltip pagemetrics-tooltip-card pagemetrics-hint-tooltip';
     hintTooltip.setAttribute('aria-hidden', 'true');
     document.body.appendChild(hintTooltip);
   }
@@ -359,8 +368,22 @@ function showHintTooltip(element, name, hint) {
   hintTooltip.replaceChildren();
 
   const title = document.createElement('span');
-  title.className = 'pagemetrics-stat-tooltip-title';
-  title.textContent = name;
+  title.className = 'pagemetrics-tooltip-title';
+
+  // Cloned from the control rather than named again here: the icon is
+  // already in the markup beside the thing being explained, and a tooltip
+  // redrawing it from a list of its own would be one more place to keep in
+  // step with the backend's icon registry.
+  const icon = element.querySelector('svg');
+
+  if (icon) {
+    const wrapper = document.createElement('span');
+    wrapper.setAttribute('aria-hidden', 'true');
+    wrapper.appendChild(icon.cloneNode(true));
+    title.appendChild(wrapper);
+  }
+
+  title.appendChild(document.createTextNode(name));
   hintTooltip.appendChild(title);
 
   if ('' !== hint) {
@@ -457,7 +480,6 @@ function appendAnnotationMarker(svg, annotation, dates, step) {
   // than dropped: it is still running, and that is why it is being drawn.
   const fromIndex = index === -1 ? 0 : index;
   const untilIndex = annotation.dateUntil ? dates.indexOf(annotation.dateUntil) : -1;
-  const category = annotation.category || 'release';
 
   if (annotation.dateUntil && untilIndex !== fromIndex) {
     const lastIndex = untilIndex === -1 ? dates.length - 1 : untilIndex;
@@ -471,7 +493,7 @@ function appendAnnotationMarker(svg, annotation, dates, step) {
     band.setAttribute('y', String(SPARKLINE_HEIGHT - ANNOTATION_BAND_HEIGHT));
     band.setAttribute('width', Math.max((lastIndex - fromIndex) * step, 1));
     band.setAttribute('height', String(ANNOTATION_BAND_HEIGHT));
-    band.setAttribute('class', `pagemetrics-sparkline-annotation-band pagemetrics-annotation-${category}`);
+    band.setAttribute('class', 'pagemetrics-sparkline-annotation-band');
     svg.appendChild(band);
 
     return;
@@ -483,7 +505,7 @@ function appendAnnotationMarker(svg, annotation, dates, step) {
   marker.setAttribute('x2', x);
   marker.setAttribute('y1', '0');
   marker.setAttribute('y2', String(SPARKLINE_HEIGHT));
-  marker.setAttribute('class', `pagemetrics-sparkline-annotation pagemetrics-annotation-${category}`);
+  marker.setAttribute('class', 'pagemetrics-sparkline-annotation');
   marker.setAttribute('vector-effect', 'non-scaling-stroke');
   svg.appendChild(marker);
 }
@@ -508,9 +530,34 @@ function annotationLineFor(annotations, date, labels) {
     return undefined;
   }
 
-  const kind = labels[`annotationCategory.${match.category || 'release'}`];
+  const category = match.category || 'release';
+  const kind = labels[`annotationCategory.${category}`];
 
-  return kind ? `${kind}: ${match.text}` : match.text;
+  return { category, text: kind ? `${kind}: ${match.text}` : match.text };
+}
+
+// The same line in both charts that draw one: the category's icon, then the
+// words. Hidden where the day carries no marker, which is most of them.
+function fillAnnotationLine(element, annotations, date, labels) {
+  const line = annotationLineFor(annotations, date, labels);
+
+  element.replaceChildren();
+  element.hidden = !line;
+
+  if (!line) {
+    return;
+  }
+
+  const paths = CATEGORY_ICON_PATHS[line.category];
+
+  if (paths) {
+    const icon = document.createElement('span');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = iconSvg(paths);
+    element.appendChild(icon);
+  }
+
+  element.appendChild(document.createTextNode(line.text));
 }
 
 // The day panel behind a marker: every marker on that day plus what each
@@ -747,7 +794,7 @@ function buildAnnotationTrigger(svg, annotation, dates, step, width, labels, con
 
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = `pagemetrics-annotation-trigger pagemetrics-annotation-${category}`;
+  button.className = 'pagemetrics-annotation-trigger';
   button.setAttribute('aria-haspopup', 'dialog');
   button.setAttribute('aria-expanded', 'false');
   // The date first: in a strip of markers it is the one thing that tells two
@@ -888,6 +935,29 @@ class PageMetricsTile {
       const label = document.createElement('dt');
       label.textContent = part.label;
 
+      // A part that has something to say about itself says it in the house
+      // tooltip: what a crawler is, or which agents the folded row stands
+      // for. The row becomes a focus stop only where there is something to
+      // read, since a stop that shows nothing is worse than no stop.
+      //
+      // The <dt> carries it rather than a wrapper: a <dl> may hold only
+      // dt, dd and div, so a button around the pair would not be a
+      // description list any more. The sentence is in the markup as well,
+      // hidden the way the stat chips hide theirs, which is what makes the
+      // tooltip's content reach a screen reader at all.
+      if (part.hint) {
+        label.tabIndex = 0;
+        label.dataset.hintTitle = part.label;
+        label.dataset.hintText = part.hint;
+
+        const hiddenHint = document.createElement('span');
+        hiddenHint.className = 'pagemetrics-popover-breakdown-hint';
+        hiddenHint.textContent = `. ${part.hint}`;
+        label.appendChild(hiddenHint);
+
+        bindHintTooltip(label);
+      }
+
       const value = document.createElement('dd');
       value.textContent = part.formattedValue;
 
@@ -954,7 +1024,7 @@ class PageMetricsTile {
     marker.hidden = true;
 
     const tooltip = document.createElement('div');
-    tooltip.className = 'pagemetrics-sparkline-tooltip';
+    tooltip.className = 'pagemetrics-tooltip pagemetrics-tooltip-inverted pagemetrics-sparkline-tooltip';
     tooltip.hidden = true;
 
     // Two separate lines rather than one run-on string: the date/value is
@@ -986,10 +1056,8 @@ class PageMetricsTile {
       marker.style.top = `${centerY}px`;
       marker.hidden = point === null;
 
-      const annotationText = annotationLineFor(annotations, date, this.labels);
       tooltipValue.textContent = `${date}: ${value === null ? this.labels.noData : formatValueForUnit(value, this.element.dataset.unit)}`;
-      tooltipAnnotation.textContent = annotationText ?? '';
-      tooltipAnnotation.hidden = !annotationText;
+      fillAnnotationLine(tooltipAnnotation, annotations, date, this.labels);
       tooltip.hidden = false;
       tooltip.style.left = `${centerX}px`;
       tooltip.style.top = `${centerY}px`;
@@ -1087,19 +1155,55 @@ class PageMetricsTile {
     headingLabel.textContent = this.element.dataset.label || '';
     heading.appendChild(headingLabel);
 
+    // Where the numbers came from, which only one of the two controls below
+    // ever shows: a tile with a link into its analytics tool has the answer
+    // in that link's own label, and a second icon beside it would say the
+    // same thing twice. Empty for a tile a listener contributed, which knows
+    // no provider - the heading then stays as bare as it always was.
+    const source = this.element.dataset.source || '';
+
     if (this.element.dataset.externalLink) {
       const externalLink = document.createElement('a');
       externalLink.className = 'pagemetrics-popover-external-link';
       externalLink.href = this.element.dataset.externalLink;
       externalLink.target = '_blank';
       externalLink.rel = 'noopener noreferrer';
-      externalLink.title = this.labels.externalLink;
-      externalLink.setAttribute('aria-label', this.labels.externalLink);
+      // "Open in Matomo" rather than "Open in analytics tool" wherever the
+      // tile knows which one it means. The generic wording is the fallback,
+      // not the target.
+      const linkLabel = '' !== source ? this.labels.externalLinkNamed.replace('%s', source) : this.labels.externalLink;
+      externalLink.setAttribute('aria-label', linkLabel);
       externalLink.innerHTML =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
         '<path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" />' +
         '<path d="M11 13l9 -9" /><path d="M15 4h5v5" /></svg>';
+      // The house tooltip rather than the title attribute this used to
+      // carry, which was the last one in the extension still waiting a
+      // second and rendering in the browser's own style. Title only, no
+      // second line: "Open in Matomo" is the whole of what there is to say.
+      externalLink.dataset.hintTitle = linkLabel;
+      externalLink.dataset.hintText = '';
+      bindHintTooltip(externalLink);
       heading.appendChild(externalLink);
+    } else if ('' !== source) {
+      // A button rather than a span, for the reason the stat chips are one:
+      // hover is not an interaction a keyboard or a touch device has, and
+      // the name of the source is the whole content of this control.
+      const sourceMarker = document.createElement('button');
+      sourceMarker.type = 'button';
+      sourceMarker.className = 'pagemetrics-popover-source';
+      sourceMarker.innerHTML = iconSvg(SOURCE_ICON_PATHS);
+
+      const sourceLabel = document.createElement('span');
+      sourceLabel.className = 'pagemetrics-popover-source-label';
+      sourceLabel.textContent = `${this.labels.source}. ${source}.`;
+      sourceMarker.appendChild(sourceLabel);
+
+      sourceMarker.dataset.hintTitle = source;
+      sourceMarker.dataset.hintText = this.labels.sourceHint;
+      bindHintTooltip(sourceMarker);
+
+      heading.appendChild(sourceMarker);
     }
 
     this.popover.appendChild(heading);
@@ -1137,15 +1241,34 @@ class PageMetricsTile {
       const icon = document.createElement('span');
       icon.className = 'pagemetrics-popover-stat-icon';
       icon.setAttribute('aria-hidden', 'true');
-      icon.innerHTML = statIconSvg(STAT_ICON_PATHS[key]);
+      icon.innerHTML = iconSvg(STAT_ICON_PATHS[key]);
 
       const labelElement = document.createElement('span');
       labelElement.className = 'pagemetrics-popover-stat-label';
-      labelElement.textContent = '' !== hint ? `${name}. ${hint}.` : name;
+      const spokenName = '' !== hint ? `${name}. ${hint}.` : name;
+      // The words move into the hidden label wherever the day carries
+      // nothing, so the drawn chip can shrink to a dash while the chip still
+      // reads as "Last day. The most recent day of the selected period. No
+      // data." to a screen reader.
+      labelElement.textContent = value === null ? `${spokenName} ${this.labels.noData}.` : spokenName;
 
       const valueElement = document.createElement('span');
       valueElement.className = 'pagemetrics-popover-stat-value';
-      valueElement.textContent = value === null ? this.labels.noData : value;
+
+      if (value === null) {
+        // An en dash rather than the words: the import marks a day complete
+        // only once it has elapsed, so the last day of the period is empty
+        // on almost every page load. "No data" was the one piece of text in
+        // a row of numbers and the widest thing in it, which made the
+        // routine case the loudest and pushed the row onto a second line.
+        // Not a translated string - it is a glyph, and the sentence it used
+        // to carry now sits in the label above.
+        valueElement.textContent = '\u2013';
+        valueElement.classList.add('pagemetrics-popover-stat-value-empty');
+        valueElement.setAttribute('aria-hidden', 'true');
+      } else {
+        valueElement.textContent = value;
+      }
 
       button.appendChild(icon);
       button.appendChild(labelElement);
@@ -1714,28 +1837,6 @@ function scaleBounds(values) {
   return low === high ? [sorted[0], sorted[sorted.length - 1]] : [low, high];
 }
 
-// One band over every series' values taken together, so the overlay has a
-// single axis and a line twice as high really is twice the number.
-//
-// The band itself is still scaleBounds()' percentile band, computed once over
-// the union rather than per series: sharing the scale must not also change
-// what a scale is, or the chart would answer differently depending on how
-// many series it was handed.
-function sharedScaleBounds(seriesList, dates) {
-  const values = [];
-
-  seriesList.forEach((series) => {
-    dates.forEach((date) => {
-      const value = series.values[date] ?? null;
-      if (value !== null) {
-        values.push(value);
-      }
-    });
-  });
-
-  return scaleBounds(values);
-}
-
 // Each series is scaled against its own range rather than a shared
 // [0, max]: metrics like "Visits" and "Bounce rate" live on wildly
 // different scales, and overlaying them is about comparing shape/trend
@@ -1749,11 +1850,11 @@ function sharedScaleBounds(seriesList, dates) {
 // one that doubled. It stays opt-in because the dashboard chart widget
 // genuinely overlays different units, where one axis would be the lie
 // instead.
-function computePlottedSeries(seriesList, dates, step, sharedBounds = null) {
+function computePlottedSeries(seriesList, dates, step) {
   return seriesList.map((series) => {
     const values = dates.map((date) => series.values[date] ?? null);
 
-    return { ...series, values, ...plotAgainstBounds(values, step, sharedBounds) };
+    return { ...series, values, ...plotAgainstBounds(values, step) };
   });
 }
 
@@ -1764,17 +1865,13 @@ function renderSeriesLines(svg, plotted) {
     appendSeriesPath(svg, series.points, {
       // A single series still relies on the surrounding --pm-accent CSS
       // custom property (currentColor) rather than its own color, so it
-      // keeps picking up the compact/trend-sentiment color overrides other
-      // rules apply to that property (see page-metrics.css) instead of only
-      // ever drawing in the metric's own fixed color.
+      // keeps picking up the overrides other rules apply to that property
+      // (see page-metrics.css) instead of only ever drawing in the metric's
+      // own fixed color.
       stroke: isMultiSeries ? series.color : 'currentColor',
       // Overlaid, a fill would just muddy the overlap between series, so it
       // stays with the single-metric case.
       withArea: !isMultiSeries,
-      // Set by a payload that has a reference series to subordinate (see
-      // PeriodComparison); absent everywhere else, where every series is
-      // equally the point.
-      dashed: true === series.subordinate,
     });
   });
 }
@@ -1818,7 +1915,7 @@ function buildTooltip(plotted) {
   const isMultiSeries = plotted.length > 1;
 
   const tooltip = document.createElement('div');
-  tooltip.className = 'pagemetrics-sparkline-tooltip';
+  tooltip.className = 'pagemetrics-tooltip pagemetrics-tooltip-inverted pagemetrics-sparkline-tooltip';
   tooltip.hidden = true;
 
   const heading = document.createElement('div');
@@ -1875,9 +1972,7 @@ function attachChartInteractivity({ svg, container, plotted, markers, tooltipPar
 
     heading.textContent = date;
 
-    const annotationText = annotationLineFor(annotations, date, labels);
-    tooltipAnnotation.textContent = annotationText ?? '';
-    tooltipAnnotation.hidden = !annotationText;
+    fillAnnotationLine(tooltipAnnotation, annotations, date, labels);
     tooltip.hidden = false;
     tooltip.style.top = `${centerY}px`;
 
@@ -1933,15 +2028,7 @@ function buildLegend(plotted, scaleNote) {
   plotted.forEach((series) => {
     const dot = document.createElement('span');
     dot.className = 'pagemetrics-sparkline-legend-dot';
-    if (true === series.subordinate) {
-      // Hollow and broken, matching the line it stands for. Two series of
-      // one metric share that metric's colour, so a filled dot apiece would
-      // leave the legend unable to tell them apart at all.
-      dot.style.background = 'transparent';
-      dot.style.border = `1px dashed ${series.color}`;
-    } else {
-      dot.style.background = series.color;
-    }
+    dot.style.background = series.color;
 
     const item = document.createElement('div');
     item.className = 'pagemetrics-sparkline-legend-item';
@@ -1977,10 +2064,7 @@ function initializeStaticCharts(root) {
 
     const width = SPARKLINE_WIDTH * 3;
     const step = dates.length > 1 ? width / (dates.length - 1) : 0;
-    // Opt-in, and only a payload overlaying one metric with itself asks for
-    // it - see computePlottedSeries() for why this is not the default.
-    const sharedScale = container.dataset.sharedScale === '1';
-    const plotted = computePlottedSeries(seriesList, dates, step, sharedScale ? sharedScaleBounds(seriesList, dates) : null);
+    const plotted = computePlottedSeries(seriesList, dates, step);
 
     const svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${width} ${SPARKLINE_HEIGHT}`);
@@ -1998,16 +2082,10 @@ function initializeStaticCharts(root) {
     // so there is no one axis to label - two numbers in the corners would
     // belong to whichever series happened to be first and silently misread
     // the others. The legend tells them apart instead.
-    //
-    // Under a shared scale there is exactly one axis, so the range is quoted
-    // again, and over every series rather than the first: the reader is being
-    // told what the height they can now compare is measured in.
-    const bounds = plotted.length > 1 && !sharedScale
-      ? null
-      : boundsOf(plotted.flatMap((series) => series.values));
+    const bounds = plotted.length > 1 ? null : boundsOf(plotted.flatMap((series) => series.values));
     // Nothing to say where there is only one line: no second height exists to
     // mistake it for.
-    const scaleNote = plotted.length > 1 ? (sharedScale ? labels.chartScaleShared : labels.chartScaleSeparate) : null;
+    const scaleNote = plotted.length > 1 ? labels.chartScaleSeparate : null;
 
     const wrapper = document.createElement('div');
     wrapper.className = 'pagemetrics-sparkline-wrapper';

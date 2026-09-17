@@ -65,12 +65,14 @@ final readonly class SparklineLabelProvider
             'popover.typicalPage.bottomFifth' => 'typicalPageBottomFifth',
             'popover.noData' => 'noData',
             'popover.externalLink' => 'externalLink',
+            'popover.externalLinkNamed' => 'externalLinkNamed',
+            'popover.source' => 'source',
+            'popover.sourceHint' => 'sourceHint',
             'slider.previous' => 'sliderPrevious',
             'slider.next' => 'sliderNext',
             'slider.page' => 'sliderPage',
             'chart.summary' => 'chartSummary',
             'chart.summaryDates' => 'chartSummaryDates',
-            'chart.scaleShared' => 'chartScaleShared',
             'chart.scaleSeparate' => 'chartScaleSeparate',
         ];
 

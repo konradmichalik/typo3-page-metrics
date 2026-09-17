@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Persistence;
 
 use DateTimeImmutable;
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
 use KonradMichalik\Typo3PageMetrics\Persistence\BotAgentDailyRepository;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -70,6 +71,82 @@ final class BotAgentDailyRepositoryTest extends FunctionalTestCase
 
         self::assertSame(['hits' => 20, 'hits_suspicious' => 0], $this->fetchRow('main', 0, 'ai_crawler', 'GPTBot'));
         self::assertSame(['hits' => 5, 'hits_suspicious' => 0], $this->fetchRow('main', 2, 'ai_crawler', 'GPTBot'));
+    }
+
+    public function testAgentSumsGroupsHitsPerAgentAcrossDaysAndPages(): void
+    {
+        $this->subject->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', new DateTimeImmutable('2026-10-10'), 5, 0);
+        $this->subject->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', new DateTimeImmutable('2026-10-11'), 7, 0);
+        $this->subject->upsert('main', 3, 0, 'ai_crawler', 'GPTBot', new DateTimeImmutable('2026-10-11'), 1, 0);
+        $this->subject->upsert('main', 2, 0, 'ai_crawler', 'ClaudeBot', new DateTimeImmutable('2026-10-10'), 20, 0);
+
+        self::assertSame(
+            ['ai_crawler' => ['ClaudeBot' => 20, 'GPTBot' => 13]],
+            $this->subject->agentSums([2, 3], 0, ['ai_crawler'], $this->range('2026-10-10', '2026-10-11')),
+        );
+    }
+
+    public function testAgentSumsCountsOnlyRowsInsideTheRange(): void
+    {
+        $this->subject->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', new DateTimeImmutable('2026-10-09'), 100, 0);
+        $this->subject->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', new DateTimeImmutable('2026-10-10'), 5, 0);
+        $this->subject->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', new DateTimeImmutable('2026-10-12'), 100, 0);
+
+        self::assertSame(
+            ['ai_crawler' => ['GPTBot' => 5]],
+            $this->subject->agentSums([2], 0, ['ai_crawler'], $this->range('2026-10-10', '2026-10-11')),
+        );
+    }
+
+    public function testAgentSumsKeepsBucketsApartAndReturnsOnlyTheRequestedOnes(): void
+    {
+        $date = new DateTimeImmutable('2026-10-10');
+        $this->subject->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', $date, 5, 0);
+        $this->subject->upsert('main', 2, 0, 'ai_chatbot', 'ChatGPT-User', $date, 3, 0);
+        $this->subject->upsert('main', 2, 0, 'search', 'Googlebot', $date, 99, 0);
+
+        self::assertSame(
+            ['ai_chatbot' => ['ChatGPT-User' => 3], 'ai_crawler' => ['GPTBot' => 5]],
+            $this->subject->agentSums([2], 0, ['ai_chatbot', 'ai_crawler'], $this->range('2026-10-10', '2026-10-10')),
+        );
+    }
+
+    public function testAgentSumsIgnoresRowsOfAnotherLanguage(): void
+    {
+        $date = new DateTimeImmutable('2026-10-10');
+        $this->subject->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', $date, 5, 0);
+        $this->subject->upsert('main', 2, 1, 'ai_crawler', 'GPTBot', $date, 100, 0);
+
+        self::assertSame(
+            ['ai_crawler' => ['GPTBot' => 5]],
+            $this->subject->agentSums([2], 0, ['ai_crawler'], $this->range('2026-10-10', '2026-10-10')),
+        );
+    }
+
+    public function testAgentSumsLeavesThePageZeroRollupOutOfAPageScopedSum(): void
+    {
+        $date = new DateTimeImmutable('2026-10-10');
+        $this->subject->upsert('main', 0, 0, 'ai_crawler', 'GPTBot', $date, 20, 0);
+        $this->subject->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', $date, 5, 0);
+
+        self::assertSame(
+            ['ai_crawler' => ['GPTBot' => 5]],
+            $this->subject->agentSums([2], 0, ['ai_crawler'], $this->range('2026-10-10', '2026-10-10')),
+        );
+    }
+
+    public function testAgentSumsReturnsAnEmptyArrayWhereNoRowsMatch(): void
+    {
+        $this->subject->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', new DateTimeImmutable('2026-10-10'), 5, 0);
+
+        self::assertSame([], $this->subject->agentSums([9], 0, ['ai_crawler'], $this->range('2026-10-10', '2026-10-10')));
+        self::assertSame([], $this->subject->agentSums([], 0, ['ai_crawler'], $this->range('2026-10-10', '2026-10-10')));
+        self::assertSame([], $this->subject->agentSums([2], 0, [], $this->range('2026-10-10', '2026-10-10')));
+    }
+
+    private function range(string $from, string $until): DateRange
+    {
+        return new DateRange(new DateTimeImmutable($from), new DateTimeImmutable($until));
     }
 
     /**

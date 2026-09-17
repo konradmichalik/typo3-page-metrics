@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\SiteMetricsOverview;
-use KonradMichalik\Typo3PageMetrics\Service\{ModuleLinkBuilder, SiteMetricsOverviewBuilder};
+use KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -38,7 +38,6 @@ abstract class AbstractSiteMetricsWidget implements WidgetInterface, RequestAwar
         private readonly SiteMetricsOverviewBuilder $overviewBuilder,
         private readonly SiteFinder $siteFinder,
         private readonly BackendViewFactory $backendViewFactory,
-        private readonly ModuleLinkBuilder $moduleLinkBuilder,
     ) {}
 
     final public function setRequest(ServerRequestInterface $request): void
@@ -57,10 +56,6 @@ abstract class AbstractSiteMetricsWidget implements WidgetInterface, RequestAwar
         $view->assignMultiple([
             ...$this->buildViewVariables($this->collectOverviews()),
             'configuration' => $this->configuration,
-            // Keyed by site rather than one flag for the widget: a
-            // dashboard can carry several sites and the reader may be
-            // allowed the root page of one and not of the next.
-            'moduleUrls' => $this->moduleLinkBuilder->forSites($this->siteFinder->getAllSites()),
         ]);
 
         return $view->render($this->templateName());

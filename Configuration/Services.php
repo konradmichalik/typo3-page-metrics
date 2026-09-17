@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics;
 
-use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, InsightBuilder, ModuleLinkBuilder, PageMetricsViewDataBuilder, SiteMetricsOverviewBuilder, SparklineLabelProvider};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, InsightBuilder, PageMetricsViewDataBuilder, SiteMetricsOverviewBuilder, SparklineLabelProvider};
 use KonradMichalik\Typo3PageMetrics\Widgets\{AnnotationsWidget, InsightWidget, NotFoundPagesWidget, PageMetricsChartWidget, PageMetricsWidget, TopPagesWidget, TrendWidget};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Reference};
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -48,11 +48,7 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
 
     $services = $configurator->services();
 
-    // Every widget gets the module link builder handed to it rather than
-    // letting its template assemble a link: whether the link is shown at all
-    // is an access decision - the tiles switch, the module permission and
-    // PAGE_SHOW on the site's root page - and a template is no place to make
-    // one. Nothing here is autowired, so each widget names the argument.
+    // Nothing here is autowired, so each widget names its arguments.
     // First in the preset and first here: it implements the plain widget
     // interface with no settings, so unlike the ones below it needs no
     // version gate at all.
@@ -61,7 +57,6 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
         ->arg('$insightBuilder', new Reference(InsightBuilder::class))
         ->arg('$siteFinder', new Reference(SiteFinder::class))
         ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
-        ->arg('$moduleLinkBuilder', new Reference(ModuleLinkBuilder::class))
         ->tag('dashboard.widget', [
             'identifier' => 'pageMetricsInsight',
             'groupNames' => 'pageMetrics',
@@ -79,7 +74,6 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
         ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
         ->arg('$labelProvider', new Reference(SparklineLabelProvider::class))
         ->arg('$annotationPayloadBuilder', new Reference(AnnotationPayloadBuilder::class))
-        ->arg('$moduleLinkBuilder', new Reference(ModuleLinkBuilder::class))
         ->tag('dashboard.widget', [
             'identifier' => 'pageMetrics',
             'groupNames' => 'pageMetrics',
@@ -98,7 +92,6 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
             ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
             ->arg('$labelProvider', new Reference(SparklineLabelProvider::class))
             ->arg('$annotationPayloadBuilder', new Reference(AnnotationPayloadBuilder::class))
-            ->arg('$moduleLinkBuilder', new Reference(ModuleLinkBuilder::class))
             ->tag('dashboard.widget', [
                 'identifier' => 'pageMetricsChart',
                 'groupNames' => 'pageMetrics',
@@ -116,7 +109,6 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
             ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
             ->arg('$labelProvider', new Reference(SparklineLabelProvider::class))
             ->arg('$annotationPayloadBuilder', new Reference(AnnotationPayloadBuilder::class))
-            ->arg('$moduleLinkBuilder', new Reference(ModuleLinkBuilder::class))
             ->tag('dashboard.widget', [
                 'identifier' => 'pageMetricsChartCompact',
                 'groupNames' => 'pageMetrics',
@@ -134,7 +126,6 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
             ->arg('$overviewBuilder', new Reference(SiteMetricsOverviewBuilder::class))
             ->arg('$siteFinder', new Reference(SiteFinder::class))
             ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
-            ->arg('$moduleLinkBuilder', new Reference(ModuleLinkBuilder::class))
             ->tag('dashboard.widget', [
                 'identifier' => 'pageMetricsTopPages',
                 'groupNames' => 'pageMetrics',
@@ -151,7 +142,6 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
         ->arg('$overviewBuilder', new Reference(SiteMetricsOverviewBuilder::class))
         ->arg('$siteFinder', new Reference(SiteFinder::class))
         ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
-        ->arg('$moduleLinkBuilder', new Reference(ModuleLinkBuilder::class))
         ->tag('dashboard.widget', [
             'identifier' => 'pageMetricsNotFoundPages',
             'groupNames' => 'pageMetrics',
@@ -168,7 +158,6 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
             ->arg('$overviewBuilder', new Reference(SiteMetricsOverviewBuilder::class))
             ->arg('$siteFinder', new Reference(SiteFinder::class))
             ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
-            ->arg('$moduleLinkBuilder', new Reference(ModuleLinkBuilder::class))
             ->tag('dashboard.widget', [
                 'identifier' => 'pageMetricsTrend',
                 'groupNames' => 'pageMetrics',
@@ -185,7 +174,6 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
         ->arg('$overviewBuilder', new Reference(SiteMetricsOverviewBuilder::class))
         ->arg('$siteFinder', new Reference(SiteFinder::class))
         ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
-        ->arg('$moduleLinkBuilder', new Reference(ModuleLinkBuilder::class))
         ->tag('dashboard.widget', [
             'identifier' => 'pageMetricsAnnotations',
             'groupNames' => 'pageMetrics',

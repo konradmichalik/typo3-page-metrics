@@ -24,7 +24,7 @@
             <h3 class="pagemetrics-day-section-title"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:day.events" default="What happened" /></h3>
             <ul class="pagemetrics-day-events">
                 <f:for each="{annotations}" as="annotation">
-                    <li class="pagemetrics-day-event pagemetrics-annotation-{annotation.category.value}">
+                    <li class="pagemetrics-day-event">
                         <span class="pagemetrics-day-event-icon" aria-hidden="true"><core:icon identifier="{annotation.categoryIcon}" size="small" alternativeMarkupIdentifier="inline" /></span>
                         <span class="pagemetrics-day-event-body">
                             <f:comment>

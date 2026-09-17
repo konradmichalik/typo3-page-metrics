@@ -267,9 +267,46 @@
 
 /* In a widget the mark belongs under the widget's own content, not wedged
    against it. */
-.pagemetrics-widget-site .pagemetrics-freshness,
-.pagemetrics-widget-chart + .pagemetrics-freshness {
+/* Beside the tiles rather than under them. The line it took under the row is
+   the line the card did not have, and a date mark is not worth handing the
+   reader a scrollbar over the numbers it dates. Over them was not an option
+   either: a tile is a button that opens a popover, and an overlay in its
+   corner takes a bite out of its target.
+
+   The row gives up the width instead, which is the axis it can spare: it
+   scrolls sideways already, and one tile less on screen is a scroll, not a
+   loss. Bottom-aligned, so the mark sits on the tiles' own baseline. */
+.pagemetrics-tiles-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    min-width: 0;
+}
+
+.pagemetrics-tiles-row .pagemetrics-tiles {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.pagemetrics-tiles-row .pagemetrics-freshness {
+    flex: 0 0 auto;
+    margin-top: 0;
+}
+
+.pagemetrics-widget-site .pagemetrics-freshness {
     margin-top: 8px;
+}
+
+/* The chart's own mark sits in the plot's top left corner, where a curve
+   drawn from a period's oldest day has the least to say. Above the drawn
+   chart, which is appended after it, and below the hover tooltip, which
+   shares this corner only while the pointer is in it. */
+.pagemetrics-widget-chart .pagemetrics-freshness {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    margin-top: 0;
 }
 
 .pagemetrics-slider {
@@ -383,20 +420,50 @@
     color: var(--typo3-text-color-variant, #6a7085);
 }
 
+/* The card decides how tall a chart is, not this stylesheet.
+   A dashboard slot is 200px a row, and what is left of it after the card's
+   own title bar and padding depends on the backend's font size, its zoom and
+   which TYPO3 version is drawing the chrome. A chart of a fixed height is a
+   guess about a box somebody else owns, and this one sat within a few pixels
+   of it: close enough to fit on one installation and to hand the reader a
+   scrollbar on the next. Filling what is there cannot be off by a pixel. */
+.pagemetrics-widget {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.pagemetrics-widget .pagemetrics-widget-site {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
 .pagemetrics-widget-chart {
     position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    /* Deep enough to still read as a curve. Under this the card is too short
+       for a chart at all, and a scrollbar is the honest answer. */
+    min-height: 60px;
     width: 100%;
+}
+
+.pagemetrics-widget-chart .pagemetrics-sparkline-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .pagemetrics-widget-chart .pagemetrics-sparkline {
     display: block;
     width: 100%;
-    /* Taller than the popover's own 52px sparkline (see
-       .pagemetrics-popover .pagemetrics-sparkline above): this chart is
-       the widget's only content, not an add-on shown alongside tiles, so it
-       gets to fill the dashboard card (a "medium" height widget slot)
-       instead of leaving most of it empty. */
-    height: 260px;
+    /* The wrapper's whole height, which is the card's minus its date axis.
+       The SVG draws with preserveAspectRatio="none", so it takes whatever it
+       is given without distorting what the curve says: the shape of a period
+       is read against its own axis, not against a fixed aspect. */
+    height: 100%;
     color: var(--pm-accent);
     cursor: crosshair;
 }
@@ -421,13 +488,6 @@
     height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
-}
-
-/* The compact chart widget registration (height: small, a single 200px
-   dashboard row) doesn't have room for the full-size sparkline above -
-   scales it down instead of letting the card scroll. */
-.pagemetrics-widget--compact .pagemetrics-sparkline {
-    height: 90px;
 }
 
 .pagemetrics-tiles::-webkit-scrollbar {
@@ -569,44 +629,13 @@
     cursor: crosshair;
 }
 
-/* One colour per annotation category, written here rather than carried in
-   PHP so each can be a light-dark() pair and follow a custom backend theme.
-   Deliberately muted in both schemes: a marker is context for the curve, not
-   a second data series competing with it.
-
-   The category is also on the icon beside the text in the annotations
-   widget, so colour is never the only thing saying which kind an event was. */
-.pagemetrics-annotation-release {
-    --pm-annotation-color: light-dark(#0969da, #6cb6ff);
-}
-
-.pagemetrics-annotation-campaign {
-    --pm-annotation-color: light-dark(#8250df, #c297ff);
-}
-
-.pagemetrics-annotation-content {
-    --pm-annotation-color: light-dark(#1a7f37, #6fdd8b);
-}
-
-.pagemetrics-annotation-redesign {
-    --pm-annotation-color: light-dark(#9a6700, #e0b341);
-}
-
-.pagemetrics-annotation-incident {
-    --pm-annotation-color: light-dark(#cf222e, #ff8182);
-}
-
-.pagemetrics-annotation-seo {
-    --pm-annotation-color: light-dark(#0f766e, #5fe0b5);
-}
-
-.pagemetrics-annotation-external {
-    --pm-annotation-color: light-dark(#6a7085, #a8adbd);
-}
-
+/* The surface's own colour, never the category's. A marker is context for
+   the curve it stands on, and seven hues over one line read as a second data
+   series competing with it. Which kind of event it was is in the tooltip and
+   in the day panel, in words. */
 .pagemetrics-sparkline-annotation {
     opacity: 0.7;
-    stroke: var(--pm-annotation-color, var(--typo3-text-color-variant, #6a7085));
+    stroke: currentColor;
     stroke-dasharray: 2 2;
     stroke-width: 1;
 }
@@ -615,52 +644,21 @@
    the curve through: it is the backdrop to the days it covers, not a shape
    of its own. */
 .pagemetrics-sparkline-annotation-band {
-    fill: var(--pm-annotation-color, var(--typo3-text-color-variant, #6a7085));
+    fill: currentColor;
     fill-opacity: 0.12;
 }
 
-/* In the page module's popover the markers take the chart's own colour
-   instead of the category's. There is no legend there, so a category colour
-   answers a question nobody can ask, and a purple strip under a blue curve
-   reads as a mistake rather than as a meaning. The kind of event is still
-   named in words in the tooltip, which is where it was already carried for
-   exactly this reason.
-
-   The dashboard chart keeps the category colours: it has a legend keyed to
-   them, so there the colour is answerable. */
-.pagemetrics-popover .pagemetrics-sparkline-annotation-band {
-    fill: currentColor;
-}
-
-.pagemetrics-popover .pagemetrics-sparkline-annotation {
-    stroke: currentColor;
-}
-
-/* The legend under a chart, naming the kinds actually present rather than
-   every kind that exists: a key to seven colours when two are drawn is
-   noise. */
-.pagemetrics-annotation-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    margin-top: 4px;
-    font-size: 0.6875rem;
-    color: var(--typo3-text-color-variant, #6a7085);
-}
-
-.pagemetrics-annotation-legend-item {
+/* The kind of event in the annotations widget's own column: icon and word on
+   one line, so neither has to be read without the other. */
+.pagemetrics-annotation-kind {
     display: inline-flex;
     align-items: center;
     gap: 4px;
 }
 
-/* Only the icon takes the category colour. The words beside it keep the
-   body colour, so the text stays at its own contrast whatever hue the
-   category is. */
-.pagemetrics-annotation-legend-item svg {
+.pagemetrics-annotation-kind svg {
     width: 12px;
     height: 12px;
-    color: var(--pm-annotation-color, currentColor);
 }
 
 /* The second date of a range, under the first in the annotations table. */
@@ -682,24 +680,12 @@
 .pagemetrics-sparkline-tooltip {
     position: absolute;
     z-index: 1;
-    width: max-content;
     max-width: 180px;
     /* Below the cursor by default: above would overlap the popover's own
        last day/previous day/peak/average stats row sitting right above the
        sparkline. Flipped to .pagemetrics-sparkline-tooltip-above in JS when
        the popover has no room below (see the mousemove handler). */
     transform: translate(-50%, 0) translateY(6px);
-    padding: 4px 8px;
-    border-radius: var(--typo3-component-border-radius, 4px);
-    /* The two tokens are each other's inverse and flip together, which is
-       what keeps this an inverted chip in both schemes. Pairing the
-       background with a literal white left it light-on-light as soon as the
-       backend went dark. */
-    background: var(--typo3-text-color-base, #14213d);
-    color: var(--typo3-component-bg, #fff);
-    font-size: 0.6875rem;
-    text-align: center;
-    pointer-events: none;
 }
 
 .pagemetrics-sparkline-tooltip-above {
@@ -707,8 +693,7 @@
 }
 
 .pagemetrics-sparkline-tooltip-heading {
-    margin-bottom: 3px;
-    font-weight: 700;
+    font-weight: 600;
     white-space: nowrap;
 }
 
@@ -753,6 +738,38 @@
 }
 
 .pagemetrics-popover-external-link svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* The source marker takes the external link's place and its size, because it
+   answers the same question on a tile that has no link to answer it with:
+   where this number came from. Quieter than the link, which is a way out of
+   the backend, while this one only ever explains. */
+.pagemetrics-popover-source {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--typo3-component-border-radius, 4px);
+    background: none;
+    color: var(--typo3-text-color-variant, #6a7085);
+    opacity: 0.65;
+    cursor: help;
+}
+
+.pagemetrics-popover-source:hover,
+.pagemetrics-popover-source:focus {
+    opacity: 1;
+    color: var(--typo3-text-color-base, #14213d);
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 8%, transparent);
+}
+
+.pagemetrics-popover-source svg {
     width: 15px;
     height: 15px;
 }
@@ -809,6 +826,21 @@
     font-weight: 400;
 }
 
+/* Only the rows that carry an explanation, which is why the cue sits on the
+   attribute rather than on the element: a dotted underline under a row with
+   nothing behind it is a promise the popover does not keep. */
+.pagemetrics-popover-breakdown dt[data-hint-text] {
+    width: fit-content;
+    text-decoration: underline dotted currentColor;
+    text-underline-offset: 2px;
+    cursor: help;
+}
+
+.pagemetrics-popover-breakdown dt[data-hint-text]:hover,
+.pagemetrics-popover-breakdown dt[data-hint-text]:focus {
+    color: var(--typo3-text-color-base, #14213d);
+}
+
 .pagemetrics-popover-breakdown dd {
     margin: 0;
     text-align: right;
@@ -835,28 +867,72 @@
     background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 12%, transparent);
 }
 
-/* Its own element on <body>, because the popover clips its overflow. */
-.pagemetrics-stat-tooltip {
-    position: fixed;
-    z-index: 2100;
+/* One shell for every tooltip this extension draws, however it is opened and
+   wherever it is anchored: the same measure, the same padding, the same
+   title line carrying the icon of whatever is being explained. What differs
+   between the two is the surface below, and only that. */
+.pagemetrics-tooltip {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    width: max-content;
     max-width: 240px;
     padding: 6px 8px;
     border-radius: var(--typo3-component-border-radius, 4px);
-    background: var(--typo3-component-bg, #fff);
-    border: 1px solid var(--typo3-component-border-color, #cbcbcb);
-    box-shadow: var(--typo3-component-box-shadow-flyout, 0 2px 8px rgba(0, 0, 0, 0.15));
     font-size: 0.6875rem;
     line-height: 1.4;
-    color: var(--typo3-text-color-variant, #6a7085);
     pointer-events: none;
 }
 
-.pagemetrics-stat-tooltip-title {
+/* The icon of the thing being explained, cloned from it or drawn from the
+   same path data, so the tooltip and its subject are recognisably one
+   thing. Decorative: the line beside it says the same in words. */
+.pagemetrics-tooltip-title,
+.pagemetrics-sparkline-tooltip-annotation {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.pagemetrics-tooltip-title {
     font-weight: 600;
+}
+
+.pagemetrics-tooltip-title svg,
+.pagemetrics-sparkline-tooltip-annotation svg {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+}
+
+/* A flyout like the backend's own, for a tooltip that stands on the page. */
+.pagemetrics-tooltip-card {
+    background: var(--typo3-component-bg, #fff);
+    border: 1px solid var(--typo3-component-border-color, #cbcbcb);
+    box-shadow: var(--typo3-component-box-shadow-flyout, 0 2px 8px rgba(0, 0, 0, 0.15));
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-tooltip-card .pagemetrics-tooltip-title {
     color: var(--typo3-text-color-base, #14213d);
+}
+
+/* Inverted, for the one that stands on a drawn chart. A card there would be
+   light on light over the filled area, with nothing but its own border
+   holding it apart from the curve it is explaining.
+
+   The two tokens are each other's inverse and flip together, which is what
+   keeps this a chip in both schemes. Pairing the background with a literal
+   white left it light-on-light as soon as the backend went dark. */
+.pagemetrics-tooltip-inverted {
+    background: var(--typo3-text-color-base, #14213d);
+    color: var(--typo3-component-bg, #fff);
+}
+
+/* Its own element on <body>, because the popover clips its overflow. */
+.pagemetrics-hint-tooltip {
+    position: fixed;
+    z-index: 2100;
 }
 
 .pagemetrics-popover-stat-icon {
@@ -873,7 +949,13 @@
    meaning visually and the title explains it on hover, but neither is a name
    a screen reader can read out, so without this the row would be five bare
    numbers. */
-.pagemetrics-popover-stat-label {
+/* Drawn as an icon or a short label, read out as a full sentence. Three
+   controls do this now, so they share the rule rather than a third copy of
+   it: the stat chips, the source marker and a breakdown row that explains
+   itself. */
+.pagemetrics-popover-stat-label,
+.pagemetrics-popover-source-label,
+.pagemetrics-popover-breakdown-hint {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -889,6 +971,14 @@
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--typo3-text-color-base, #14213d);
+}
+
+/* A day the import has not covered yet. It keeps its place in the row, so the
+   chip beside it is never read as the most recent one, but it carries no
+   number and should not be weighted like the chips that do. */
+.pagemetrics-popover-stat-value-empty {
+    font-weight: 400;
+    color: var(--typo3-text-color-variant, #6a7085);
 }
 
 .pagemetrics-unresolved-hint {
@@ -977,8 +1067,7 @@
     .pagemetrics-tile:hover .pagemetrics-tile-icon,
     .pagemetrics-tile:focus-visible .pagemetrics-tile-icon {
         transform: scale(1.1);
-    }
-}
+    }}
 
 @media (prefers-reduced-motion: reduce) {
     .pagemetrics-skeleton-icon,
@@ -986,8 +1075,7 @@
     .pagemetrics-period-skeleton {
         animation: none;
         background-position: 50% 0;
-    }
-}
+    }}
 
 @keyframes pagemetrics-skeleton-shimmer {
     0% {
@@ -1015,13 +1103,21 @@
     container-type: inline-size;
 }
 
+/* A column, so the date mark can sit at its foot under the icon: both are
+   one per card, and the mark read as one more row while it stood in the
+   list beside them. */
 .pagemetrics-widget-aside-icon-col {
     display: flex;
+    flex-direction: column;
     flex-shrink: 0;
     align-items: flex-start;
     padding-right: 24px;
     margin-right: 16px;
     border-right: 1px solid var(--typo3-component-border-color, #cbcbcb);
+}
+
+.pagemetrics-widget-aside-icon-col .pagemetrics-freshness {
+    margin-top: auto;
 }
 
 .pagemetrics-widget-aside-icon {
@@ -1035,9 +1131,19 @@
     color: var(--pm-accent);
 }
 
+/* A column rather than a stack, so the date mark below can be pushed to the
+   foot of the card instead of trailing the last row like one more of them. */
 .pagemetrics-widget-aside-content {
+    display: flex;
     flex: 1 1 auto;
+    flex-direction: column;
     min-width: 0;
+}
+
+.pagemetrics-widget-aside-content .pagemetrics-widget-site {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
 }
 
 /* EXT:dashboard's own .widget-table-wrapper cancels the widget's ambient
@@ -1062,9 +1168,28 @@
     --pm-accent: var(--pm-sentiment-neutral);
 }
 
+/* Too narrow for a column beside the rows. The icon goes, because the card's
+   title says the same thing in words, but the date mark stays: it is the one
+   thing here that can say the numbers stopped moving. So the aside stacks
+   instead of hiding, and the mark lands under the list rather than beside
+   it. */
 @container (max-width: 420px) {
+    .pagemetrics-widget-aside {
+        flex-direction: column-reverse;
+    }
+
     .pagemetrics-widget-aside-icon-col {
+        padding-right: 0;
+        margin-right: 0;
+        border-right: 0;
+    }
+
+    .pagemetrics-widget-aside-icon {
         display: none;
+    }
+
+    .pagemetrics-widget-aside-icon-col .pagemetrics-freshness {
+        margin-top: 8px;
     }
 }
 
@@ -1251,8 +1376,7 @@
         50% {
             opacity: 0.45;
         }
-    }
-}
+    }}
 
 .pagemetrics-day {
     padding: 12px 16px 16px;
@@ -1329,7 +1453,7 @@
 .pagemetrics-day-event-icon {
     display: flex;
     flex: 0 0 auto;
-    color: var(--pm-annotation-color, var(--typo3-text-color-variant, #6a7085));
+    color: var(--typo3-text-color-variant, #6a7085);
 }
 
 .pagemetrics-day-event-icon svg {
@@ -1344,11 +1468,11 @@
     gap: 4px 6px;
 }
 
-/* The kind of event in words. The marker's colour says it too and says it
-   to nobody using a screen reader or a forced-colours mode. */
+/* The kind of event in words, which is the only place it is said: the marker
+   takes its surface's colour and carries no category of its own. */
 .pagemetrics-day-event-kind {
     font-weight: 600;
-    color: var(--pm-annotation-color, var(--typo3-text-color-variant, #6a7085));
+    color: var(--typo3-text-color-variant, #6a7085);
 }
 
 .pagemetrics-day-event-range {
@@ -1432,237 +1556,6 @@
 }
 
 /* ==========================================================================
-   Backend module: the page view
-   ========================================================================== */
-
-/* The module has the width the popover never had, which is the whole reason
-   it exists. Capped anyway: a metric table stretched across an ultrawide
-   display puts its label and its figure so far apart that the eye loses the
-   row it is on. */
-.pagemetrics-module {
-    max-width: 72rem;
-}
-
-/* Wide enough not to read as a broken column beside a full-width table, and
-   still capped: prose running the width of a 1800px display is unreadable in
-   the other direction. 60ch was right when the module was capped at 72rem and
-   wrong the moment the pages and compare views lifted that cap. */
-.pagemetrics-module-intro {
-    max-width: 90ch;
-    color: var(--typo3-text-color-variant, #515151);
-}
-
-/* Taller than the sparkline in a tile popover, because this one is read
-   rather than glanced at. The chart itself is drawn by the same
-   initializeStaticCharts() the dashboard widgets use. */
-.pagemetrics-module-chart {
-    margin-block: 1.5rem;
-}
-
-.pagemetrics-module-chart .pagemetrics-sparkline {
-    height: 180px;
-}
-
-.pagemetrics-module-metric {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 600;
-}
-
-.pagemetrics-module-metric-icon {
-    display: inline-flex;
-    color: var(--pm-accent, currentColor);
-}
-
-/* The provider's own description, on its own line under the label: this is
-   the text the tile popover hides behind a hover, and putting it back behind
-   one here would be the same mistake in a new place. */
-.pagemetrics-module-metric-description {
-    display: block;
-    margin-block-start: 0.125rem;
-    font-weight: 400;
-    font-size: 0.8125rem;
-    color: var(--typo3-text-color-variant, #515151);
-}
-
-.pagemetrics-module-table th[scope="row"] {
-    max-width: 32rem;
-}
-
-/* ------------------------------------------------------------------------
-   The way into the backend module, from the page module's tile row and from
-   the foot of a dashboard widget. Issue #73.
-   ------------------------------------------------------------------------ */
-
-/* An offer, not a call to action: it takes the size and the colour of the
-   date mark it sits beside, and only gains weight once it is hovered or
-   focused. A button here would push, and the tiles are what the reader came
-   for. */
-.pagemetrics-module-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 9px;
-    border-radius: 999px;
-    font-size: 0.6875rem;
-    font-weight: 500;
-    color: var(--typo3-text-color-variant, #6a7085);
-    text-decoration: none;
-    transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.pagemetrics-module-link:hover,
-.pagemetrics-module-link:focus-visible {
-    color: var(--typo3-text-color-base, #14213d);
-    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 8%, transparent);
-    text-decoration: none;
-}
-
-.pagemetrics-module-link-icon {
-    display: inline-flex;
-}
-
-.pagemetrics-module-link-icon svg {
-    width: 14px;
-    height: 14px;
-}
-
-/* In a widget the link belongs under the widget's own content, on the same
-   line as nothing else, so it reads as the end of the block rather than as
-   another row of it. */
-.pagemetrics-widget-foot {
-    margin-top: 8px;
-}
-
-/* The tile row is right-aligned as a whole, so the link needs no alignment
-   of its own there; a widget's foot is left-aligned like everything above
-   it, and the padding that makes the row's pill sit right would push it off
-   that edge. */
-.pagemetrics-widget-foot .pagemetrics-module-link {
-    padding-inline: 0;
-}
-
-/* ---------------------------------------------------------------------------
-   Compare view (backend module)
-   --------------------------------------------------------------------------- */
-
-.pagemetrics-compare-picker {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.75rem;
-    margin-block: 1rem;
-}
-
-/* A real heading, so the picker is a landmark the keyboard and the screen
-   reader can reach, at the size of the label it actually is. */
-.pagemetrics-compare-picker-label {
-    margin: 0;
-    font-size: 0.875rem;
-    font-weight: 600;
-}
-
-.pagemetrics-compare-baselines {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-/* The date range under the column head, so the head itself can keep saying
-   which period it is rather than only when it ran. */
-.pagemetrics-compare-range {
-    display: block;
-    font-weight: 400;
-    font-size: 0.75rem;
-    color: var(--typo3-text-color-variant, #515151);
-}
-
-/* A movement that cleared the metric's threshold, named in words next to the
-   badge that colours it: the colour is the second carrier of that fact and
-   never the only one. */
-/* Named for what it is, not for the view it appeared in first: a judgement
-   stated in words beside the badge that colours it. The compare view and the
-   pages table make the same kind of statement, and a class called "compare"
-   in a table of pages would send the next reader looking for a comparison. */
-.pagemetrics-verdict {
-    font-weight: 600;
-}
-
-/* Everything that did not clear it, and the two states that could not be
-   judged at all. Quiet on purpose: a percentage that reads as loudly as a
-   significant one is the misreading this view exists to prevent. */
-.pagemetrics-quiet {
-    color: var(--typo3-text-color-variant, #515151);
-}
-
-/* ==========================================================================
-   Backend module: the pages view
-   ========================================================================== */
-
-/* The 72rem cap the rest of the module wears keeps a label near its figure
-   on a two-column table. This one is as wide as the site has metrics, and
-   capping it would only move the scrollbar inside the table. */
-.pagemetrics-module-wide {
-    max-width: none;
-}
-
-/* Figures read down the column, so the header sits over the last digit
-   rather than over the first. */
-.pagemetrics-pages-table th[scope="col"] {
-    vertical-align: bottom;
-}
-
-.pagemetrics-pages-table th[scope="row"] {
-    max-width: 24rem;
-    font-weight: 600;
-}
-
-
-.pagemetrics-pages-sort {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.25rem;
-    color: inherit;
-    text-decoration: none;
-}
-
-.pagemetrics-pages-sort:hover,
-.pagemetrics-pages-sort:focus-visible {
-    text-decoration: underline;
-}
-
-/* The sorted column is marked by the arrow beside its label and by the
-   underline, never by the colour alone: a reader who cannot tell the two
-   greys apart still has the arrow and the aria-sort on the header. */
-.pagemetrics-pages-sort-active {
-    text-decoration: underline;
-}
-
-.pagemetrics-pages-pager {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-block-start: 1rem;
-}
-
-.pagemetrics-pages-pager nav {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.pagemetrics-pages-pager-position {
-    color: var(--typo3-text-color-variant, #515151);
-}
-
-
-/* ==========================================================================
    Insight widget: what changed, as sentences
    ========================================================================== */
 
@@ -1710,194 +1603,4 @@
    one more series in it. */
 .pagemetrics-sparkline-legend-note {
     flex-basis: 100%;
-}
-
-/* ==========================================================================
-   Pages table: the shape beside the figure
-   ========================================================================== */
-
-/* Narrow and short on purpose. This is a shape in a table cell, not a chart:
-   it answers "falling or not" at a glance and leaves the question of how far
-   to the percentage beside it. Without the height the dashboard chart's own
-   260px would apply and every row would be a screenful. */
-.pagemetrics-pages-sparkline {
-    width: 96px;
-    margin-inline-start: auto;
-}
-
-.pagemetrics-pages-sparkline .pagemetrics-sparkline {
-    height: 24px;
-}
-
-/* The renderer draws a date axis under every chart it makes. Twenty-five of
-   them would repeat the period the prose above the table already states once. */
-.pagemetrics-pages-sparkline .pagemetrics-sparkline-dates {
-    display: none;
-}
-
-.pagemetrics-pages-sorted-cell {
-    white-space: nowrap;
-}
-
-/* The descriptions, once above the table rather than once in every column
-   header. That repetition was most of why the table had to be scrolled
-   sideways, and a hover would have been the mistake the module exists to
-   avoid. */
-.pagemetrics-pages-glossary {
-    display: grid;
-    gap: 0.25rem 1.5rem;
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    margin-bottom: 1rem;
-}
-
-.pagemetrics-pages-glossary dt {
-    font-weight: 600;
-}
-
-.pagemetrics-pages-glossary dd {
-    margin: 0;
-    color: var(--typo3-text-color-variant, #6a7085);
-}
-
-/* The record note under a metric's figure in the module: the same shape as
-   the description above it, because it is the same kind of thing, a sentence
-   that belongs to the number rather than a second number beside it. */
-.pagemetrics-module-metric-note {
-    display: block;
-    margin-block-start: 0.125rem;
-    font-weight: 400;
-    font-size: 0.8125rem;
-    color: var(--typo3-text-color-variant, #515151);
-}
-
-/* ------------------------------------------------------------------------
-   The module's metric blocks. What the page-header tile keeps behind a
-   hover, printed: the description, the seven qualifying figures and the
-   crawler breakdown. Issue #93.
-   ------------------------------------------------------------------------ */
-
-/* A wall of cards rather than a single column: a block is about 24rem of
-   readable width, and on a wide backend two or three sit side by side
-   without any of them being stretched to a line nobody can scan. The module
-   itself is capped at 72rem, so this tops out at three. */
-.pagemetrics-module-metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(24rem, 100%), 1fr));
-    gap: 1rem;
-    margin-block-end: 1.5rem;
-}
-
-/* The accent is the metric's own colour, carried on the left edge the way
-   the tile carries it behind its icon: the block and the tile are the same
-   metric, and recognising that is the whole reason this view repeats what
-   the popover said. */
-.pagemetrics-module-metric-block {
-    padding: 1rem 1.25rem;
-    border: 1px solid var(--typo3-component-border-color, #d7d7d7);
-    border-inline-start: 3px solid var(--pm-accent, currentColor);
-    border-radius: 4px;
-    background: var(--typo3-component-bg, #fff);
-}
-
-.pagemetrics-module-metric-heading {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-}
-
-.pagemetrics-module-metric-block .pagemetrics-module-metric-description {
-    margin-block: 0.375rem 0;
-    max-width: 48ch;
-}
-
-/* The headline and its badge on one line, sized so it is read as the
-   block's answer and the figures below it as the qualification. */
-.pagemetrics-module-metric-figure {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-block: 0.75rem 0;
-    font-size: 1.75rem;
-    font-weight: 600;
-    line-height: 1.2;
-}
-
-.pagemetrics-module-metric-comparison {
-    margin-block: 0.25rem 0;
-    font-size: 0.8125rem;
-    color: var(--typo3-text-color-variant, #515151);
-}
-
-/* Each figure with the sentence that says what it is, which is the part a
-   tooltip could only give one at a time. Two columns at the block's own
-   width, one on a narrow backend. */
-.pagemetrics-module-metric-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
-    gap: 0.75rem;
-    margin-block: 1rem 0;
-}
-
-.pagemetrics-module-metric-stat dt {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: var(--typo3-text-color-variant, #515151);
-}
-
-.pagemetrics-module-metric-stat dd {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-}
-
-.pagemetrics-module-metric-stat-hint {
-    display: block;
-    margin-block-start: 0.125rem;
-    font-weight: 400;
-    font-size: 0.75rem;
-    text-transform: none;
-    letter-spacing: normal;
-}
-
-.pagemetrics-module-metric-breakdown-heading {
-    margin-block: 1rem 0.5rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: var(--typo3-text-color-variant, #515151);
-}
-
-/* Label and figure on one row with the gap between them doing the aligning,
-   the way the popover draws the same list: these are parts of one number,
-   so they are read down the right edge rather than across. */
-.pagemetrics-module-metric-breakdown {
-    margin: 0;
-}
-
-.pagemetrics-module-metric-breakdown-part {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1rem;
-    padding-block: 0.25rem;
-    border-block-start: 1px solid var(--typo3-component-border-color, #d7d7d7);
-}
-
-.pagemetrics-module-metric-breakdown-part dt {
-    font-weight: 400;
-    color: var(--typo3-text-color-variant, #515151);
-}
-
-.pagemetrics-module-metric-breakdown-part dd {
-    margin: 0;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
 }

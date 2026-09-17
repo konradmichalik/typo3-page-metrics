@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Persistence;
 
 use DateTimeImmutable;
-use TYPO3\CMS\Core\Database\ConnectionPool;
+use Doctrine\DBAL\ParameterType;
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
+use TYPO3\CMS\Core\Database\{Connection, ConnectionPool};
 
 use function hash;
 use function substr;
@@ -43,6 +45,67 @@ class BotAgentDailyRepository
     public function __construct(
         private readonly ConnectionPool $connectionPool,
     ) {}
+
+    /**
+     * Which named agent made the hits a bot bucket counts, summed over the
+     * range and the pages, as bucket => agent => hits.
+     *
+     * Several buckets in one query rather than one call each, for the same
+     * reason DailyMetricsRepository::sumsByMetricAndDimensionPrefix() takes
+     * a list of metrics: this answers a popover most readers never open, and
+     * a tile row must not pay an aggregate scan per tile for it.
+     *
+     * No LIMIT, although only the strongest few are ever shown. The agent
+     * column holds a needle from BotTaxonomy's curated lists, never a raw
+     * User-Agent header, so a bucket has tens of possible values rather than
+     * the unbounded set the header itself would give - and the caller needs
+     * the whole set anyway to state what the remainder below its cut is made
+     * of.
+     *
+     * Ordered by hits within a bucket so the caller's cut keeps the agents
+     * that matter, with the agent name as tie-break so equal counts do not
+     * reorder themselves between two renders of the same period.
+     *
+     * Page-scoped: the page-zero rollup rows this table also carries are
+     * only ever returned where a caller asks for page zero itself.
+     *
+     * @param list<int>    $pageUids
+     * @param list<string> $buckets
+     *
+     * @return array<string, array<string, int>> bucket => agent => hits, only for buckets and agents with at least one row
+     */
+    public function agentSums(array $pageUids, int $languageUid, array $buckets, DateRange $range): array
+    {
+        if ([] === $pageUids || [] === $buckets) {
+            return [];
+        }
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $rows = $queryBuilder
+            ->select('bucket', 'agent')
+            ->addSelectLiteral('SUM('.$queryBuilder->quoteIdentifier('hits').') AS total')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->in('page_uid', $queryBuilder->createNamedParameter($pageUids, Connection::PARAM_INT_ARRAY)),
+                $queryBuilder->expr()->eq('sys_language_uid', $queryBuilder->createNamedParameter($languageUid, ParameterType::INTEGER)),
+                $queryBuilder->expr()->in('bucket', $queryBuilder->createNamedParameter($buckets, Connection::PARAM_STR_ARRAY)),
+                $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($range->from->format('Y-m-d'))),
+                $queryBuilder->expr()->lte('date', $queryBuilder->createNamedParameter($range->until->format('Y-m-d'))),
+            )
+            ->groupBy('bucket', 'agent')
+            ->orderBy('bucket')
+            ->addOrderBy('total', 'DESC')
+            ->addOrderBy('agent')
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        $sums = [];
+        foreach ($rows as $row) {
+            $sums[(string) $row['bucket']][(string) $row['agent']] = (int) $row['total'];
+        }
+
+        return $sums;
+    }
 
     public function upsert(string $siteIdentifier, int $pageUid, int $languageUid, string $bucket, string $agent, DateTimeImmutable $date, int $hits, int $hitsSuspicious): void
     {

@@ -16,8 +16,11 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Analysis\Taxonomy;
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Analysis\Parser\LogLine;
 use KonradMichalik\Typo3PageMetrics\Analysis\Taxonomy\{AgentMatcher, BotTaxonomy, Bucket};
-use PHPUnit\Framework\Attributes\{CoversClass, Test};
+use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+
+use function sprintf;
 
 /**
  * BotTaxonomyTest.
@@ -32,6 +35,46 @@ final class BotTaxonomyTest extends TestCase
     protected function setUp(): void
     {
         $this->taxonomy = new BotTaxonomy(new AgentMatcher());
+    }
+
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function aiNeedleLists(): iterable
+    {
+        yield 'chatbots' => ['AI_CHATBOTS'];
+        yield 'crawlers' => ['AI_CRAWLERS'];
+    }
+
+    /**
+     * The two AI buckets list their agents by name in a tile popover, so a
+     * needle without a description is a row a reader can hover for nothing.
+     * The map is curated by hand and the needle lists grow whenever a vendor
+     * ships a new crawler, which is exactly when the two drift apart.
+     */
+    #[Test]
+    #[DataProvider('aiNeedleLists')]
+    public function everyAgentOfATileBucketHasADescription(string $constant): void
+    {
+        $needles = (new ReflectionClass(BotTaxonomy::class))->getConstant($constant);
+        self::assertIsArray($needles);
+        self::assertNotSame([], $needles);
+
+        foreach ($needles as $needle) {
+            self::assertIsString($needle);
+            self::assertNotNull(
+                BotTaxonomy::describe($needle),
+                sprintf('Agent "%s" is matched into a tile bucket but has no curated description.', $needle),
+            );
+        }
+    }
+
+    #[Test]
+    public function describesNothingForAnAgentItHasNeverHeardOf(): void
+    {
+        // Null rather than a guessed sentence: an agent absent from the map
+        // is one nobody has curated, not necessarily a suspicious one.
+        self::assertNull(BotTaxonomy::describe('SomeVendorBot'));
     }
 
     #[Test]

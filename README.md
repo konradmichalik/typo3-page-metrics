@@ -45,6 +45,9 @@ doing" without leaving the backend.
 - Goal conversions per page, from Matomo goals or GA4 key events, as a tile
   of their own beside the traffic ones, with optional revenue — see
   [Goal tiles](docs/page-tiles.md#goal-tiles)
+- Bot traffic per page from the access log, folded into one tile, with AI
+  chatbots and AI crawlers as tiles of their own that name the bots behind
+  the number — see [Bot traffic](docs/page-tiles.md#bot-traffic)
 - Annotations, imported (e.g. Matomo release markers) or created by hand,
   categorised, optionally spanning days or scoped to one page, and marked on
   every sparkline — see [Annotations](docs/page-tiles.md#annotations)
@@ -109,8 +112,7 @@ widgets.
 | [Access log provider](docs/providers/accesslog.md) | Site configuration, what it can and cannot measure, bot/asset filtering |
 | [Dashboard widgets](docs/dashboard-widgets.md) | The full EXT:dashboard widget catalog, their settings and the bundled preset |
 | [Page module tiles](docs/page-tiles.md) | The period switch, the subpages toggle, sparkline popovers and annotations |
-| [Backend module](docs/backend-module.md) | The extension's own module under **Web**, its period and its access rules |
-| [Security](docs/security.md) | Restricting tile and module visibility per backend user group |
+| [Security](docs/security.md) | Restricting tile visibility per backend user group |
 | [Registering custom tiles](docs/extending.md) | Contributing an additional tile via `ModifyMetricTilesEvent`, without implementing `MetricProviderInterface` |
 
 ## 🧭 Related extensions

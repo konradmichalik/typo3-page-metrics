@@ -9,23 +9,24 @@
                         <f:if condition="{siteIteration.total} > 1">
                             <h3 class="pagemetrics-widget-site-title">{siteTiles.site.identifier}</h3>
                         </f:if>
-                        <div class="pagemetrics-tiles pagemetrics-tiles-static" data-labels="{f:format.json(value: sparklineLabels)}" data-annotations="{f:format.json(value: siteTiles.annotations)}">
-                            <f:for each="{siteTiles.tiles}" as="tile">
-                                <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-label="{tile.label}" data-description="{tile.description}" data-unit="{tile.unit.value}" data-external-link="{tile.externalLink}" data-sparkline="{f:format.json(value: tile.sparkline)}" data-redirect-share="{tile.redirectSharePercent}" data-record-value="{tile.recordFormattedValue}" data-breakdown="{f:format.json(value: tile.breakdown)}" data-benchmark-median="{tile.benchmark.formattedMedian}" data-benchmark-band="{tile.benchmark.band.value}" data-benchmark-pages="{tile.benchmark.pageCount}" style="--pm-accent: {tile.color}" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">
-                                    <div class="pagemetrics-tile-head">
-                                        <span class="pagemetrics-tile-icon"><core:icon identifier="{tile.icon}" size="medium" alternativeMarkupIdentifier="inline" /></span>
-                                        <div class="pagemetrics-tile-text">
-                                            <span class="pagemetrics-tile-main">
-                                                <span class="pagemetrics-tile-value">{tile.formattedValue}</span>
-                                            </span>
-                                            <span class="pagemetrics-tile-label">{tile.label}</span>
+                        <div class="pagemetrics-tiles-row">
+                            <div class="pagemetrics-tiles pagemetrics-tiles-static" data-labels="{f:format.json(value: sparklineLabels)}" data-annotations="{f:format.json(value: siteTiles.annotations)}">
+                                <f:for each="{siteTiles.tiles}" as="tile">
+                                    <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-label="{tile.label}" data-description="{tile.description}" data-unit="{tile.unit.value}" data-external-link="{tile.externalLink}" data-source="{tile.source}" data-sparkline="{f:format.json(value: tile.sparkline)}" data-redirect-share="{tile.redirectSharePercent}" data-record-value="{tile.recordFormattedValue}" data-breakdown="{f:format.json(value: tile.breakdown)}" data-benchmark-median="{tile.benchmark.formattedMedian}" data-benchmark-band="{tile.benchmark.band.value}" data-benchmark-pages="{tile.benchmark.pageCount}" style="--pm-accent: {tile.color}" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">
+                                        <div class="pagemetrics-tile-head">
+                                            <span class="pagemetrics-tile-icon"><core:icon identifier="{tile.icon}" size="medium" alternativeMarkupIdentifier="inline" /></span>
+                                            <div class="pagemetrics-tile-text">
+                                                <span class="pagemetrics-tile-main">
+                                                    <span class="pagemetrics-tile-value">{tile.formattedValue}</span>
+                                                </span>
+                                                <span class="pagemetrics-tile-label">{tile.label}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </f:for>
+                                </f:for>
+                            </div>
+                            <f:render partial="DataFreshness" arguments="{freshness: siteTiles.dataFreshness}" />
                         </div>
-                        <f:render partial="DataFreshness" arguments="{freshness: siteTiles.dataFreshness}" />
-                        <f:render partial="WidgetModuleLink" arguments="{urls: moduleUrls, site: siteTiles.site}" />
                     </div>
                 </f:for>
             </div>

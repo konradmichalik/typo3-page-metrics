@@ -25,10 +25,9 @@ namespace KonradMichalik\Typo3PageMetrics\Domain\Enum;
  * it is worthless: "Release", "release" and "Deployment" become three
  * categories describing one thing.
  *
- * The icon lives here because it is a property of the category. The colour
- * does not: it is written once per category in page-metrics.css, where it
- * can be a light-dark() pair and follow a custom backend theme, neither of
- * which a hex string in PHP could do.
+ * The icon lives here because it is a property of the category. A colour
+ * does not, and no longer exists: a marker takes the colour of the surface
+ * it is drawn on, and the kind of event is carried in words instead.
  *
  * @api
  *

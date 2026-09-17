@@ -33,12 +33,12 @@ falls in the shown range, and an annotation covering several days is drawn
 as a strip along the bottom of the chart spanning them, rather than as a
 tick on the day it started. Along the bottom rather than across the plot:
 the strip says which days without ever sitting between the reader and the
-curve. Both take the chart's own colour here, since this popover carries no
-legend for a category colour to be looked up in, and the kind of event is
-named in words in the tooltip anyway. The
-[dashboard chart](dashboard-widgets.md) keeps the category colours, because
-it does have a legend. Hovering or focusing a marked date shows the kind of
-event and its text in the tooltip alongside that day's value.
+curve. Both take the chart's own colour, here and in the
+[dashboard chart](dashboard-widgets.md) alike: a marker is context for the
+curve it stands on, and a category hue over that line reads as a second
+series competing with it. Which kind of event it was is in the tooltip, in
+words. Hovering or focusing a marked date shows it there alongside that
+day's value.
 
 ![Sparkline popover for the Visits tile, showing last day/previous day/peak/average and a dated tooltip](img/page-tiles-sparkline-popover.png)
 
@@ -46,7 +46,11 @@ The sparkline carries no scale of its own. It is a filled silhouette of the peri
 
 Above the chart the popover shows the period's figures as an icon and a number each: the most recent day, the day before it, the peak, the average, and the share that arrived through a redirect. Hovering one shows its name and what it counts, in a tooltip of the extension's own rather than the browser's title attribute, which waits about a second and runs both together into one line. Keyboard focus shows the same tooltip, and a tap toggles it, since a touch device has no hover at all. The written name and explanation are in the markup either way, so a screen reader reads "Peak. The highest value a single day reached. 162" rather than a bare number. They are simply not drawn: five two-word labels wrapped the row onto three uneven lines and pushed one value out of alignment with the rest.
 
-That tooltip is the house style for every explanation in this extension, not just the popover's figures: the trend badge on a tile names both periods and their values, the date mark names the day the numbers are from, and the fold-away control says which way it will fold. All of them are written the same way in the markup, which is what keeps them behaving the same way.
+In the popover's top right corner sits the answer to where the numbers came from. On a tile whose provider has an interface of its own, that is the link out of the backend, and it names the destination: "Open in Matomo", not "Open in the analytics tool". On a tile without one, an access-log tile or a bot tile, a quieter marker takes the same place and names the source in its tooltip. The question only becomes interesting once a site configures two providers, which is exactly when it becomes unavoidable: Matomo and an access log both count page views, both tiles are called "Page views", and the two numbers differ for reasons that are entirely correct. A tile contributed by a listener names no source, because it comes from no provider.
+
+That tooltip is the house style for every explanation in this extension, not just the popover's figures: the trend badge on a tile names both periods and their values, the date mark names the day the numbers are from, and the fold-away control says which way it will fold. All of them are written the same way in the markup, which is what keeps them behaving the same way. Each one opens with the icon of whatever it explains, cloned from the control itself rather than named a second time, so the tooltip and its subject read as one thing.
+
+The readout that follows the pointer across a chart is the same tooltip, down to the measure, the padding and that icon line. It differs in one thing, its surface: it stands on a drawn curve, where a light card would have nothing but its own border holding it apart from the line it is explaining, so it stays an inverted chip.
 
 The browser's own `title` attribute is not used for any of them. It waits about a second before appearing, cannot be styled to match the backend, and runs a heading and its explanation together into a single line.
 
@@ -72,13 +76,27 @@ The dashboard's own tiles widget does not show the comparison at all. It renders
 
 A page's tiles answer how it performs with people. Crawler traffic is a different question, and when the access-log provider is configured it used to arrive as five more tiles of the same size and weight beside the two an editor came for, pushing the answer off the end of the row.
 
-Those five now fold into one **Bot traffic** tile carrying their total, in grey rather than a colour of its own, and the popover lists what it is made of. Every bucket is listed, including the ones at zero: a bucket that is absent and a bucket reading zero answer different questions.
+Those five now fold into one **Bot traffic** tile carrying their total, in grey rather than a colour of its own, and the popover lists what it is made of. Every bucket is listed, including the ones at zero: a bucket that is absent and a bucket reading zero answer different questions. Each row says what its bucket counts when hovered or focused, in the same words that bucket's own tile uses, because "Social/link previews" is a label rather than an explanation.
 
 The tile sits at the end of the row, after the rate metrics, whatever sort order the buckets themselves declare. It is the one tile that is not about the site's readers, so it reads as a footnote to the row rather than as a member of it.
 
 Its change badge stays grey even when the number rises. Colour says whether a metric got better, and no provider can claim that more crawler hits are an improvement; the arrow still says which way it moved.
 
 Nothing about the import changes. Each bucket is still fetched, resolved and stored under its own identifier exactly as before, and the summary is assembled when the tiles are built. See [bot traffic metrics](providers/accesslog.md#bot-traffic-metrics) for what each bucket counts.
+
+### AI chatbots and AI crawlers
+
+Two of the five buckets also stand on their own, in tiles directly before the summary: **AI chatbots**, which fetch a page live when someone asks a chatbot about it, and **AI crawlers**, which collect content for model training or an AI search index. Whether AI reads a page, and which one, is a question about the page itself.
+
+The popover names the bots behind the number, strongest first, from the agent detail the import records beside each bucket. Five by name, the rest as one part, under the names the vendors publish (`GPTBot`, `ClaudeBot`, `ChatGPT-User`). Where those fall short of the headline, the gap is listed too: bucket totals and agent detail are written at different moments of an import, and a list of 20 under a headline of 30 would read as a fault instead of as a gap.
+
+A name on its own only helps a reader who has met that bot before, so every row carries what it is: hovering or focusing "CCBot" says it is Common Crawl's crawler and that its archive is widely reused as AI training data. The folded row names the bots it stands for instead. The descriptions are curated per agent and cover all but one of the bots either AI bucket can match; a crawler nobody has written a line for yet carries no tooltip rather than a guessed one.
+
+Both keep counting towards the bot traffic tile, so the same hits appear twice in the row. The AI tiles answer who is coming, the bot traffic tile answers how much of this was not a person, and the second question contains the first. Each tile's description says so.
+
+A tile at zero is still shown. A row whose tiles come and go with the period makes two pages impossible to compare, and "no AI has been here" is an answer.
+
+Neither carries a benchmark against the rest of the site: being crawled more than other pages is not an achievement, and not something an editor can act on.
 
 A provider decides which side of this its metrics fall on, see [Audience and machine metrics](extending.md#audience-and-machine-metrics).
 
@@ -157,16 +175,6 @@ The date comes from the import's own resume cursor, which every run records, rat
 More than two days behind, the mark changes to a clock and spells the warning out in words beside it. That is the point at which it stops being a footnote, so it stops behaving like one. At that point a scheduled import that simply has not run yet is no longer the likely explanation, and without this the backend would go on showing the last numbers it was given indefinitely, without ever saying they had stopped moving.
 
 This is also why the popover's first two figures are called "Last day" and "Previous day" rather than "Today" and "Yesterday": they are the last two days of the selected period, which is rarely today and yesterday.
-
-## Opening the full view
-
-Beside the date mark sits a link into **Web → Page metrics**, this extension's own backend module, opened on the page the tiles are about. The tile row answers one question at a glance; the module answers the ones that follow it, with every metric as a labelled table, the chart across the full width, the period's markers as a list and a comparison against the period before.
-
-The link carries the page and nothing else. The period chosen above the tiles does not travel with it, because the module keeps its own period as a stored per-user setting rather than as URL state: a query parameter named like one of those settings is persisted before the module is even reached, so a link carrying a period would not pre-select one for that visit, it would overwrite the period that reader gets on every later visit, including the ones opened from the module menu. The module names its period in the docheader, so a period that differs from the tile row's is visible rather than silent, and changing it is one click.
-
-No link appears where the module would refuse the reader: where `tx_typo3pagemetrics.disabled = 1` is set for them (see [Security](security.md)), where none of their groups lists the module (it is declared `access = user`, so a non-admin needs it granted), or where they have no show permission on the page itself. A link to a page that answers "you may not see this" is worse than no link at all.
-
-One case it does not cover: `options.hideModules = web_pagemetrics` takes the entry out of the module menu but leaves the route open, so a user who has that setting without the TSconfig switch still gets this link, and the module still opens for them. That is the same split [Security](security.md) describes, where only the TSconfig switch is a boundary and the module setting tidies the menu.
 
 ## Days without data
 
@@ -253,11 +261,12 @@ and stays editable where it is. Moving those onto the storage page is optional.
 
 ### Category
 
-Every annotation has a category, which decides the colour and the icon it is
-drawn with: release, campaign, content change, redesign, incident, SEO change
-or external event. A marker's category is always spelled out in its tooltip
-as well, so the colour is never the only thing carrying it, and the chart
-widget can filter its markers down to a single category.
+Every annotation has a category, which decides the icon it is drawn with:
+release, campaign, content change, redesign, incident, SEO change or external
+event. The category is carried in words, never in a colour: a marker takes
+the colour of the chart it sits on, and its kind is spelled out in its
+tooltip and in the day panel. The chart widget can filter its markers down to
+a single category.
 
 Annotations that predate this field, and anything imported from a provider
 that has no notion of a kind (Matomo's own annotations, for instance), read

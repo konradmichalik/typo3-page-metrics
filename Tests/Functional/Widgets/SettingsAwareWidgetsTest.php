@@ -308,6 +308,10 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('pagemetrics-trend-negative', $content);
         self::assertStringNotContainsString('Restricted', $content);
         self::assertStringContainsString('pagemetrics-widget-trend-sentiment-negative', $content);
+        // Declined, so the widget's own icon points down. Read off the aside
+        // alone: every row carries a direction arrow of its own, and those
+        // are the two icons this one must not be confused with.
+        self::assertStringContainsString('tabler-trending-down', self::asideOf($content));
     }
 
     public function testTrendWidgetListsTheBiggestGainWhenConfigured(): void
@@ -326,6 +330,7 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringNotContainsString('About', $content);
         self::assertStringContainsString('pagemetrics-widget-trend-sentiment-positive', $content);
         self::assertStringNotContainsString('pagemetrics-widget-trend-sentiment-negative', $content);
+        self::assertStringContainsString('tabler-trending-up', self::asideOf($content));
     }
 
     public function testTrendWidgetIconStaysNeutralForAMetricWithoutPolarity(): void
@@ -345,6 +350,10 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('pagemetrics-widget-trend-sentiment-neutral', $content);
         self::assertStringContainsString('pagemetrics-trend-neutral', $content);
         self::assertStringNotContainsString('pagemetrics-widget-trend-sentiment-positive', $content);
+        // No arrow where there is no better or worse to point at: an icon
+        // claiming a direction over rows that carry none is the misreading
+        // the whole polarity distinction exists to prevent.
+        self::assertStringNotContainsString('tabler-trending-', self::asideOf($content));
     }
 
     public function testTrendWidgetRendersTheEmptyStateWhenNoSiteIsConfigured(): void
@@ -494,22 +503,6 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertNull($result->label);
     }
 
-    public function testAllThreeWidgetsOfferTheWayIntoTheModuleInTheirFoot(): void
-    {
-        // One assertion per widget rather than one per template detail: the
-        // markup comes from a single partial, so what is worth proving here
-        // is that each of the three renders it at all.
-        $this->writeSiteConfiguration();
-        $today = new DateTimeImmutable('today');
-        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 42);
-        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 7);
-
-        foreach ([$this->renderChartWidget([]), $this->renderTopPagesWidget([]), $this->renderTrendWidget([])] as $content) {
-            self::assertStringContainsString('module/web/pagemetrics', $content);
-            self::assertStringContainsString('Open full view', $content);
-        }
-    }
-
     public function testEachSettingsAwareWidgetDeclaresItsBackendAssets(): void
     {
         $css = ['EXT:typo3_page_metrics/Resources/Public/Css/page-metrics.css'];
@@ -595,6 +588,16 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertInstanceOf(PageMetricsChartWidget::class, $widget);
 
         return $widget->renderWidget($this->buildContext('pageMetricsChart', $widget->getSettingsDefinitions(), $settings));
+    }
+
+    /**
+     * The icon column of a widget's aside, without the rows beside it. The
+     * rows carry direction arrows of their own, so asserting on the whole
+     * render would prove nothing about the one icon above them.
+     */
+    private static function asideOf(string $content): string
+    {
+        return explode('pagemetrics-widget-aside-content', $content)[0];
     }
 
     /**

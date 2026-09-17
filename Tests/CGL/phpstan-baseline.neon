@@ -60,9 +60,12 @@ parameters:
 			# almost no page has records below it, and this is the `@api`
 			# constructor, so a required parameter would break every existing
 			# ModifyMetricTilesEvent listener for a field a listener-built
-			# tile has no way to know.
+			# tile has no way to know. The seventh is source, for the second
+			# of those reasons alone: a listener-built tile comes from no
+			# provider, so there is no name for its popover to show and an
+			# empty string is the honest value rather than a placeholder.
 			identifier: ergebnis.noConstructorParameterWithDefaultValue
-			count: 6
+			count: 7
 			path: ../../Classes/Domain/ValueObject/MetricTile.php
 		-
 			identifier: ergebnis.noConstructorParameterWithDefaultValue

@@ -3,24 +3,6 @@
 <f:variable name="includeSubpagesDataValue"><f:if condition="{includeSubpages}" then="1" else="0" /></f:variable>
 <div class="pagemetrics-toolbar">
     <f:render partial="DataFreshness" arguments="{freshness: dataFreshness}" />
-    <f:comment>
-        Beside the date mark, at the quiet end of the row: this is an offer,
-        not an instruction, and it sits where the reader's eye already lands
-        when the tiles have not answered the question.
-
-        The URL is built server-side against the module's own route and is
-        null for a reader the module would refuse, so the row never promises
-        a page that answers "you may not see this". The label names what is
-        on the other end rather than repeating the row's own subject, and
-        the icon is the module's own, so the destination is recognisable
-        before it opens.
-    </f:comment>
-    <f:if condition="{moduleUrl}">
-        <a class="pagemetrics-module-link" href="{moduleUrl}" data-hint-title="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.link', default: 'Open full view')}" data-hint-text="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.link.hint', default: 'Every metric as a labelled table, the chart over the whole period, and the markers of the period as a list.')}">
-            <span class="pagemetrics-module-link-icon" aria-hidden="true"><core:icon identifier="tabler-chart-dots" size="small" alternativeMarkupIdentifier="inline" /></span>
-            <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:module.link" default="Open full view" />
-        </a>
-    </f:if>
     <nav class="pagemetrics-period" aria-label="{f:translate(key: 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:period.label', default: 'Period')}">
         <f:for each="{periodOptions}" as="option">
             <f:be.link route="web_layout" parameters="{id: pageId, tx_typo3pagemetrics_period: option}" additionalAttributes="{'data-period': option}" class="pagemetrics-period-link{f:if(condition: '{option} == {periodDays}', then: ' pagemetrics-period-link-active')}">{option} <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:period.days" default="days" /></f:be.link>
@@ -70,7 +52,7 @@
 </div>
 <div class="pagemetrics-tiles" data-labels="{f:format.json(value: sparklineLabels)}" data-page-id="{pageId}" data-include-subpages="{includeSubpagesDataValue}" data-annotations="{f:format.json(value: annotations)}">
     <f:for each="{tiles}" as="tile">
-        <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-label="{tile.label}" data-description="{tile.description}" data-unit="{tile.unit.value}" data-external-link="{tile.externalLink}" data-sparkline="{f:format.json(value: tile.sparkline)}" data-redirect-share="{tile.redirectSharePercent}" data-record-value="{tile.recordFormattedValue}" data-breakdown="{f:format.json(value: tile.breakdown)}" data-benchmark-median="{tile.benchmark.formattedMedian}" data-benchmark-band="{tile.benchmark.band.value}" data-benchmark-pages="{tile.benchmark.pageCount}" style="--pm-accent: {tile.color}" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">
+        <div class="pagemetrics-tile" data-metric="{tile.identifier}" data-label="{tile.label}" data-description="{tile.description}" data-unit="{tile.unit.value}" data-external-link="{tile.externalLink}" data-source="{tile.source}" data-sparkline="{f:format.json(value: tile.sparkline)}" data-redirect-share="{tile.redirectSharePercent}" data-record-value="{tile.recordFormattedValue}" data-breakdown="{f:format.json(value: tile.breakdown)}" data-benchmark-median="{tile.benchmark.formattedMedian}" data-benchmark-band="{tile.benchmark.band.value}" data-benchmark-pages="{tile.benchmark.pageCount}" style="--pm-accent: {tile.color}" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">
             <div class="pagemetrics-tile-head">
                 <span class="pagemetrics-tile-icon"><core:icon identifier="{tile.icon}" size="medium" alternativeMarkupIdentifier="inline" /></span>
                 <div class="pagemetrics-tile-text">

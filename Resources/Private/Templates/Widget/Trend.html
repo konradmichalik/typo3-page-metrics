@@ -5,14 +5,22 @@
         <f:then>
             <div class="pagemetrics-widget-aside">
                 <div class="pagemetrics-widget-aside-icon-col">
-                    <!-- Deliberately not an up/down arrow: the widget's rows can
-                         rank a metric where lower is better, where "improved" means
-                         the number fell. One icon for the whole widget cannot carry
-                         that, so the direction stays on the per-row badges and this
-                         one only carries the sentiment colour. -->
+                    <!-- Improvement or decline, not up or down: for a metric
+                         where lower is better the rising arrow stands over
+                         rows whose numbers fell, which is what the card's own
+                         title already says. Bound to the sentiment the rows
+                         agreed on rather than to the setting that selected
+                         them, so a mixed set and a metric with no better or
+                         worse both fall back to a shape that claims nothing.
+                         The direction itself stays on the per-row badges. -->
                     <span class="pagemetrics-widget-aside-icon pagemetrics-widget-trend-sentiment-{sentiment}" aria-hidden="true">
-                        <core:icon identifier="tabler-chart-dots" size="large" alternativeMarkupIdentifier="inline" />
+                        <f:switch expression="{sentiment}">
+                            <f:case value="positive"><core:icon identifier="tabler-trending-up" size="large" alternativeMarkupIdentifier="inline" /></f:case>
+                            <f:case value="negative"><core:icon identifier="tabler-trending-down" size="large" alternativeMarkupIdentifier="inline" /></f:case>
+                            <f:defaultCase><core:icon identifier="tabler-chart-dots" size="large" alternativeMarkupIdentifier="inline" /></f:defaultCase>
+                        </f:switch>
                     </span>
+                    <f:render partial="DataFreshness" arguments="{freshness: dataFreshness}" />
                 </div>
                 <div class="pagemetrics-widget-aside-content">
                     <f:for each="{sites}" as="siteTrend" iteration="siteIteration">
@@ -77,8 +85,6 @@
                                     </div>
                                 </f:else>
                             </f:if>
-                            <f:render partial="DataFreshness" arguments="{freshness: siteTrend.dataFreshness}" />
-                            <f:render partial="WidgetModuleLink" arguments="{urls: moduleUrls, site: siteTrend.site}" />
                         </div>
                     </f:for>
                 </div>

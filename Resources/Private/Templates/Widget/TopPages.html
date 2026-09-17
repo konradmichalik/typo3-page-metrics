@@ -8,6 +8,7 @@
                     <span class="pagemetrics-widget-aside-icon" style="--pm-accent: #0969da" aria-hidden="true">
                         <core:icon identifier="tabler-eye-search" size="large" alternativeMarkupIdentifier="inline" />
                     </span>
+                    <f:render partial="DataFreshness" arguments="{freshness: dataFreshness}" />
                 </div>
                 <div class="pagemetrics-widget-aside-content">
                     <f:for each="{sites}" as="siteTopPages" iteration="siteIteration">
@@ -85,8 +86,6 @@
                                     </div>
                                 </f:else>
                             </f:if>
-                            <f:render partial="DataFreshness" arguments="{freshness: siteTopPages.dataFreshness}" />
-                            <f:render partial="WidgetModuleLink" arguments="{urls: moduleUrls, site: siteTopPages.site}" />
                         </div>
                     </f:for>
                 </div>

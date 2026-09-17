@@ -88,4 +88,40 @@ final class DataFreshnessTest extends TestCase
 
         self::assertSame(0, $freshness->daysBehind);
     }
+
+    public function testTheOldestOfSeveralDaysDecidesForTheWholeCard(): void
+    {
+        $today = new DateTimeImmutable('2026-09-12');
+
+        $oldest = DataFreshness::oldestOf([
+            new DataFreshness(new DateTimeImmutable('2026-09-11'), $today),
+            new DataFreshness(new DateTimeImmutable('2026-09-04'), $today),
+            new DataFreshness(new DateTimeImmutable('2026-09-10'), $today),
+        ]);
+
+        self::assertNotNull($oldest);
+        self::assertSame('2026-09-04', $oldest->date->format('Y-m-d'));
+        // And it carries the verdict of the day it came from, not a fresh
+        // one assembled here: a card is stale as soon as one of its rows is.
+        self::assertTrue($oldest->isStale);
+    }
+
+    public function testASiteThatHasNeverRunDoesNotDecideForTheOthers(): void
+    {
+        // Null is "no import at all", and it would otherwise outrank every
+        // real day: a second site nobody has imported yet would mark a card
+        // whose numbers arrived this morning as having no date.
+        $today = new DateTimeImmutable('2026-09-12');
+
+        $oldest = DataFreshness::oldestOf([null, new DataFreshness(new DateTimeImmutable('2026-09-11'), $today), null]);
+
+        self::assertNotNull($oldest);
+        self::assertSame('2026-09-11', $oldest->date->format('Y-m-d'));
+    }
+
+    public function testNothingToGoOnStaysNothing(): void
+    {
+        self::assertNull(DataFreshness::oldestOf([]));
+        self::assertNull(DataFreshness::oldestOf([null, null]));
+    }
 }

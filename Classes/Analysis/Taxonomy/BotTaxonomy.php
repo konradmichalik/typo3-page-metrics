@@ -142,6 +142,7 @@ final readonly class BotTaxonomy
         'FirecrawlAgent' => "Firecrawl's crawler, a service that converts sites into LLM-ready data.",
         'PanguBot' => "Huawei's crawler, collecting training data for its Pangu AI models.",
         'Webzio-Extended' => "Webz.io's crawler, collecting content for its data/AI licensing business.",
+        'Kangaroo Bot' => "Kangaroo's crawler, collecting content for its AI assistant.",
         // Social / link-preview unfurling.
         'facebookexternalhit' => "Meta's crawler, generating link previews for Facebook/Instagram shares.",
         'facebookcatalog' => "Meta's crawler, validating product catalog/shopping feed links.",

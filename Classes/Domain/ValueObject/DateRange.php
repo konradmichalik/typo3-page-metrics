@@ -30,17 +30,6 @@ final readonly class DateRange
     ) {}
 
     /**
-     * Whether the two ranges share at least one day. Asked where two periods
-     * are held against each other: a baseline that moves only the start back
-     * can still land inside the period it is the baseline for, and a
-     * comparison of a period with itself is not one.
-     */
-    public function overlaps(self $other): bool
-    {
-        return $this->from <= $other->until && $other->from <= $this->until;
-    }
-
-    /**
      * @return iterable<DateTimeImmutable> one entry per calendar day, inclusive of both ends
      */
     public function days(): iterable

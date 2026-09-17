@@ -24,8 +24,7 @@ namespace KonradMichalik\Typo3PageMetrics\Domain\ValueObject;
  * with no visits underneath it is a metric this page never recorded, and
  * both spell 0. Every surface that has to tell "no data" from "zero" reads
  * the denominator to do it: the per-page trend ranking skips a page that had
- * neither, and the pages table leaves its cell empty rather than printing a
- * flattering zero.
+ * neither rather than ranking it on a flattering zero.
  *
  * @api
  *

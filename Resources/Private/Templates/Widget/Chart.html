@@ -3,7 +3,7 @@
 <f:section name="main">
     <f:if condition="{sites}">
         <f:then>
-            <div class="pagemetrics-widget{f:if(condition: compact, then: ' pagemetrics-widget--compact')}">
+            <div class="pagemetrics-widget">
                 <f:for each="{sites}" as="overview" iteration="siteIteration">
                     <div class="pagemetrics-widget-site">
                         <f:if condition="{siteIteration.total} > 1">
@@ -20,10 +20,13 @@
                             data-sparkline="{f:format.json(value: overview.series)}"
                             data-annotations="{f:format.json(value: overview.annotations)}"
                             style="--pm-accent: {overview.chartColor}"
-                        ></div>
-                        <f:render partial="AnnotationLegend" arguments="{categories: overview.annotationCategories}" />
-                        <f:render partial="DataFreshness" arguments="{freshness: overview.dataFreshness}" />
-                        <f:render partial="WidgetModuleLink" arguments="{urls: moduleUrls, site: overview.site}" />
+                        ><f:comment>
+                            Inside the plot rather than under it. The chart is
+                            the whole of a card this small, so a line of its
+                            own underneath cost more height than the mark is
+                            worth. The renderer only appends, so markup put
+                            here survives it.
+                        </f:comment><f:render partial="DataFreshness" arguments="{freshness: overview.dataFreshness}" /></div>
                     </div>
                 </f:for>
             </div>

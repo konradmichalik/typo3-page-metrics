@@ -50,7 +50,7 @@ use function usort;
  * outcome of a quiet month rather than a failure. Nothing here manufactures
  * a statement to fill a card: a movement is stated only once it has cleared
  * the metric's own MetricSignificance, which is the same double threshold
- * the trend widget and the compare view filter by.
+ * the trend widget filters by.
  *
  * The cards of every site are pooled into one list, ranked together and cut
  * to four - the cap belongs to the widget, not to each site, because four
@@ -147,7 +147,23 @@ final readonly class InsightBuilder
      */
     private function forSite(Site $site, int $periodDays): array
     {
-        $provider = $this->metricDefinitionCollector->supporting($this->providers, $site)[0] ?? null;
+        // The site's primary metric, asked of every provider the site has
+        // rather than of whichever one the container happens to hand over
+        // first (see #88). The order is alphabetical by service id, so a
+        // site pairing Matomo with an access log pared down to the bot
+        // buckets is asked about the access log first, and a widget reading
+        // only that one goes silent about a site with plenty to say.
+        $primary = $this->metricDefinitionCollector->primaryFor($this->providers, $site);
+
+        if (null === $primary) {
+            return [];
+        }
+
+        // The rest of a card's frame is the primary metric's own provider's:
+        // import coverage is kept per provider, and the second slot may only
+        // offer metrics from the same source, or two cards of one site would
+        // be measured against two different windows.
+        $provider = $this->metricDefinitionCollector->providerOf($this->providers, $site, $primary->identifier);
 
         if (null === $provider) {
             return [];
@@ -156,13 +172,6 @@ final readonly class InsightBuilder
         [$current, $previous] = $this->computeRanges($periodDays);
 
         if (!$this->claimable($provider, $site, $current, $previous)) {
-            return [];
-        }
-
-        $counts = $this->audienceCountDefinitions($provider, $site);
-        $primary = $counts[0] ?? null;
-
-        if (null === $primary) {
             return [];
         }
 
@@ -175,7 +184,13 @@ final readonly class InsightBuilder
         // Rates belong in the second slot as much as counts do: "bounce rate
         // up six points" is the kind of line an editor acts on, and it is
         // the reason the ranking had to become unit-free in the first place.
-        $others = [...array_slice($counts, 1), ...$provider->getRateMetricDefinitions()];
+        $others = [
+            ...array_values(array_filter(
+                $this->audienceCountDefinitions($provider, $site),
+                static fn (MetricDefinition $definition): bool => $definition->identifier !== $primary->identifier,
+            )),
+            ...$provider->getRateMetricDefinitions(),
+        ];
 
         return array_values(array_filter([
             $this->siteInsight($site, $primary, $pageUids, $current, $previous, $periodDays),

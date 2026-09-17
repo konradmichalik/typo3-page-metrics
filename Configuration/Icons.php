@@ -14,10 +14,11 @@ declare(strict_types=1);
 use TYPO3\CMS\Core\Imaging\IconProvider\SvgIconProvider;
 
 // Sourced from Tabler Icons (MIT, see Resources/Public/Icons/TABLER_LICENSE.txt).
-// tabler-robot, tabler-spider and tabler-world-search are not wired to a
-// metric tile yet - they are staged for a future bot/crawler-traffic metric,
-// contributed by a third-party listener (e.g. typo3_bot_inspect) via
-// ModifyMetricTilesEvent, not by this extension itself.
+// Every icon a bundled provider names in a MetricDefinition has to be
+// registered here, including the bot buckets that only ever appear inside
+// the machine-traffic summary today: an icon this list is missing renders as
+// an empty box the moment anything gives that bucket a tile of its own.
+// MetricDefinitionIconTest holds that seam.
 return [
     'tabler-eye-search' => [
         'provider' => SvgIconProvider::class,
@@ -78,6 +79,18 @@ return [
     'tabler-dots-vertical' => [
         'provider' => SvgIconProvider::class,
         'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-dots-vertical.svg',
+    ],
+    'tabler-message-chatbot' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-message-chatbot.svg',
+    ],
+    'tabler-share' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-share.svg',
+    ],
+    'tabler-tool' => [
+        'provider' => SvgIconProvider::class,
+        'source' => 'EXT:typo3_page_metrics/Resources/Public/Icons/tabler-tool.svg',
     ],
     'tabler-robot' => [
         'provider' => SvgIconProvider::class,

@@ -59,6 +59,23 @@ final class PageHeaderMetricsTemplateTest extends FunctionalTestCase
         self::assertStringContainsString('data-record-value=""', $html);
     }
 
+    public function testHandsThePopoverTheNameOfTheSourceTheNumbersCameFrom(): void
+    {
+        $html = $this->render();
+
+        // What the popover turns into either "Open in Matomo" on the link or,
+        // on a tile without one, a marker of its own.
+        self::assertStringContainsString('data-source="Matomo"', $html);
+    }
+
+    public function testATileWithoutAKnownSourceHandsOverNothing(): void
+    {
+        // A tile contributed through ModifyMetricTilesEvent knows no
+        // provider. Empty, so the heading stays as bare as it was rather
+        // than claiming a source.
+        self::assertStringContainsString('data-source=""', $this->render());
+    }
+
     private function render(): string
     {
         $request = (new ServerRequest('https://example.com/typo3/ajax/page-metrics/tiles', 'GET'))
@@ -84,7 +101,6 @@ final class PageHeaderMetricsTemplateTest extends FunctionalTestCase
             'hasSubpages' => false,
             'dataFreshness' => null,
             'addAnnotationUrl' => null,
-            'moduleUrl' => null,
             'annotations' => [],
         ]);
 
@@ -97,8 +113,9 @@ final class PageHeaderMetricsTemplateTest extends FunctionalTestCase
     private function tiles(): array
     {
         return [
-            new MetricTile('matomo.pageviews', 'Page views', 'How often the page was viewed.', 'tabler-eye-search', '#0969da', MetricUnit::Count, 1240, '1240', [], 12, TrendDirection::Up, 0, null, '1100', MetricPolarity::HigherIsBetter, [], null, true, 1100, '830'),
+            new MetricTile('matomo.pageviews', 'Page views', 'How often the page was viewed.', 'tabler-eye-search', '#0969da', MetricUnit::Count, 1240, '1240', [], 12, TrendDirection::Up, 0, null, '1100', MetricPolarity::HigherIsBetter, [], null, true, 1100, '830', 'Matomo'),
             new MetricTile('matomo.visits', 'Visits', 'How many visits included the page.', 'tabler-chart-dots', '#8250df', MetricUnit::Count, 900, '900', [], 4, TrendDirection::Up, 0, null, '860', MetricPolarity::HigherIsBetter, [], null, true, 860),
+            new MetricTile('listener.custom', 'Newsletter signups', 'Contributed by a listener.', 'tabler-target', '#1a7f37', MetricUnit::Count, 12, '12', [], null, TrendDirection::Flat, 0, null, ''),
         ];
     }
 }

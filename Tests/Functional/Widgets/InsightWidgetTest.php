@@ -160,18 +160,25 @@ final class InsightWidgetTest extends FunctionalTestCase
         self::assertStringContainsString('up 30% against the previous period.', $content);
     }
 
-    public function testStillStatesEverySentenceForAReaderWhoCannotOpenTheModule(): void
+    /**
+     * The container hands the tagged providers over in alphabetical order,
+     * not in the order Services.yaml lists them, so a site running the
+     * access log beside Matomo is asked about the access log first. Pared
+     * down to the bot buckets - which is the pairing the provider docs
+     * recommend - it counts no audience at all, and the site's primary
+     * metric lives in the provider behind it. Speaking only for the first
+     * one leaves this widget silent about a site every other surface has
+     * plenty to say about.
+     */
+    public function testSpeaksForTheProviderHoldingThePrimaryMetricEvenWhenAnotherComesFirst(): void
     {
-        $this->importCSVDataSet(__DIR__.'/../Service/Fixtures/module_readers.csv');
-        $backendUser = $this->setUpBackendUser(21);
-        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
+        $this->writeSiteConfigurationWithMachineOnlyAccessLog();
         $this->record(2, 'matomo.pageviews', $this->inCurrentPeriod(), 130);
         $this->record(2, 'matomo.pageviews', $this->inPreviousPeriod(), 100);
 
         $content = $this->renderWidget();
 
-        self::assertStringContainsString('up 30% against the previous period.', $content);
-        self::assertStringNotContainsString('pagemetrics-module-link', $content);
+        self::assertStringContainsString('Page views, 30 days: 130, up 30% against the previous period.', $content);
     }
 
     public function testRendersTheEmptyStateWhenNoSiteHasAProvider(): void
@@ -240,6 +247,27 @@ final class InsightWidgetTest extends FunctionalTestCase
             'errorHandling' => [],
             'routes' => [],
             'pageMetrics' => ['providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
+        ]);
+    }
+
+    /**
+     * Two providers, and the one the container asks first counts nothing a
+     * reader is in the widget for.
+     */
+    private function writeSiteConfigurationWithMachineOnlyAccessLog(): void
+    {
+        $this->get(SiteWriter::class)->write('main', [
+            'rootPageId' => 1,
+            'base' => 'https://example.com/',
+            'languages' => [
+                0 => ['title' => 'English', 'enabled' => true, 'languageId' => 0, 'base' => '/', 'locale' => 'en_US.UTF-8', 'navigationTitle' => 'English', 'flag' => 'us'],
+            ],
+            'errorHandling' => [],
+            'routes' => [],
+            'pageMetrics' => ['providers' => [
+                'matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x'],
+                'accesslog' => ['pathPattern' => '/var/log/nowhere/access.log*', 'metrics' => ['machine']],
+            ]],
         ]);
     }
 }

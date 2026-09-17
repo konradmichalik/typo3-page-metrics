@@ -59,6 +59,17 @@ built for (`$event->tileRange`, `$event->previousRange`,
 `$event->sparklineRange`), so a listener can tailor its tile to the same
 period the built-in tiles use.
 
+## Naming your provider
+
+A tile's popover names the source its numbers came from, either in the label of the link into your tool or in a marker beside the heading. The name is looked up as `provider.<identifier>` in this extension's `locallang_mod.xlf`, and a provider it does not know falls back to its own identifier: a provider called `plausible` shows "plausible". To ship a real name, add the trans-unit through `locallangXMLOverride` in your extension:
+
+```php
+$GLOBALS['TYPO3_CONF_VARS']['SYS']['locallangXMLOverride']['EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf'][]
+    = 'EXT:my_extension/Resources/Private/Language/page_metrics_overrides.xlf';
+```
+
+A tile you contribute through `ModifyMetricTilesEvent` rather than through a provider names no source at all, since it belongs to none.
+
 ## Polarity
 
 `polarity` says whether a rise in your metric is an improvement, and nothing else can: the platform never interprets what a metric means. It decides the colour of the trend badge and the word a screen reader reads out for it, so a metric where a rise is the bad outcome needs `MetricPolarity::LowerIsBetter` to avoid showing a worsening number in green and announcing it as improved.
@@ -69,7 +80,7 @@ period the built-in tiles use.
 | `LowerIsBetter` | bounce rate, error counts |
 | `Neutral` | anything whose direction is not a judgement, such as an average time on page |
 
-The arrow icon always follows the actual direction, so `LowerIsBetter` shows a down arrow in green rather than inverting the arrow.
+The arrow icon beside a row always follows the actual direction, so `LowerIsBetter` shows a down arrow in green rather than inverting the arrow. The one icon above a whole trend widget is the exception and points by improvement, see [Movement, not direction](dashboard-widgets.md#movement-not-direction).
 
 `MetricDefinition` takes this parameter. `RateMetricDefinition` does not: a rate cannot be summed, so there is nothing for a machine-side rate to fold into, and a parameter nothing reads is a promise nothing keeps. Note that `MetricDefinition::$maxDimensions` was removed in the same change: it was never read. A positional call that passed it now fails loudly instead of silently landing in `polarity`.
 

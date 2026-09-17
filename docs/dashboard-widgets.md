@@ -14,7 +14,7 @@ skipped entirely for sites without one.
 | Widget | Identifier | Shows | Fixed period | Configurable |
 | --- | --- | --- | --- | --- |
 | Page metrics | `pageMetrics` | Each site's homepage tiles: page views, visits, avg. time on page, bounce rate | 7 days | — |
-| Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers and a key to the kinds drawn | — | Metric, period (7/30/90 days), marker category |
+| Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers | — | Metric, period (7/30/90 days), marker category |
 | Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days), marker category |
 | Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level, include subpages, goal column |
 | Page metrics trend | `pageMetricsTrend` | Pages that improved or declined most against the previous period | 7/30/90 days | Metric, movement (declines/improvements), period |
@@ -107,19 +107,13 @@ Every widget that shows imported numbers (tiles, chart, most viewed pages, trend
 
 Unlike the page module, a dashboard widget covers one site per row, so its date is that site's own provider's and never a compromise between several.
 
-## Opening the full view
-
-Every widget that carries a site's numbers ends with a link into **Web → Page metrics**, opened on that site's root page. It is the same offer the page module's tile row makes, for the site instead of for one page, see [Opening the full view](page-tiles.md#opening-the-full-view) for what is on the other end and why the link carries no period.
-
-The link is left out for a reader the module would refuse, and here the page half of that check is not academic: a widget names a site's root page rather than a page the reader picked, so somebody who may not see that root page gets the widget's numbers without the link. On a dashboard listing several sites the decision is made per site, not once for the whole widget.
-
-Every one of these links reads "Open full view", so the site's own name is carried in the link's accessible name. A screen reader announces which site it leads to; on screen the site heading above it already says so.
-
 ## Movement, not direction
 
 The trend widget ranks by whether a page improved or declined, not by whether its number went up or down. The two only coincide for a metric where higher is better: a rising bounce rate is a decline, and a page whose bounce rate fell shows a green down arrow. Which way round a metric reads is set by its provider, see [Polarity](extending.md#polarity).
 
 A metric with no polarity of its own, such as an average time on page, has no improvement to rank by, so for those the setting falls back to its literal direction meaning.
+
+The widget's own icon beside the rows follows that same reading: it rises for a set of improvements and falls for a set of declines, whichever way the numbers behind them went. On a `LowerIsBetter` metric it therefore points the opposite way to the arrows in the rows underneath it, which carry the literal direction. Where the rows disagree, or where the metric has no better or worse at all, the icon drops back to a neutral shape rather than claiming one.
 
 ## What counts as a movement
 

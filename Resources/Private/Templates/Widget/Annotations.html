@@ -21,8 +21,8 @@
                                                         <br /><span class="pagemetrics-annotation-until"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:annotation.until" default="until" /> <f:format.date date="{annotation.dateUntil}" format="Y-m-d" /></span>
                                                     </f:if>
                                                 </td>
-                                                <td class="nowrap pagemetrics-annotation-{annotation.category.value}">
-                                                    <span class="pagemetrics-annotation-legend-item">
+                                                <td class="nowrap">
+                                                    <span class="pagemetrics-annotation-kind">
                                                         <core:icon identifier="{annotation.categoryIcon}" size="small" alternativeMarkupIdentifier="inline" />
                                                         <f:translate key="{annotation.categoryLabel}" default="{annotation.category.value}" />
                                                     </span>
@@ -44,7 +44,6 @@
                             </div>
                         </f:else>
                     </f:if>
-                    <f:render partial="WidgetModuleLink" arguments="{urls: moduleUrls, site: overview.site}" />
                 </div>
             </f:for>
         </f:then>

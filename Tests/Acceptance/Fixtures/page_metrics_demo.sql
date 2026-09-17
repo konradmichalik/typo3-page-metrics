@@ -192,20 +192,28 @@ SELECT * FROM (
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
 -- The bot agent detail a real access log import would have written alongside
--- the buckets above: one row per page, day, bucket and crawler. Nothing
--- renders it yet (see docs/providers/accesslog.md#bot-traffic-metrics), so it
--- is seeded for the last 14 days only and for two agents per bucket - enough
--- to query the table and see the shape, without another 60-day cross join.
+-- the buckets above: one row per page, day, bucket and crawler, over the same
+-- 60 days, because the two AI tiles list it under "Made up of" and a window
+-- shorter than the tile's own period would show most of the traffic as
+-- unattributed.
+--
+-- `bucket` holds the bucket code (`ai_crawler`), not the metric identifier
+-- the buckets above are stored under (`bot.ai_crawler`) - the two are joined
+-- here but they are not the same column. Writing the identifier into it is
+-- the one mistake this seed can make that nothing catches: the table would
+-- look fine and the breakdown would simply stay empty.
 --
 -- hits are a share of the bucket total rather than an independent series, so
--- the detail never claims more hits than the tile above shows. Only the two
--- buckets whose agents plausibly spoof carry hits_suspicious.
+-- the detail never claims more hits than the tile above shows. The shares do
+-- not add up to 1, which is deliberate: the remainder is what the popover
+-- lists as unattributed. Only the two buckets whose agents plausibly spoof
+-- carry hits_suspicious.
 INSERT INTO tx_typo3pagemetrics_bot_agent_daily (date, site_identifier, page_uid, sys_language_uid, bucket, agent, agent_hash, hits, hits_suspicious)
 SELECT * FROM (
     WITH RECURSIVE days AS (
         SELECT 0 AS day_offset
         UNION ALL
-        SELECT day_offset + 1 FROM days WHERE day_offset < 13
+        SELECT day_offset + 1 FROM days WHERE day_offset < 59
     )
     SELECT
         DATE_SUB(CURDATE(), INTERVAL day_offset DAY) AS date,
@@ -219,20 +227,24 @@ SELECT * FROM (
         FLOOR(GREATEST(1, ROUND(daily.value * agents.share)) * agents.suspicious_share) AS hits_suspicious
     FROM days
     INNER JOIN (
-        SELECT 'bot.search' AS bucket, 'Googlebot' AS agent, 0.6 AS share, 0.0 AS suspicious_share UNION ALL
-        SELECT 'bot.search', 'bingbot', 0.3, 0.15 UNION ALL
-        SELECT 'bot.ai_crawler', 'GPTBot', 0.65, 0.0 UNION ALL
-        SELECT 'bot.ai_crawler', 'ClaudeBot', 0.3, 0.0 UNION ALL
-        SELECT 'bot.ai_chatbot', 'ChatGPT-User', 0.7, 0.0 UNION ALL
-        SELECT 'bot.ai_chatbot', 'Perplexity-User', 0.25, 0.0 UNION ALL
-        SELECT 'bot.social', 'facebookexternalhit', 0.6, 0.2 UNION ALL
-        SELECT 'bot.social', 'Slackbot-LinkExpanding', 0.35, 0.0 UNION ALL
-        SELECT 'bot.tool', 'AhrefsBot', 0.55, 0.0 UNION ALL
-        SELECT 'bot.tool', 'curl', 0.4, 0.0
+        SELECT 'search' AS bucket, 'bot.search' AS metric, 'Googlebot' AS agent, 0.6 AS share, 0.0 AS suspicious_share UNION ALL
+        SELECT 'search', 'bot.search', 'bingbot', 0.3, 0.15 UNION ALL
+        SELECT 'ai_crawler', 'bot.ai_crawler', 'GPTBot', 0.55, 0.0 UNION ALL
+        SELECT 'ai_crawler', 'bot.ai_crawler', 'ClaudeBot', 0.22, 0.0 UNION ALL
+        SELECT 'ai_crawler', 'bot.ai_crawler', 'PerplexityBot', 0.1, 0.0 UNION ALL
+        SELECT 'ai_crawler', 'bot.ai_crawler', 'CCBot', 0.05, 0.0 UNION ALL
+        SELECT 'ai_crawler', 'bot.ai_crawler', 'Bytespider', 0.03, 0.0 UNION ALL
+        SELECT 'ai_crawler', 'bot.ai_crawler', 'Amazonbot', 0.02, 0.0 UNION ALL
+        SELECT 'ai_chatbot', 'bot.ai_chatbot', 'ChatGPT-User', 0.7, 0.0 UNION ALL
+        SELECT 'ai_chatbot', 'bot.ai_chatbot', 'Perplexity-User', 0.25, 0.0 UNION ALL
+        SELECT 'social', 'bot.social', 'facebookexternalhit', 0.6, 0.2 UNION ALL
+        SELECT 'social', 'bot.social', 'Slackbot', 0.35, 0.0 UNION ALL
+        SELECT 'tool', 'bot.tool', 'AhrefsBot', 0.55, 0.0 UNION ALL
+        SELECT 'tool', 'bot.tool', 'curl/', 0.4, 0.0
     ) agents
     INNER JOIN tx_typo3pagemetrics_daily daily
         ON daily.provider = 'accesslog'
-        AND daily.metric = agents.bucket
+        AND daily.metric = agents.metric
         AND daily.dimension = ''
         AND daily.date = DATE_SUB(CURDATE(), INTERVAL day_offset DAY)
 ) sub

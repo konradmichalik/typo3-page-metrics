@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\Insight;
-use KonradMichalik\Typo3PageMetrics\Service\{InsightBuilder, ModuleLinkBuilder};
+use KonradMichalik\Typo3PageMetrics\Service\InsightBuilder;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Site\{Entity\Site, SiteFinder};
@@ -62,7 +62,6 @@ final class InsightWidget implements WidgetInterface, RequestAwareWidgetInterfac
         private readonly InsightBuilder $insightBuilder,
         private readonly SiteFinder $siteFinder,
         private readonly BackendViewFactory $backendViewFactory,
-        private readonly ModuleLinkBuilder $moduleLinkBuilder,
     ) {}
 
     public function setRequest(ServerRequestInterface $request): void
@@ -92,11 +91,6 @@ final class InsightWidget implements WidgetInterface, RequestAwareWidgetInterfac
             // one site on each of four cards would be exactly the noise this
             // is meant to avoid.
             'showSite' => count($contributingSites) > 1,
-            'linkSites' => $contributingSites,
-            // Keyed by site, and absent for a site whose root page this
-            // reader may not open: the link is a convenience and its absence
-            // never touches the sentences (see WidgetModuleLink).
-            'moduleUrls' => $this->moduleLinkBuilder->forSites($sites),
             'configuration' => $this->configuration,
         ]);
 
@@ -121,9 +115,9 @@ final class InsightWidget implements WidgetInterface, RequestAwareWidgetInterfac
 
     /**
      * The sites that actually produced a card, in the order their first card
-     * appears. The foot offers a way into the module for those and no
-     * others: a link to a site the widget said nothing about is an invitation
-     * to go looking for something that is not there.
+     * appears. A site the widget said nothing about is not among them, which
+     * is what makes counting them the right test for whether a card has to
+     * name its site at all.
      *
      * @param array<string, Site> $sites
      * @param list<Insight>       $insights

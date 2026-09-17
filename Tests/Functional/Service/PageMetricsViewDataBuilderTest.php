@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Service;
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, BenchmarkBand, TrendDirection, UnresolvedReason};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricTile, PageMetricsViewData};
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, BotAgentDailyRepository, DailyMetricsRepository, ImportStateRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Service\PageMetricsViewDataBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -25,6 +25,7 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 use function array_column;
 use function array_map;
+use function array_slice;
 use function sprintf;
 
 /**
@@ -783,7 +784,7 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         self::assertFalse($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30)->hasSubpages);
     }
 
-    public function testTheFiveBotBucketsBecomeOneTileInsteadOfFive(): void
+    public function testTheThreeNonAiBotBucketsOnlyEverExistInsideTheSummary(): void
     {
         $this->writeSiteConfigurationWithAccessLog();
         $today = new DateTimeImmutable('today');
@@ -799,9 +800,106 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         // providers with machine metrics cannot produce two tiles that are
         // indistinguishable to a reader or to a lookup by identifier.
         self::assertContains('machine.summary.accesslog', $identifiers);
-        foreach (['bot.ai_chatbot', 'bot.ai_crawler', 'bot.search', 'bot.social', 'bot.tool'] as $bucket) {
+        foreach (['bot.search', 'bot.social', 'bot.tool'] as $bucket) {
             self::assertNotContains($bucket, $identifiers);
         }
+    }
+
+    public function testTheTwoAiBucketsGetTheirOwnTileDirectlyBeforeTheSummary(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'accesslog.pageviews', 40);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.ai_crawler', 7);
+
+        $identifiers = array_map(
+            static fn (MetricTile $tile): string => $tile->identifier,
+            $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30)->tiles,
+        );
+
+        // Last three, in this order: the row an editor came for ends before
+        // them, and the summary they are also counted in closes it.
+        self::assertSame(
+            ['bot.ai_chatbot', 'bot.ai_crawler', 'machine.summary.accesslog'],
+            array_slice($identifiers, -3),
+        );
+    }
+
+    public function testAnAiTileIsShownAtZeroRatherThanLeftOut(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', new DateTimeImmutable('today'), 'accesslog.pageviews', 40);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'bot.ai_chatbot');
+
+        self::assertSame(0, $tile->value);
+        // Nothing to break down, so the popover shows no "Made up of" at
+        // all rather than a heading over an empty list.
+        self::assertSame([], $tile->breakdown);
+    }
+
+    public function testAnAiTileCarriesItsAgentsAsItsParts(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.ai_crawler', 30);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.ai_chatbot', 4);
+        $agents = $this->get(BotAgentDailyRepository::class);
+        $agents->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', $today, 20, 0);
+        $agents->upsert('main', 2, 0, 'ai_crawler', 'ClaudeBot', $today, 10, 0);
+        // The chatbot bucket's own agents must not leak into the crawler
+        // tile's parts, and vice versa.
+        $agents->upsert('main', 2, 0, 'ai_chatbot', 'ChatGPT-User', $today, 4, 0);
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
+
+        $crawlers = $this->tileFor($viewData, 'bot.ai_crawler')->breakdown;
+        self::assertSame(['GPTBot', 'ClaudeBot'], array_column($crawlers, 'label'));
+        self::assertSame(['20', '10'], array_column($crawlers, 'formattedValue'));
+        // Each row says what the crawler behind it is, from the same curated
+        // map that named it. Read through array_column, which drops a row
+        // without the key, so this asserts both rows carry one.
+        self::assertSame([
+            "OpenAI's crawler, collecting web content to train future models.",
+            "Anthropic's crawler, collecting web content to train Claude.",
+        ], array_column($crawlers, 'hint'));
+
+        $chatbots = $this->tileFor($viewData, 'bot.ai_chatbot')->breakdown;
+        self::assertSame(['ChatGPT-User'], array_column($chatbots, 'label'));
+        self::assertSame(['4'], array_column($chatbots, 'formattedValue'));
+    }
+
+    public function testAnAiTileKeepsItsHeadlineWhenTheAgentRowsFallShortOfIt(): void
+    {
+        // The import writes the bucket metric and the agent detail at
+        // different moments, so a gap between the two is an ordinary state
+        // rather than a defect - and the headline stays the stored total.
+        $this->writeSiteConfigurationWithAccessLog();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.ai_crawler', 30);
+        $this->get(BotAgentDailyRepository::class)->upsert('main', 2, 0, 'ai_crawler', 'GPTBot', $today, 20, 0);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'bot.ai_crawler');
+
+        self::assertSame(30, $tile->value);
+        self::assertSame(['GPTBot', 'Unattributed'], array_column($tile->breakdown, 'label'));
+        self::assertSame(['20', '10'], array_column($tile->breakdown, 'formattedValue'));
+    }
+
+    public function testTheSummaryStillCountsTheAiBucketsThatNowHaveTheirOwnTile(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.ai_crawler', 7);
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.search', 3);
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
+
+        // Deliberately double-counted: the AI tiles answer "who is coming",
+        // the summary answers "how much of this was not a person", and the
+        // second question includes the first.
+        self::assertSame(10, $this->tileFor($viewData, 'machine.summary.accesslog')->value);
+        self::assertSame(7, $this->tileFor($viewData, 'bot.ai_crawler')->value);
     }
 
     public function testTheMachineSummaryAddsUpItsBucketsAndKeepsThemAsItsParts(): void
@@ -826,6 +924,26 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         // Every bucket is listed, including the ones at zero: an absent row
         // and a row reading 0 answer different questions.
         self::assertCount(5, $tile->breakdown);
+    }
+
+    public function testEachPartOfTheSummarySaysWhatItsBucketCounts(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(2, 0, 'accesslog', $today, 'bot.search', 3);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'machine.summary.accesslog');
+        $byLabel = array_column($tile->breakdown, 'hint', 'label');
+
+        // The bucket's own description, not a second copy written for this
+        // list: it is the same sentence its own tile shows, and two
+        // wordings for one bucket would be two things to keep in step.
+        self::assertSame(
+            'Requests from real search-engine indexers building their search index.',
+            $byLabel['Search indexers'],
+        );
+        // Every bucket, including the two that also have a tile of their own.
+        self::assertCount(5, $byLabel);
     }
 
     public function testASiteWithoutMachineMetricsGetsNoSummaryTile(): void
@@ -916,6 +1034,41 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.visits');
 
         self::assertSame([['label' => 'carrier-pigeon', 'formattedValue' => '9']], $tile->breakdown);
+    }
+
+    public function testEveryTileNamesTheProviderItsNumbersCameFrom(): void
+    {
+        // Two providers counting the same thing is the case the name exists
+        // for: both declare a "Page views" tile, both are right, and the two
+        // numbers differ.
+        $this->writeSiteConfigurationWithTwoProviders();
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.pageviews', 40);
+        $repository->upsert(2, 0, 'accesslog', $today, 'accesslog.pageviews', 31);
+        $repository->upsert(2, 0, 'accesslog', $today, 'bot.ai_crawler', 7);
+
+        $viewData = $this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30);
+
+        self::assertSame('Matomo', $this->tileFor($viewData, 'matomo.pageviews')->source);
+        self::assertSame('Access log', $this->tileFor($viewData, 'accesslog.pageviews')->source);
+        // The two tiles this class assembles itself rather than taking from a
+        // definition still belong to the provider that declared the buckets.
+        self::assertSame('Access log', $this->tileFor($viewData, 'bot.ai_crawler')->source);
+        self::assertSame('Access log', $this->tileFor($viewData, 'machine.summary.accesslog')->source);
+    }
+
+    public function testARateTileNamesItsProviderToo(): void
+    {
+        $this->writeSiteConfiguration(1, 'https://example.com/');
+        $today = new DateTimeImmutable('today');
+        $repository = $this->get(DailyMetricsRepository::class);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.visits', 100);
+        $repository->upsert(2, 0, 'matomo', $today, 'matomo.bounces', 40);
+
+        $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.bounce_rate');
+
+        self::assertSame('Matomo', $tile->source);
     }
 
     private function writeSiteConfigurationWithAccessLog(): void

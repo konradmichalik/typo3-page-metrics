@@ -130,13 +130,6 @@ services:
             $providers: !tagged_iterator page_metrics.metric_provider
         public: true
 
-    # Public so a functional test can pin the rules it shares with
-    # sparkline.js, which derives the same four figures from the same series
-    # in the browser. Nothing can be shared between the two implementations,
-    # so the test is what keeps them from drifting apart.
-    KonradMichalik\Typo3PageMetrics\Service\TileStatsCalculator:
-        public: true
-
     # Public so functional tests can fetch it directly via $this->get() before
     # any consuming widget references it.
     KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder:
@@ -157,6 +150,16 @@ services:
     # going through a request, and so the renderer's two states can be set up
     # directly.
     KonradMichalik\Typo3PageMetrics\Service\PageMetricsUserPreferences:
+        public: true
+
+    # Public so a functional test can assert the fallback for a provider this
+    # extension's XLF does not name, without a provider to go through.
+    KonradMichalik\Typo3PageMetrics\Service\MetricSourceLabelProvider:
+        public: true
+
+    # Public so a functional test can assert the two remainder rows directly,
+    # rather than inferring them from a rendered tile's breakdown JSON.
+    KonradMichalik\Typo3PageMetrics\Service\TileBreakdownBuilder:
         public: true
 
     # Public so a functional test can assert the key list against the XLF
@@ -216,58 +219,6 @@ services:
 
     # Public for the same reason as the tiles controller above.
     KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsDayController:
-        public: true
-
-    # The tagged iterator has to be named, like every other consumer of the
-    # metric providers. Public so the functional test can call handleRequest()
-    # directly with a built request, rather than booting the whole backend
-    # routing stack to reach one controller.
-    KonradMichalik\Typo3PageMetrics\Controller\PageMetricsModuleController:
-        arguments:
-            $providers: !tagged_iterator page_metrics.metric_provider
-        public: true
-
-    # Public so functional tests can fetch it directly via $this->get() and
-    # assert who the module link is offered to, without rendering a tile row
-    # or a widget to find out.
-    KonradMichalik\Typo3PageMetrics\Service\ModuleLinkBuilder:
-        public: true
-
-    # The tagged iterator has to be named, like every other consumer of the
-    # metric providers. Public so functional tests can fetch it directly via
-    # $this->get() instead of rendering the module's compare view.
-    KonradMichalik\Typo3PageMetrics\Service\PeriodComparisonBuilder:
-        arguments:
-            $providers: !tagged_iterator page_metrics.metric_provider
-        public: true
-
-    # The tagged iterator has to be named, like every other consumer of the
-    # metric providers. Public so functional tests can fetch it directly via
-    # $this->get() instead of rendering the module's pages view.
-    KonradMichalik\Typo3PageMetrics\Service\SitePagesTableBuilder:
-        arguments:
-            $providers: !tagged_iterator page_metrics.metric_provider
-        public: true
-
-    # Public for the same reason as the tiles controller above.
-    KonradMichalik\Typo3PageMetrics\Controller\Ajax\PageMetricsExportController:
-        public: true
-
-    # The tagged iterator has to be named, like every other consumer of the
-    # metric providers. Public so functional tests can fetch it directly via
-    # $this->get() instead of going through the export route.
-    KonradMichalik\Typo3PageMetrics\Service\SiteMetricValueReader:
-        arguments:
-            $providers: !tagged_iterator page_metrics.metric_provider
-        public: true
-
-    # Public so functional tests can fetch it directly via $this->get()
-    # instead of dispatching a real AJAX route request.
-    KonradMichalik\Typo3PageMetrics\Service\CsvExportBuilder:
-        public: true
-
-    # Public for the same reason as the export builder above.
-    KonradMichalik\Typo3PageMetrics\Service\CsvStreamWriter:
         public: true
 
     # The tagged iterator has to be named, like every other consumer of the

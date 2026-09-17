@@ -373,52 +373,6 @@ final class PageMetricsTilesControllerTest extends FunctionalTestCase
         self::assertStringNotContainsString('Add marker', $body);
     }
 
-    public function testOffersTheWayIntoTheModuleBesideTheDateMark(): void
-    {
-        // The tile row is where an editor already looks, and until now
-        // nothing on it said that a fuller reading of the same page exists.
-        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
-
-        $body = (string) $this->dispatch(['id' => '2'])->getBody();
-
-        self::assertStringContainsString('pagemetrics-module-link', $body);
-        self::assertStringContainsString('module/web/pagemetrics', $body);
-        self::assertStringContainsString('Open full view', $body);
-    }
-
-    public function testTheWayIntoTheModuleCarriesThePageAndNotThePeriod(): void
-    {
-        // The page module's period is URL state; the module's is a stored
-        // per-user preference, and a query parameter named like a moduleData
-        // key overwrites it on the way in. So the link names the page and
-        // leaves the reader's own period alone.
-        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
-
-        $body = (string) $this->dispatch(['id' => '2', 'period' => '90'])->getBody();
-
-        self::assertMatchesRegularExpression('#pagemetrics-module-link" href="[^"]*id=2[^"]*"#', $body);
-        self::assertDoesNotMatchRegularExpression('#pagemetrics-module-link" href="[^"]*period=#', $body);
-    }
-
-    public function testOffersNoWayIntoTheModuleToAUserWhoCannotOpenIt(): void
-    {
-        // The module is declared 'access' => 'user' and this editor is in no
-        // group that lists it, so the route would refuse them. A link to
-        // that is worse than no link. Their own tiles still render, which is
-        // why this user needs a page mount and the fixture's other editor,
-        // who has none, cannot stand in for them.
-        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
-        $this->importCSVDataSet(__DIR__.'/Fixtures/module_link_users.csv');
-        $backendUser = $this->setUpBackendUser(4);
-        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
-
-        $body = (string) $this->dispatch(['id' => '2'])->getBody();
-
-        self::assertStringNotContainsString('pagemetrics-module-link', $body);
-        // The rest of the row is untouched by that decision.
-        self::assertStringContainsString('pagemetrics-tiles', $body);
-    }
-
     public function testRendersEmptyResponseWhenBackendUserLacksPageAccess(): void
     {
         // Page 3 in the fixture has perms_everybody = 0 and perms_userid = 1,

@@ -71,4 +71,33 @@ final readonly class DataFreshness
         $difference = $this->date->setTime(0, 0)->diff($today->setTime(0, 0));
         $this->daysBehind = 1 === $difference->invert ? 0 : $difference->days;
     }
+
+    /**
+     * The oldest of several days, for a surface that carries one mark over
+     * rows from more than one site.
+     *
+     * The earliest wins, the same rule DataFreshnessResolver applies across
+     * a site's providers, one level up: a card is only as current as its
+     * stalest row, and showing the freshest day would hide a site whose
+     * import stopped a week ago.
+     *
+     * A site that has never been imported contributes null and is skipped
+     * rather than winning. It has no day to be behind by, and letting it
+     * decide would say "no date" about a card whose numbers arrived this
+     * morning.
+     *
+     * @param list<?self> $values
+     */
+    public static function oldestOf(array $values): ?self
+    {
+        $oldest = null;
+
+        foreach ($values as $value) {
+            if (null !== $value && (null === $oldest || $value->date < $oldest->date)) {
+                $oldest = $value;
+            }
+        }
+
+        return $oldest;
+    }
 }

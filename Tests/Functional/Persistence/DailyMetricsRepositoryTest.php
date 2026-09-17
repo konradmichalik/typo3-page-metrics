@@ -154,64 +154,6 @@ final class DailyMetricsRepositoryTest extends FunctionalTestCase
         self::assertSame([2 => 50], $sums);
     }
 
-    public function testSeriesByPageZeroFillsEveryDayOfEveryPageThatRecordedSomething(): void
-    {
-        $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 5);
-        $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-03'), 'matomo.pageviews', 9);
-        $this->subject->upsert(3, 0, 'matomo', new DateTimeImmutable('2026-08-02'), 'matomo.pageviews', 1);
-
-        $series = $this->subject->seriesByPage([2, 3], 0, 'matomo.pageviews', new DateRange(
-            new DateTimeImmutable('2026-08-01'),
-            new DateTimeImmutable('2026-08-03'),
-        ));
-
-        self::assertSame([
-            2 => ['2026-08-01' => 5, '2026-08-02' => 0, '2026-08-03' => 9],
-            3 => ['2026-08-01' => 0, '2026-08-02' => 1, '2026-08-03' => 0],
-        ], $series);
-    }
-
-    public function testSeriesByPageLeavesOutAPageWithNoRowAtAll(): void
-    {
-        // The same reading sumsByPage() makes: a page nothing was recorded
-        // for is absent rather than present with a row of zeros, so the
-        // caller can tell "nothing here" from "zero every day".
-        $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 5);
-
-        $series = $this->subject->seriesByPage([2, 3], 0, 'matomo.pageviews', new DateRange(
-            new DateTimeImmutable('2026-08-01'),
-            new DateTimeImmutable('2026-08-01'),
-        ));
-
-        self::assertArrayHasKey(2, $series);
-        self::assertArrayNotHasKey(3, $series);
-    }
-
-    public function testSeriesByPageKeepsLanguagesMetricsAndDimensionsApart(): void
-    {
-        $date = new DateTimeImmutable('2026-08-01');
-        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.pageviews', 10);
-        $this->subject->upsert(2, 1, 'matomo', $date, 'matomo.pageviews', 20);
-        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.visits', 7);
-        $this->subject->upsert(2, 0, 'matomo', $date, 'matomo.pageviews', 4, 'via_redirect');
-
-        $range = new DateRange($date, $date);
-
-        self::assertSame([2 => ['2026-08-01' => 10]], $this->subject->seriesByPage([2], 0, 'matomo.pageviews', $range));
-        self::assertSame([2 => ['2026-08-01' => 20]], $this->subject->seriesByPage([2], 1, 'matomo.pageviews', $range));
-        self::assertSame([2 => ['2026-08-01' => 4]], $this->subject->seriesByPage([2], 0, 'matomo.pageviews', $range, 'via_redirect'));
-    }
-
-    public function testSeriesByPageShortCircuitsOnAnEmptyPageList(): void
-    {
-        $this->subject->upsert(2, 0, 'matomo', new DateTimeImmutable('2026-08-01'), 'matomo.pageviews', 42);
-
-        self::assertSame([], $this->subject->seriesByPage([], 0, 'matomo.pageviews', new DateRange(
-            new DateTimeImmutable('2026-08-01'),
-            new DateTimeImmutable('2026-08-01'),
-        )));
-    }
-
     public function testSumsByDimensionPrefixAddsUpOnePrefixAcrossDaysAndPages(): void
     {
         $first = new DateTimeImmutable('2026-08-01');

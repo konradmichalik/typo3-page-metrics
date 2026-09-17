@@ -17,7 +17,7 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{MetricGroup, MetricPolarity, MetricUnit, TrafficChannel};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DateRange, MetricDefinition, MetricTile, MetricTrend, PageMetricsViewData, RateMetricDefinition, SiteBenchmarkResult, TileBenchmark};
 use KonradMichalik\Typo3PageMetrics\Event\ModifyMetricTilesEvent;
-use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
+use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, BotAgentDailyRepository, DailyMetricsRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface};
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Throwable;
@@ -30,10 +30,9 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 
+use function count;
 use function in_array;
 use function sprintf;
-use function strlen;
-use function substr;
 
 /**
  * PageMetricsViewDataBuilder.
@@ -50,6 +49,29 @@ final readonly class PageMetricsViewDataBuilder
     private const PERIOD_OPTIONS = [7, 30, 90];
 
     private const LL = 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:';
+
+    /**
+     * The bot buckets that also get a tile of their own, as metric
+     * identifier => the bucket value the agent rows carry (see Bucket, and
+     * AccessLogMetricProvider for where the identifiers are declared). The
+     * order here is the order they appear in.
+     *
+     * These two and not the other three because they answer a question an
+     * editor now asks about their own page: whether AI is reading it, and
+     * which one. The remaining buckets are infrastructure noise, and their
+     * share of the summary is all anybody has wanted from them.
+     *
+     * They keep counting towards the summary as well. The double appearance
+     * is deliberate: the tiles answer "who is coming", the summary answers
+     * "how much of this was not a person", and the second question contains
+     * the first.
+     *
+     * @var array<string, string>
+     */
+    private const AGENT_DETAIL_METRICS = [
+        'bot.ai_chatbot' => 'ai_chatbot',
+        'bot.ai_crawler' => 'ai_crawler',
+    ];
 
     /**
      * The summary is assembled by this class rather than declared by a
@@ -114,6 +136,9 @@ final readonly class PageMetricsViewDataBuilder
         private ManualAnnotationLinkBuilder $annotationLinkBuilder,
         private EventDispatcherInterface $eventDispatcher,
         private MetricDefinitionCollector $metricDefinitionCollector,
+        private TileBreakdownBuilder $breakdownBuilder,
+        private MetricSourceLabelProvider $sourceLabels,
+        private BotAgentDailyRepository $botAgentDailyRepository,
         private iterable $providers,
     ) {}
 
@@ -257,7 +282,9 @@ final readonly class PageMetricsViewDataBuilder
 
         $pageUrl = $includeSubpages ? null : $this->resolvePageUrl($site, $pageId);
         $pageUids = $includeSubpages ? $this->pageUidRepository->descendantsOf($pageId) : [$pageId];
-        [$definitions, $rateDefinitions, $externalLinkByIdentifier, $coverageByIdentifier, $machineDefinitionsByProvider] = $this->collectDefinitions($site, $pageUrl, $tileRange);
+        [$definitions, $rateDefinitions, $externalLinkByIdentifier, $coverageByIdentifier, $machineDefinitionsByProvider, $machineDefinitionsByIdentifier, $sourceByIdentifier] = $this->collectDefinitions($site, $pageUrl, $tileRange);
+
+        $promotedDefinitions = array_intersect_key($machineDefinitionsByIdentifier, self::AGENT_DETAIL_METRICS);
 
         // One query for every tile's traffic split rather than one each. The
         // dimension LIKE cannot use the table's index prefix, so a row of
@@ -266,7 +293,16 @@ final readonly class PageMetricsViewDataBuilder
         // still not asked here: the answer is simply empty for the ones that
         // do not, which is what lets a provider name a channel this class has
         // never heard of.
-        $identifiers = array_map(static fn (MetricDefinition $definition): string => $definition->identifier, $definitions);
+        //
+        // The promoted bot tiles are counted in, although their own parts
+        // come from somewhere else entirely: both dimensions below are
+        // written for every headline metric the import sees, bot buckets
+        // included, and a tile that leaves them out would drop the share of
+        // its traffic that arrived on a record or through a redirect.
+        $identifiers = [
+            ...array_map(static fn (MetricDefinition $definition): string => $definition->identifier, $definitions),
+            ...array_keys($promotedDefinitions),
+        ];
         $channelSums = $this->dailyMetricsRepository->sumsByMetricAndDimensionPrefix(
             $pageUids,
             $languageId,
@@ -293,7 +329,35 @@ final readonly class PageMetricsViewDataBuilder
         foreach ($definitions as $definition) {
             $ordered[] = [
                 'sortOrder' => $definition->sortOrder,
-                'tile' => $this->buildCountTile($definition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null, $coverageByIdentifier[$definition->identifier] ?? null, $includeSubpages, $withBenchmark, $channelSums[$definition->identifier] ?? [], $recordSums[$definition->identifier][self::RECORD_DIMENSION] ?? 0),
+                'tile' => $this->buildCountTile($definition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$definition->identifier] ?? null, $coverageByIdentifier[$definition->identifier] ?? null, $sourceByIdentifier[$definition->identifier] ?? '', $includeSubpages, $withBenchmark, $channelSums[$definition->identifier] ?? [], $recordSums[$definition->identifier][self::RECORD_DIMENSION] ?? 0),
+            ];
+        }
+
+        // One query for both tiles' parts rather than one each, for the same
+        // reason the channel split above is fetched once for the whole row.
+        // Asked unconditionally: with no promoted definition the bucket list
+        // is empty and the repository answers without touching the database.
+        $agentSums = $this->botAgentDailyRepository->agentSums($pageUids, $languageId, array_values(array_intersect_key(self::AGENT_DETAIL_METRICS, $promotedDefinitions)), $tileRange);
+        // The constant's own order, which is the order the tiles appear in.
+        // Taken from here rather than from $promotedDefinitions, which is in
+        // whatever order the providers were asked in.
+        $slots = array_flip(array_keys(self::AGENT_DETAIL_METRICS));
+
+        foreach ($promotedDefinitions as $identifier => $definition) {
+            $ordered[] = [
+                // Directly before the summary these are also counted in, and
+                // after every tile that is about the site's readers. Their
+                // own sortOrder (30 and 40) would put them between the two
+                // figures an editor came for and the rates that qualify
+                // them, which is the position buildMachineSummaryTile()
+                // rejects for the whole group.
+                'sortOrder' => \PHP_INT_MAX - count(self::AGENT_DETAIL_METRICS) + $slots[$identifier],
+                // No benchmark, although unlike the summary this tile does
+                // stand for a single metric and could have one: the band
+                // says a page is in the top fifth of its site, which reads
+                // as an achievement. Being crawled more than the rest of the
+                // site is not one, and it is nothing an editor can act on.
+                'tile' => $this->buildCountTile($definition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$identifier] ?? null, $coverageByIdentifier[$identifier] ?? null, $sourceByIdentifier[$identifier] ?? '', $includeSubpages, false, $channelSums[$identifier] ?? [], $recordSums[$identifier][self::RECORD_DIMENSION] ?? 0, $agentSums[self::AGENT_DETAIL_METRICS[$identifier]] ?? []),
             ];
         }
 
@@ -314,7 +378,7 @@ final readonly class PageMetricsViewDataBuilder
         foreach ($rateDefinitions as $rateDefinition) {
             $ordered[] = [
                 'sortOrder' => $rateDefinition->sortOrder,
-                'tile' => $this->buildRateTile($rateDefinition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$rateDefinition->identifier] ?? null, $coverageByIdentifier[$rateDefinition->identifier] ?? null, $includeSubpages, $withBenchmark),
+                'tile' => $this->buildRateTile($rateDefinition, $site, $pageId, $pageUids, $languageId, $tileRange, $previousRange, $externalLinkByIdentifier[$rateDefinition->identifier] ?? null, $coverageByIdentifier[$rateDefinition->identifier] ?? null, $sourceByIdentifier[$rateDefinition->identifier] ?? '', $includeSubpages, $withBenchmark),
             ];
         }
 
@@ -346,7 +410,13 @@ final readonly class PageMetricsViewDataBuilder
      * buckets are called bot.*, not accesslog.* - and guessing it is exactly
      * the fragility the provider tagging exists to avoid.
      *
-     * @return array{0: list<MetricDefinition>, 1: list<RateMetricDefinition>, 2: array<string, ?string>, 3: array<string, ?DateRange>, 4: array<string, non-empty-list<MetricDefinition>>}
+     * Keyed by identifier a second time on top of that, because the two
+     * buckets that also get a tile of their own are looked up by
+     * identifier and a tile is one per identifier no matter how many
+     * providers declared it. First declaration wins, the same way the
+     * audience list below resolves the same collision.
+     *
+     * @return array{0: list<MetricDefinition>, 1: list<RateMetricDefinition>, 2: array<string, ?string>, 3: array<string, ?DateRange>, 4: array<string, non-empty-list<MetricDefinition>>, 5: array<string, MetricDefinition>, 6: array<string, string>}
      */
     private function collectDefinitions(Site $site, ?string $pageUrl, DateRange $tileRange): array
     {
@@ -363,17 +433,28 @@ final readonly class PageMetricsViewDataBuilder
         $coverageByIdentifier = [];
         /** @var array<string, non-empty-list<MetricDefinition>> $machineDefinitionsByProvider */
         $machineDefinitionsByProvider = [];
+        /** @var array<string, MetricDefinition> $machineDefinitionsByIdentifier */
+        $machineDefinitionsByIdentifier = [];
+        // Which source a metric came from, as the name its popover shows.
+        // Resolved once per provider rather than once per metric: the answer
+        // is a property of the provider, and a row of eight tiles would
+        // otherwise be eight lookups for one string.
+        /** @var array<string, string> $sourceByIdentifier */
+        $sourceByIdentifier = [];
 
         foreach ($this->metricDefinitionCollector->supporting($this->providers, $site) as $provider) {
             $externalLink = null !== $pageUrl ? $provider->getExternalLink($site, $pageUrl, $tileRange) : null;
             $coverage = $this->importCoverage->forProvider($provider->getIdentifier(), $site->getIdentifier());
+            $source = $this->sourceLabels->for($provider->getIdentifier());
 
             foreach ($this->metricDefinitionCollector->forSite($provider, $site) as $definition) {
                 $externalLinkByIdentifier[$definition->identifier] = $externalLink;
                 $coverageByIdentifier[$definition->identifier] = $coverage;
+                $sourceByIdentifier[$definition->identifier] = $source;
 
                 if (MetricGroup::Machine === $definition->group) {
                     $machineDefinitionsByProvider[$provider->getIdentifier()][] = $definition;
+                    $machineDefinitionsByIdentifier[$definition->identifier] ??= $definition;
 
                     continue;
                 }
@@ -385,10 +466,11 @@ final readonly class PageMetricsViewDataBuilder
                 $rateDefinitionsByIdentifier[$rateDefinition->identifier] = $rateDefinition;
                 $externalLinkByIdentifier[$rateDefinition->identifier] = $externalLink;
                 $coverageByIdentifier[$rateDefinition->identifier] = $coverage;
+                $sourceByIdentifier[$rateDefinition->identifier] = $source;
             }
         }
 
-        return [array_values($definitionsByIdentifier), array_values($rateDefinitionsByIdentifier), $externalLinkByIdentifier, $coverageByIdentifier, $machineDefinitionsByProvider];
+        return [array_values($definitionsByIdentifier), array_values($rateDefinitionsByIdentifier), $externalLinkByIdentifier, $coverageByIdentifier, $machineDefinitionsByProvider, $machineDefinitionsByIdentifier, $sourceByIdentifier];
     }
 
     private function resolvePageUrl(Site $site, int $pageId): ?string
@@ -450,8 +532,11 @@ final readonly class PageMetricsViewDataBuilder
      * @param array<string, int> $channelSums dimension => total for this metric, fetched once for the whole row
      * @param int                $recordValue how much of this metric arrived on a record below the page, same period
      *                                        as the headline and fetched once for the whole row
+     * @param array<string, int> $agentSums   agent => hits, on the bot buckets that get a tile of their own and
+     *                                        empty on every other metric, which is what picks the shape of the
+     *                                        popover's parts below
      */
-    private function buildCountTile(MetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, bool $includeSubpages, bool $withBenchmark, array $channelSums, int $recordValue): MetricTile
+    private function buildCountTile(MetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, string $source, bool $includeSubpages, bool $withBenchmark, array $channelSums, int $recordValue, array $agentSums = []): MetricTile
     {
         $series = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
         $sparkline = $this->importCoverage->mask($series, $coverage);
@@ -482,10 +567,13 @@ final readonly class PageMetricsViewDataBuilder
             $externalLink,
             $this->previousFormatted($deltaPercent, $previousValue, $definition->unit),
             $definition->polarity,
-            // Where this metric's traffic came from, on the one metric per
-            // provider that has an answer, and empty on every other, which
-            // leaves their popovers exactly as they were.
-            $this->channelBreakdown($channelSums, $definition, $value),
+            // What this metric's number is made of: which bot made the
+            // requests on the two bot buckets that carry agent detail, and
+            // where the traffic came from on everything else. Empty on a
+            // metric with neither, which leaves its popover as it was.
+            [] !== $agentSums
+                ? $this->breakdownBuilder->byAgent($definition, $value, $agentSums)
+                : $this->breakdownBuilder->byChannel($definition, $value, $channelSums),
             $this->tileBenchmark($benchmark, $definition->unit),
             $previousPeriodCovered,
             $previousValue,
@@ -495,70 +583,8 @@ final readonly class PageMetricsViewDataBuilder
             // where none of the metric arrived that way, which is almost
             // every page: see MetricTile::$recordFormattedValue.
             $recordValue > 0 ? $this->valueFormatter->format($recordValue, $definition->unit) : '',
+            $source,
         );
-    }
-
-    /**
-     * The tile's number split by where it came from, as the parts its
-     * popover lists.
-     *
-     * Read from the dimension column of the very metric the tile shows, so
-     * the parts are parts of the number above them and not of a neighbouring
-     * one. Empty, and therefore invisible, wherever the provider wrote no
-     * split: an analytics source without referrer data must leave the
-     * popover as it found it.
-     *
-     * A provider attributes what it can attribute, so the named channels do
-     * not add up to the headline on their own. The remainder is carried as a
-     * part of its own rather than left implicit: the popover heads this list
-     * with "Made up of", which is a claim, and a list of 950 under a headline
-     * of 1,000 reads as a rendering fault instead of as traffic the source
-     * could not place. Naming it keeps the claim true and says the honest
-     * thing at the same time.
-     *
-     * @param array<string, int> $sums dimension => total, already fetched for every tile at once
-     *
-     * @return list<array{label: string, formattedValue: string}>
-     */
-    private function channelBreakdown(array $sums, MetricDefinition $definition, int $value): array
-    {
-        // array_merge keeps the left operand's key order and the right
-        // operand's values, so the nulls below are purely positional: a
-        // known channel takes the place TrafficChannel's case order gave it,
-        // one this version has never heard of lands after them under its own
-        // name, and a channel with no rows is filtered back out. Shown rather
-        // than dropped, because a split that silently loses traffic is worse
-        // than one carrying a label nobody recognises. Reading the split by
-        // prefix rather than by the declared cases is what makes that
-        // possible at all.
-        $positions = array_fill_keys(array_map(static fn (TrafficChannel $channel): string => $channel->dimension(), TrafficChannel::cases()), null);
-        $ordered = array_filter(array_merge($positions, $sums), static fn (?int $value): bool => null !== $value);
-
-        $breakdown = [];
-
-        foreach ($ordered as $dimension => $channelValue) {
-            $channel = TrafficChannel::fromDimension($dimension);
-            $breakdown[] = [
-                'label' => $channel?->label() ?? substr($dimension, strlen(TrafficChannel::DIMENSION_PREFIX)),
-                'formattedValue' => $this->valueFormatter->format($channelValue, $definition->unit),
-            ];
-        }
-
-        // Last, and only where there is one. A negative remainder is possible
-        // in principle, where a provider's segmented totals exceed its own
-        // unsegmented one, and printing "-12 unattributed" would be a claim
-        // about arithmetic nobody can act on; the parts are then simply shown
-        // as they came.
-        $unattributed = $value - array_sum($ordered);
-
-        if ([] !== $breakdown && $unattributed > 0) {
-            $breakdown[] = [
-                'label' => $this->getLanguageService()->sL(self::LL.'popover.breakdown.unattributed'),
-                'formattedValue' => $this->valueFormatter->format($unattributed, $definition->unit),
-            ];
-        }
-
-        return $breakdown;
     }
 
     /**
@@ -638,6 +664,11 @@ final readonly class PageMetricsViewDataBuilder
             null,
             $previousPeriodCovered,
             $previousValue,
+            '',
+            // The summary has no definition to carry a source, but it does
+            // belong to exactly one provider: it is assembled per provider
+            // for that very reason.
+            $this->sourceLabels->for($providerIdentifier),
         );
     }
 
@@ -650,11 +681,11 @@ final readonly class PageMetricsViewDataBuilder
      * is. The import writes a via_redirect row for every metric, and folding
      * the buckets together would otherwise drop that share in silence.
      *
-     * @param list<int>                                          $pageUids
-     * @param array<string, int>                                 $series
-     * @param list<array{label: string, formattedValue: string}> $breakdown
+     * @param list<int>                                                         $pageUids
+     * @param array<string, int>                                                $series
+     * @param list<array{label: string, formattedValue: string, hint?: string}> $breakdown
      *
-     * @return array{0: array<string, int>, 1: int, 2: int, 3: list<array{label: string, formattedValue: string}>}
+     * @return array{0: array<string, int>, 1: int, 2: int, 3: list<array{label: string, formattedValue: string, hint?: string}>}
      */
     private function foldBucket(MetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, array $series, int $previousValue, int $redirectValue, array $breakdown, bool $previousPeriodCovered): array
     {
@@ -667,6 +698,11 @@ final readonly class PageMetricsViewDataBuilder
         $breakdown[] = [
             'label' => $definition->label,
             'formattedValue' => $this->valueFormatter->format(array_sum($bucketSeries), $definition->unit),
+            // What the bucket counts, in the words its own tile uses. A
+            // reader who can tell an AI crawler from a link preview does not
+            // need the list explained, and this list exists for the reader
+            // who cannot.
+            'hint' => $definition->description,
         ];
 
         return [
@@ -680,7 +716,7 @@ final readonly class PageMetricsViewDataBuilder
     /**
      * @param list<int> $pageUids
      */
-    private function buildRateTile(RateMetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, bool $includeSubpages, bool $withBenchmark): MetricTile
+    private function buildRateTile(RateMetricDefinition $definition, Site $site, int $pageId, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, ?string $externalLink, ?DateRange $coverage, string $source, bool $includeSubpages, bool $withBenchmark): MetricTile
     {
         $numeratorSparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->numerator, $tileRange);
         $denominatorSparkline = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->denominator, $tileRange);
@@ -729,6 +765,8 @@ final readonly class PageMetricsViewDataBuilder
             $this->tileBenchmark($benchmark, $definition->unit),
             $previousPeriodCovered,
             $previousValue,
+            '',
+            $source,
         );
     }
 

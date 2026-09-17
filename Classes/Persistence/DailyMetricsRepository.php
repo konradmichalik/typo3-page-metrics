@@ -164,66 +164,6 @@ class DailyMetricsRepository
     }
 
     /**
-     * One daily series per page, all of them in a single query.
-     *
-     * dailySeries() answers for one page and siteSeries() answers for a set
-     * of pages taken together; this is the shape between them, and it exists
-     * because the site-wide pages table draws a sparkline on every row it
-     * shows. Calling dailySeries() per row would be twenty-five queries for
-     * one screen, which is the N+1 SitePagesTableBuilder is built to avoid;
-     * here the cost of a screen stays one query however many rows it has.
-     *
-     * A day with no row is zero on the same reading as siteSeries(): a
-     * provider only emits a metric for a URL that had activity. A page with
-     * no row anywhere in the range is absent altogether rather than present
-     * with a row of zeros, exactly as sumsByPage() leaves it out, so the
-     * caller can still tell "nothing was recorded here" from "zero every
-     * day". Which days were imported at all stays ImportCoverage's question.
-     *
-     * @param list<int> $pageUids
-     *
-     * @return array<int, array<string, int>> page uid => (Y-m-d => value), zero-filled, only for pages with at least one row
-     */
-    public function seriesByPage(array $pageUids, int $languageId, string $metric, DateRange $range, string $dimension = ''): array
-    {
-        if ([] === $pageUids) {
-            return [];
-        }
-
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
-        $rows = $queryBuilder
-            ->select('page_uid', 'date')
-            ->addSelectLiteral('SUM('.$queryBuilder->quoteIdentifier('value').') AS total')
-            ->from(self::TABLE)
-            ->where(
-                $queryBuilder->expr()->in('page_uid', $queryBuilder->createNamedParameter($pageUids, Connection::PARAM_INT_ARRAY)),
-                $queryBuilder->expr()->eq('sys_language_uid', $queryBuilder->createNamedParameter($languageId, ParameterType::INTEGER)),
-                $queryBuilder->expr()->eq('metric', $queryBuilder->createNamedParameter($metric)),
-                $queryBuilder->expr()->eq('dimension', $queryBuilder->createNamedParameter($dimension)),
-                $queryBuilder->expr()->gte('date', $queryBuilder->createNamedParameter($range->from->format('Y-m-d'))),
-                $queryBuilder->expr()->lte('date', $queryBuilder->createNamedParameter($range->until->format('Y-m-d'))),
-            )
-            ->groupBy('page_uid', 'date')
-            ->executeQuery()
-            ->fetchAllAssociative();
-
-        $byPage = [];
-        foreach ($rows as $row) {
-            $byPage[(int) $row['page_uid']][substr((string) $row['date'], 0, 10)] = (int) $row['total'];
-        }
-
-        $series = [];
-        foreach ($byPage as $pageUid => $values) {
-            foreach ($range->days() as $day) {
-                $key = $day->format('Y-m-d');
-                $series[$pageUid][$key] = $values[$key] ?? 0;
-            }
-        }
-
-        return $series;
-    }
-
-    /**
      * Every dimension of one metric that starts with $dimensionPrefix,
      * summed over the range and the pages, ordered by dimension so the same
      * data always comes back in the same order.

@@ -52,9 +52,6 @@
                     </li>
                 </f:for>
             </ul>
-            <f:for each="{linkSites}" as="linkSite">
-                <f:render partial="WidgetModuleLink" arguments="{urls: moduleUrls, site: linkSite}" />
-            </f:for>
         </f:then>
         <f:else>
             <div class="callout callout-info">
