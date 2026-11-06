@@ -15,6 +15,7 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Provider\AccessLog;
 
 use KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
+use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
@@ -43,6 +44,8 @@ final class AccessLogMetricProviderWiringTest extends FunctionalTestCase
         parent::setUp();
         $this->importCSVDataSet(__DIR__.'/../../Service/Fixtures/pages.csv');
         $this->logFile = (string) tempnam(sys_get_temp_dir(), 'accesslog-');
+        // availableMetrics() labels the "Bot traffic" summary through it.
+        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->create('default');
     }
 
     protected function tearDown(): void

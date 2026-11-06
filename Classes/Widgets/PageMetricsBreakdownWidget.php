@@ -23,6 +23,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, JavaScriptInterface, WidgetConfigurationInterface, WidgetContext, WidgetRendererInterface, WidgetResult};
 
+use function array_keys;
 use function array_map;
 use function in_array;
 
@@ -77,7 +78,13 @@ final readonly class PageMetricsBreakdownWidget implements WidgetRendererInterfa
      */
     public function getSettingsDefinitions(): array
     {
-        $availableMetrics = $this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites());
+        // Every other machine metric is folded into the summary tile, so
+        // findTile() would never find it.
+        $availableMetrics = $this->overviewBuilder->availableMetrics(
+            $this->siteFinder->getAllSites(),
+            true,
+            array_keys(PageMetricsViewDataBuilder::AGENT_DETAIL_METRICS),
+        );
 
         return [
             new SettingDefinition(

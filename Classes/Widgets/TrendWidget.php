@@ -67,7 +67,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
                 false,
                 [
                     '' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.metric.auto',
-                    ...$this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites()),
+                    ...$this->availableMetrics(),
                 ],
             ),
             new SettingDefinition(
@@ -112,7 +112,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
             'sites' => $sites,
             'dataFreshness' => DataFreshness::oldestOf(array_column($sites, 'dataFreshness')),
             'sentiment' => $this->rowSentiment($sites)->value,
-            'columnLabel' => '' !== $metric ? ($this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites())[$metric] ?? null) : null,
+            'columnLabel' => '' !== $metric ? ($this->availableMetrics()[$metric] ?? null) : null,
             'configuration' => $this->configuration,
         ]);
 
@@ -173,7 +173,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
         $parts = [$languageService->sL($this->configuration->getTitle())];
 
         if ('' !== $metricIdentifier) {
-            $metricLabel = $this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites())[$metricIdentifier] ?? null;
+            $metricLabel = $this->availableMetrics()[$metricIdentifier] ?? null;
 
             if (null !== $metricLabel) {
                 $parts[] = $metricLabel;
@@ -189,6 +189,17 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
     private function getLanguageService(): LanguageService
     {
         return $GLOBALS['LANG'];
+    }
+
+    /**
+     * Without the synthetic "Bot traffic" summary: the ranking sums stored
+     * rows per page, and nothing is ever stored under its identifier.
+     *
+     * @return array<string, string>
+     */
+    private function availableMetrics(): array
+    {
+        return $this->overviewBuilder->availableMetrics($this->siteFinder->getAllSites(), false);
     }
 
     /**

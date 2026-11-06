@@ -295,6 +295,18 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertSame('Page views', $enum['matomo.pageviews']);
     }
 
+    public function testTrendWidgetOffersSingleBotMetricsButNotTheirSummaryItCannotRank(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $widget = $this->get('dashboard.widget.pageMetricsTrend');
+        self::assertInstanceOf(TrendWidget::class, $widget);
+
+        $enum = $widget->getSettingsDefinitions()[0]->enum;
+
+        self::assertArrayHasKey('bot.search', $enum);
+        self::assertArrayNotHasKey('machine.summary.accesslog', $enum);
+    }
+
     public function testTrendWidgetListsTheBiggestDropByDefault(): void
     {
         $this->writeSiteConfiguration();

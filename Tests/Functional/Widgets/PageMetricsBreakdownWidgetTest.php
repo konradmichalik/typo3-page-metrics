@@ -215,6 +215,19 @@ final class PageMetricsBreakdownWidgetTest extends FunctionalTestCase
         self::assertArrayHasKey(90, $definitions[1]->enum);
     }
 
+    public function testOffersOnlyTheBotMetricsThatHaveATileOfTheirOwn(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $widget = $this->get('dashboard.widget.pageMetricsBreakdown');
+        self::assertInstanceOf(PageMetricsBreakdownWidget::class, $widget);
+
+        $enum = $widget->getSettingsDefinitions()[0]->enum;
+
+        self::assertArrayHasKey('machine.summary.accesslog', $enum);
+        self::assertArrayHasKey('bot.ai_crawler', $enum);
+        self::assertArrayNotHasKey('bot.search', $enum);
+    }
+
     public function testSkipsSitesWhoseRootPageHasNoTiles(): void
     {
         $this->writeSiteConfiguration('main', 1, 'https://example.com/');

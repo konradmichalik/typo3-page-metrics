@@ -14,12 +14,13 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, MetricUnit, TrendSentiment, UnresolvedReason};
+use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, MetricGroup, MetricUnit, TrendSentiment, UnresolvedReason};
 use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DataFreshness, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface, SiteAwareMetricProviderInterface};
 use TYPO3\CMS\Core\Site\Entity\Site;
 
+use function in_array;
 use function sprintf;
 use function ucfirst;
 
@@ -264,27 +265,25 @@ final readonly class SiteMetricsOverviewBuilder
      * a site mix pulls in both. A label unique among the relevant providers
      * (e.g. Matomo's "Visits" vs. GA4's "Sessions") is shown as-is.
      *
-     * @param array<Site> $sites restricts the result to providers supporting at least one of these sites
+     * @param array<Site>   $sites                  restricts the result to providers supporting at least one of these sites
+     * @param bool          $includeMachineSummary  false for a widget that reads stored rows, since none exist for the summary
+     * @param ?list<string> $machineMetricAllowList null keeps every MetricGroup::Machine metric, a list keeps only those
+     *                                              (the breakdown widget only finds the ones with a tile of their own)
      *
      * @return array<string, string> metric identifier => label, across every relevant provider
      */
-    public function availableMetrics(array $sites): array
+    public function availableMetrics(array $sites, bool $includeMachineSummary = true, ?array $machineMetricAllowList = null): array
     {
         $definitions = [];
 
         foreach ($this->relevantProviders($sites) as [$provider, $site]) {
-            foreach ([...$this->metricDefinitionCollector->forSite($provider, $site), ...$provider->getRateMetricDefinitions()] as $definition) {
+            $offered = array_filter(
+                [...$this->metricDefinitionCollector->forSite($provider, $site), ...$provider->getRateMetricDefinitions()],
+                static fn (MetricDefinition|RateMetricDefinition $definition): bool => self::isOffered($definition, $machineMetricAllowList),
+            );
+
+            foreach ([...$offered, ...$this->offeredMachineSummary($provider, $site, $includeMachineSummary)] as $definition) {
                 $definitions[$definition->identifier] = ['provider' => $provider, 'label' => $definition->label];
-            }
-
-            // One synthetic entry per provider with anything to sum, the
-            // same total the tile's "Bot traffic" summary already shows -
-            // nothing this site's own bot.* metrics couldn't already chart
-            // individually, just added together the way the tile does.
-            $machineSummary = $this->machineSummaryMetric->definitionFor($provider, $site);
-
-            if (null !== $machineSummary) {
-                $definitions[$machineSummary->identifier] = ['provider' => $provider, 'label' => $machineSummary->label];
             }
         }
 
@@ -299,6 +298,28 @@ final readonly class SiteMetricsOverviewBuilder
         }
 
         return $metrics;
+    }
+
+    /**
+     * One synthetic entry per provider with anything to sum, the same total
+     * the tile's "Bot traffic" summary shows.
+     *
+     * @return list<MetricDefinition>
+     */
+    private function offeredMachineSummary(MetricProviderInterface $provider, Site $site, bool $includeMachineSummary): array
+    {
+        return $includeMachineSummary ? array_filter([$this->machineSummaryMetric->definitionFor($provider, $site)]) : [];
+    }
+
+    /**
+     * @param ?list<string> $machineMetricAllowList
+     */
+    private static function isOffered(MetricDefinition|RateMetricDefinition $definition, ?array $machineMetricAllowList): bool
+    {
+        return null === $machineMetricAllowList
+            || !$definition instanceof MetricDefinition
+            || MetricGroup::Machine !== $definition->group
+            || in_array($definition->identifier, $machineMetricAllowList, true);
     }
 
     /**
