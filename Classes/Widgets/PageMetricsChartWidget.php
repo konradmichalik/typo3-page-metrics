@@ -238,7 +238,6 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
                 'chartIcon' => $overview->chartIcon,
                 'chartColor' => $overview->chartColor,
                 'chartUnit' => $overview->chartUnit,
-                'chartSeries' => $overview->chartSeries,
                 'annotations' => $payloadBuilder->build($overview->annotations),
                 'series' => [
                     ['label' => $overview->chartLabel, 'color' => $overview->chartColor, 'unit' => $overview->chartUnit->value, 'values' => $overview->chartSeries],
