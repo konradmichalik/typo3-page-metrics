@@ -22,6 +22,13 @@ skipped entirely for sites without one.
 | Not found pages | `pageMetricsNotFoundPages` | URLs the daily import could not resolve to a page, with the reason. A record detail URL served by a route enhancer resolves to the page that renders it and does not appear here; one below the same page that no record matches still does | 30 days | — |
 | Page metrics annotations | `pageMetricsAnnotations` | Recent annotations with their kind and, for one that ran for a while, its last day | 90 days | — |
 
+> [!NOTE]
+> Every widget with an entry in the *Configurable* column needs TYPO3 14.
+> Its settings dialog relies on `WidgetRendererInterface`, which TYPO3 13.4's
+> EXT:dashboard does not have. On TYPO3 13.4 only `pageMetricsInsight`, *Not
+> found pages* and *Page metrics annotations* are registered, and a dashboard
+> preset skips the rest.
+
 Every widget except the two site-homepage tiles widgets reads from the same
 `SiteMetricsOverviewBuilder`, aggregated across all pages of a site rather
 than a single one. That includes annotations: a dashboard covers the whole

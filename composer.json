@@ -43,7 +43,7 @@
 		"typo3/testing-framework": "^8.2 || ^9.0.3 || ^10.0"
 	},
 	"suggest": {
-		"typo3/cms-dashboard": "Enables the 'Page metrics' dashboard widget, showing each site's homepage tiles at a glance."
+		"typo3/cms-dashboard": "Enables the dashboard widgets. Those with settings, including 'Page metrics', need TYPO3 14."
 	},
 	"autoload": {
 		"psr-4": {
