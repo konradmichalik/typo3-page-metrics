@@ -13,6 +13,7 @@ skipped entirely for sites without one.
 
 | Widget | Identifier | Shows | Fixed period | Configurable |
 | --- | --- | --- | --- | --- |
+| What changed | `pageMetricsInsight` | Up to four sentences on the significant movements across all sites, and nothing when nothing moved significantly | 30 days | — |
 | Page metrics | `pageMetrics` | Each site's homepage tiles: page views, visits, avg. time on page, bounce rate | — | Period (7/30/90 days) |
 | Page metrics breakdown | `pageMetricsBreakdown` | One configured metric per site (defaults to each site's primary metric): its curve, its last day/previous day/peak/average/via redirects figures, and its breakdown into parts where it has one (e.g. Bot traffic split by crawler), drawn as a donut where every part can be sized | — | Metric, period (7/30/90 days) |
 | Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers | — | Metric, period (7/30/90 days), marker category |
@@ -25,9 +26,9 @@ skipped entirely for sites without one.
 > [!NOTE]
 > Every widget with an entry in the *Configurable* column needs TYPO3 14.
 > Its settings dialog relies on `WidgetRendererInterface`, which TYPO3 13.4's
-> EXT:dashboard does not have. On TYPO3 13.4 only `pageMetricsInsight`, *Not
-> found pages* and *Page metrics annotations* are registered, and a dashboard
-> preset skips the rest.
+> EXT:dashboard does not have. On TYPO3 13.4 only *What changed*, *Not found
+> pages* and *Page metrics annotations* are registered, and a dashboard preset
+> skips the rest.
 
 Every widget except the two site-homepage tiles widgets reads from the same
 `SiteMetricsOverviewBuilder`, aggregated across all pages of a site rather
