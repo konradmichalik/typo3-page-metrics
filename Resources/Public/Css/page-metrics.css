@@ -1176,10 +1176,24 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    /* WCAG 2.5.8 minimum target size. */
+    min-height: 24px;
     padding: 3px 8px;
+    border: 0;
     border-radius: 999px;
     background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 6%, transparent);
+    font: inherit;
     cursor: help;
+}
+
+.pagemetrics-widget-metric-stat:hover,
+.pagemetrics-widget-metric-stat:focus-visible {
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 12%, transparent);
+}
+
+.pagemetrics-widget-metric-stat:focus-visible {
+    outline: 2px solid var(--typo3-component-primary-color, #0b5fff);
+    outline-offset: 1px;
 }
 
 .pagemetrics-widget-metric-stat-icon {
@@ -1242,8 +1256,9 @@
     transform: translate(-50%, -50%);
 }
 
+/* Capped so a value stays next to its label in a wide card. */
 .pagemetrics-widget-donut-legend {
-    flex: 1 1 auto;
+    flex: 0 1 280px;
     min-width: 0;
 }
 
@@ -1260,18 +1275,52 @@
     gap: 12px;
 }
 
-/* Only the legend's own pairs get a swatch column - the plain fallback list
-   has no colour to explain, since a part without a $value never reached
-   DonutChartBuilder in the first place. */
-.pagemetrics-widget-donut-legend .pagemetrics-widget-metric-breakdown-pair {
-    grid-template-columns: auto 1fr auto;
+/* Inside the dt, since a dl's div wrapper may only hold dt and dd. */
+.pagemetrics-widget-donut-legend dt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Same cue as .pagemetrics-popover-breakdown dt[data-hint-text]. */
+.pagemetrics-widget-metric-breakdown-list dt[data-hint-text] {
+    width: fit-content;
+    min-height: 24px;
+    text-decoration: underline dotted currentColor;
+    text-underline-offset: 2px;
+    cursor: help;
+}
+
+.pagemetrics-widget-metric-breakdown-list dt[data-hint-text]:hover,
+.pagemetrics-widget-metric-breakdown-list dt[data-hint-text]:focus-visible {
+    color: var(--typo3-text-color-base, #14213d);
+}
+
+.pagemetrics-widget-metric-breakdown-list dt[data-hint-text]:focus-visible {
+    outline: 2px solid var(--typo3-component-primary-color, #0b5fff);
+    outline-offset: 1px;
 }
 
 .pagemetrics-widget-donut-legend-swatch {
+    flex-shrink: 0;
     width: 8px;
     height: 8px;
     border-radius: 50%;
     background: var(--pm-swatch);
+}
+
+/* Forced colours would blank the swatches but keep the gradient, leaving
+   slices nothing to match against. */
+@media (forced-colors: active) {
+    .pagemetrics-widget-donut,
+    .pagemetrics-widget-donut-legend-swatch {
+        forced-color-adjust: none;
+    }
+
+    /* forced-color-adjust inherits: the hole has to take Canvas again. */
+    .pagemetrics-widget-donut-hole {
+        forced-color-adjust: auto;
+    }
 }
 
 .pagemetrics-widget-metric-breakdown-list dt {

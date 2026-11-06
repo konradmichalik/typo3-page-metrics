@@ -426,9 +426,33 @@ function bindHintTooltip(element) {
     return;
   }
 
-  element.addEventListener('focus', open);
+  // A tap focuses before it clicks. Without remembering that the focus came
+  // from this same press, the click would close what the focus just opened.
+  let pressed = false;
+  let openedByPress = false;
+
+  element.addEventListener('pointerdown', () => {
+    pressed = true;
+  });
+  element.addEventListener('focus', () => {
+    openedByPress = pressed;
+    open();
+  });
   element.addEventListener('blur', () => hideHintTooltip());
+  element.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      hideHintTooltip();
+    }
+  });
   element.addEventListener('click', () => {
+    const skipToggle = openedByPress;
+    pressed = false;
+    openedByPress = false;
+
+    if (skipToggle) {
+      return;
+    }
+
     if (hintTooltipFor === element && hintTooltip && !hintTooltip.hidden) {
       hideHintTooltip();
 

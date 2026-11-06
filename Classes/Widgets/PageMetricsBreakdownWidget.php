@@ -25,6 +25,7 @@ use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, JavaScriptInterface, Wi
 
 use function array_keys;
 use function array_map;
+use function count;
 use function in_array;
 
 /**
@@ -137,7 +138,7 @@ final readonly class PageMetricsBreakdownWidget implements WidgetRendererInterfa
             'configuration' => $this->configuration,
         ]);
 
-        return new WidgetResult($view->render('Widget/PageMetricsBreakdown'), [] !== $sites ? $this->buildLabel($period) : null);
+        return new WidgetResult($view->render('Widget/PageMetricsBreakdown'), [] !== $sites ? $this->buildLabel($period, $sites) : null);
     }
 
     /**
@@ -157,19 +158,24 @@ final readonly class PageMetricsBreakdownWidget implements WidgetRendererInterfa
     }
 
     /**
-     * Mirrors PageMetricsWidget::buildLabel(): the registered widget title
-     * alone doesn't tell two instances of this widget with different periods
-     * (or metrics, shown per site in the content instead, see
-     * PageMetricsChartWidget::buildLabel()) apart on the dashboard.
+     * Same rule as PageMetricsChartWidget::buildLabel(): a single site names
+     * its resolved metric here, since the content then has no h3 carrying it.
+     *
+     * @param non-empty-list<array{tile: MetricTile}> $sites
      */
-    private function buildLabel(int $period): string
+    private function buildLabel(int $period, array $sites): string
     {
         $languageService = $this->getLanguageService();
-
-        return implode(' · ', [
+        $parts = [
             $languageService->sL($this->configuration->getTitle()),
             $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period),
-        ]);
+        ];
+
+        if (1 === count($sites)) {
+            $parts[] = $sites[0]['tile']->label;
+        }
+
+        return implode(' · ', $parts);
     }
 
     private function getLanguageService(): LanguageService

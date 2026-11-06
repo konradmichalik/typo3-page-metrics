@@ -93,6 +93,23 @@ final class PageMetricsBreakdownWidgetTest extends FunctionalTestCase
         self::assertStringContainsString('data-hint-text="The most recent day of the selected period"', $content);
     }
 
+    public function testStatChipIsAButtonSoKeyboardAndTouchCanOpenItsHint(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 42);
+
+        self::assertStringContainsString('<button type="button" class="pagemetrics-widget-metric-stat"', $this->renderWidget([]));
+    }
+
+    public function testShowsAZeroDayInsteadOfHidingItsStat(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('yesterday'), 'matomo.pageviews', 42);
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 0);
+
+        self::assertStringContainsString('data-hint-title="Last day"', $this->renderWidget([]));
+    }
+
     public function testRendersTheTilesOwnCurveAsACompactChart(): void
     {
         $this->writeSiteConfiguration('main', 1, 'https://example.com/');
@@ -180,6 +197,18 @@ final class PageMetricsBreakdownWidgetTest extends FunctionalTestCase
         self::assertStringContainsString('pagemetrics-widget-donut', $content);
         self::assertStringContainsString('conic-gradient(', $content);
         self::assertStringContainsString('pagemetrics-widget-donut-legend-swatch', $content);
+    }
+
+    public function testALegendPartWithAHintOpensItAsAFocusableTooltip(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'accesslog', $today, 'bot.ai_crawler', 20);
+        $this->get(BotAgentDailyRepository::class)->upsert('main', 1, 0, 'ai_crawler', 'GPTBot', $today, 20, 0);
+
+        $content = $this->renderWidget(['metric' => 'bot.ai_crawler']);
+
+        self::assertMatchesRegularExpression('/<dt tabindex="0" data-hint-title="GPTBot" data-hint-text="[^"]+">/', $content);
     }
 
     public function testRendersNoBreakdownForAMetricThatHasNone(): void
@@ -272,6 +301,14 @@ final class PageMetricsBreakdownWidgetTest extends FunctionalTestCase
 
         self::assertStringContainsString('Page metrics breakdown', (string) $result->label);
         self::assertStringContainsString('30', (string) $result->label);
+    }
+
+    public function testLabelNamesTheResolvedMetricForASingleSite(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 42);
+
+        self::assertStringContainsString('Page views', (string) $this->renderWidgetResult([])->label);
     }
 
     /**

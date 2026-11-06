@@ -1,0 +1,12 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:comment>
+    One breakdown part's term, with the hint the tile's popover shows for it
+    (sparkline.js, togglePopover()). Focusable only where there is a hint to read.
+    A swatch only for donut legend parts, the only ones DonutChartBuilder gives a color.
+</f:comment>
+<f:if condition="{part.hint}">
+    <f:then><dt tabindex="0" data-hint-title="{part.label}" data-hint-text="{part.hint}"><f:render section="swatch" arguments="{color: part.color}" />{part.label}<span class="pagemetrics-visually-hidden">. {part.hint}</span></dt></f:then>
+    <f:else><dt><f:render section="swatch" arguments="{color: part.color}" />{part.label}</dt></f:else>
+</f:if>
+<f:section name="swatch"><f:if condition="{color}"><span class="pagemetrics-widget-donut-legend-swatch" style="--pm-swatch: {color}" aria-hidden="true"></span></f:if></f:section>
+</html>

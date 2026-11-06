@@ -22,7 +22,7 @@
                         <div class="pagemetrics-widget-site">
                             <f:if condition="{siteIteration.total} > 1">
                                 <h3 class="pagemetrics-widget-site-title">
-                                    <span class="pagemetrics-widget-site-icon"><core:icon identifier="{siteTile.tile.icon}" size="small" alternativeMarkupIdentifier="inline" /></span>
+                                    <span class="pagemetrics-widget-site-icon" aria-hidden="true"><core:icon identifier="{siteTile.tile.icon}" size="small" alternativeMarkupIdentifier="inline" /></span>
                                     {siteTile.site.identifier}
                                     <span class="pagemetrics-widget-site-subtitle">{siteTile.tile.label}</span>
                                 </h3>
@@ -53,31 +53,21 @@
                                 own days carry no data, rather than shown as a false zero.
                             </f:comment>
                             <div class="pagemetrics-widget-metric-stats">
-                                <f:if condition="{siteTile.stats.lastDayFormattedValue}">
-                                    <f:variable name="lastDayLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.lastDay" default="Last day" /></f:variable>
-                                    <f:variable name="lastDayHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.lastDayHint" default="The most recent day of the selected period" /></f:variable>
-                                    <f:render partial="MetricStat" arguments="{key: 'lastDay', label: lastDayLabel, value: siteTile.stats.lastDayFormattedValue, hint: lastDayHint}" />
+                                <f:comment>Compared against '' rather than tested for truth: Fluid reads a formatted "0" as false.</f:comment>
+                                <f:if condition="{siteTile.stats.lastDayFormattedValue} != ''">
+                                    <f:render partial="MetricStat" arguments="{key: 'lastDay', value: siteTile.stats.lastDayFormattedValue}" />
                                 </f:if>
-                                <f:if condition="{siteTile.stats.previousDayFormattedValue}">
-                                    <f:variable name="previousDayLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.previousDay" default="Previous day" /></f:variable>
-                                    <f:variable name="previousDayHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.previousDayHint" default="The day before the most recent one" /></f:variable>
-                                    <f:render partial="MetricStat" arguments="{key: 'previousDay', label: previousDayLabel, value: siteTile.stats.previousDayFormattedValue, hint: previousDayHint}" />
+                                <f:if condition="{siteTile.stats.previousDayFormattedValue} != ''">
+                                    <f:render partial="MetricStat" arguments="{key: 'previousDay', value: siteTile.stats.previousDayFormattedValue}" />
                                 </f:if>
-                                <f:if condition="{siteTile.stats.peakFormattedValue}">
-                                    <f:variable name="peakLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.peak" default="Peak" /></f:variable>
-                                    <f:variable name="peakHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.peakHint" default="The highest value a single day reached" /></f:variable>
-                                    <f:render partial="MetricStat" arguments="{key: 'peak', label: peakLabel, value: siteTile.stats.peakFormattedValue, hint: peakHint}" />
+                                <f:if condition="{siteTile.stats.peakFormattedValue} != ''">
+                                    <f:render partial="MetricStat" arguments="{key: 'peak', value: siteTile.stats.peakFormattedValue}" />
                                 </f:if>
-                                <f:if condition="{siteTile.stats.averageFormattedValue}">
-                                    <f:variable name="averageLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.average" default="Average" /></f:variable>
-                                    <f:variable name="averageHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.averageHint" default="The mean across the days that have data" /></f:variable>
-                                    <f:render partial="MetricStat" arguments="{key: 'average', label: averageLabel, value: siteTile.stats.averageFormattedValue, hint: averageHint}" />
+                                <f:if condition="{siteTile.stats.averageFormattedValue} != ''">
+                                    <f:render partial="MetricStat" arguments="{key: 'average', value: siteTile.stats.averageFormattedValue}" />
                                 </f:if>
                                 <f:if condition="{siteTile.tile.redirectSharePercent} > 0">
-                                    <f:variable name="viaRedirectsLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.viaRedirects" default="Via redirects" /></f:variable>
-                                    <f:variable name="viaRedirectsHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.viaRedirectsHint" default="The share of this metric that arrived through a redirect" /></f:variable>
-                                    <f:variable name="viaRedirectsValue">{siteTile.tile.redirectSharePercent}%</f:variable>
-                                    <f:render partial="MetricStat" arguments="{key: 'viaRedirects', label: viaRedirectsLabel, value: viaRedirectsValue, hint: viaRedirectsHint}" />
+                                    <f:render partial="MetricStat" arguments="{key: 'viaRedirects', value: '{siteTile.tile.redirectSharePercent}%'}" />
                                 </f:if>
                             </div>
                             <f:comment>
@@ -110,8 +100,7 @@
                                                 <dl class="pagemetrics-widget-donut-legend pagemetrics-widget-metric-breakdown-list">
                                                     <f:for each="{siteTile.donut.legend}" as="part">
                                                         <div class="pagemetrics-widget-metric-breakdown-pair">
-                                                            <span class="pagemetrics-widget-donut-legend-swatch" style="--pm-swatch: {part.color}" aria-hidden="true"></span>
-                                                            <dt>{part.label}</dt>
+                                                            <f:render partial="BreakdownTerm" arguments="{part: part}" />
                                                             <dd>{part.formattedValue}</dd>
                                                         </div>
                                                     </f:for>
@@ -122,7 +111,7 @@
                                             <dl class="pagemetrics-widget-metric-breakdown-list">
                                                 <f:for each="{siteTile.tile.breakdown}" as="part">
                                                     <div class="pagemetrics-widget-metric-breakdown-pair">
-                                                        <dt>{part.label}</dt>
+                                                        <f:render partial="BreakdownTerm" arguments="{part: part}" />
                                                         <dd>{part.formattedValue}</dd>
                                                     </div>
                                                 </f:for>

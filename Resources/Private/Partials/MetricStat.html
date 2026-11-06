@@ -11,15 +11,17 @@
     inline checkmark rather than invent a bridge from a JS constant to PHP
     for five paths that never change.
 
+    A button, not a div: bindHintTooltip() only opens the hint on focus and
+    tap for focusable elements, so keyboard and touch would otherwise lose it.
+
     Arguments:
       key    which stat this is - lastDay, previousDay, peak, average or
-             viaRedirects - selects the icon
-      label  the chip's short label, e.g. "Peak"
+             viaRedirects - selects the icon and the popover.{key} label/hint
       value  the chip's already formatted value, e.g. "160"
-      hint   the explanation shown on hover, e.g. "The highest value a
-             single day reached"
 </f:comment>
-<div class="pagemetrics-widget-metric-stat" data-hint-title="{label}" data-hint-text="{hint}">
+<f:variable name="label"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.{key}" /></f:variable>
+<f:variable name="hint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.{key}Hint" /></f:variable>
+<button type="button" class="pagemetrics-widget-metric-stat" data-hint-title="{label}" data-hint-text="{hint}">
     <span class="pagemetrics-widget-metric-stat-icon" aria-hidden="true">
         <f:switch expression="{key}">
             <f:case value="lastDay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12" /><path d="M16 3l0 4" /><path d="M8 3l0 4" /><path d="M4 11l16 0" /><path d="M8 15h2v2h-2l0 -2" /></svg></f:case>
@@ -29,12 +31,9 @@
             <f:case value="viaRedirects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4" /><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5" /></svg></f:case>
         </f:switch>
     </span>
+    <f:comment>The icon means nothing to a screen reader, so the label is spoken before the value.</f:comment>
+    <span class="pagemetrics-visually-hidden">{label}: </span>
     <span class="pagemetrics-widget-metric-stat-value">{value}</span>
-    <f:comment>
-        The icon and the pill's shape carry nothing on their own for
-        assistive technology or a forced-colours mode - the same reasoning
-        the trend badge's own visually-hidden sentence follows.
-    </f:comment>
-    <span class="pagemetrics-visually-hidden">{label}. {hint}</span>
-</div>
+    <span class="pagemetrics-visually-hidden">. {hint}</span>
+</button>
 </html>
