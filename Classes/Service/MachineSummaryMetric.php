@@ -40,19 +40,19 @@ use function array_values;
  */
 final readonly class MachineSummaryMetric
 {
-    private const LL = 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:';
+    /**
+     * Shared with PageMetricsViewDataBuilder's tile, so the chart's total and
+     * the tile's summary read as one thing. Nothing is ever stored under it.
+     */
+    public const IDENTIFIER = 'machine.summary';
+    public const ICON = 'tabler-robot';
 
     /**
-     * The same identifier prefix PageMetricsViewDataBuilder's tile uses (see
-     * its MACHINE_SUMMARY_IDENTIFIER), so the chart's total and the tile's
-     * own summary read as the one thing they are - suffixed with the
-     * provider's own identifier for the same reason as there: two providers
-     * each declaring machine metrics would otherwise produce two
-     * indistinguishable summary entries.
+     * Grey on purpose: an accent of an audience tile's weight would put
+     * machine traffic back on the footing this summary takes it off.
      */
-    private const IDENTIFIER = 'machine.summary';
-    private const ICON = 'tabler-robot';
-    private const COLOR = '#868e96';
+    public const COLOR = '#868e96';
+    private const LL = 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:';
 
     public function __construct(
         private MetricDefinitionCollector $metricDefinitionCollector,

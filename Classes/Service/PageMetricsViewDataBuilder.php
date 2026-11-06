@@ -45,11 +45,6 @@ use function sprintf;
  */
 final readonly class PageMetricsViewDataBuilder
 {
-    /** @var list<int> */
-    private const PERIOD_OPTIONS = [7, 30, 90];
-
-    private const LL = 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:';
-
     /**
      * The bot buckets that also get a tile of their own, as metric
      * identifier => the bucket value the agent rows carry (see Bucket, and
@@ -68,26 +63,14 @@ final readonly class PageMetricsViewDataBuilder
      *
      * @var array<string, string>
      */
-    private const AGENT_DETAIL_METRICS = [
+    public const AGENT_DETAIL_METRICS = [
         'bot.ai_chatbot' => 'ai_chatbot',
         'bot.ai_crawler' => 'ai_crawler',
     ];
+    /** @var list<int> */
+    private const PERIOD_OPTIONS = [7, 30, 90];
 
-    /**
-     * The summary is assembled by this class rather than declared by a
-     * provider, so it needs an identifier of its own. Not a real metric
-     * identifier: nothing is ever stored under it, and it exists so the
-     * client can tell this tile apart from the ones that stand for a single
-     * stored metric.
-     */
-    private const MACHINE_SUMMARY_IDENTIFIER = 'machine.summary';
-
-    /**
-     * Grey on purpose. Every audience tile carries a colour of its own, and
-     * giving machine traffic one of the same weight would put it back on the
-     * footing this tile exists to take it off.
-     */
-    private const MACHINE_SUMMARY_COLOR = '#868e96';
+    private const LL = 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:';
 
     /**
      * The dimension the import writes beside a headline figure for the part
@@ -636,11 +619,11 @@ final readonly class PageMetricsViewDataBuilder
             // declaring machine metrics would otherwise produce two tiles that
             // are indistinguishable to a reader and ambiguous to anything that
             // looks a tile up by identifier.
-            self::MACHINE_SUMMARY_IDENTIFIER.'.'.$providerIdentifier,
+            MachineSummaryMetric::IDENTIFIER.'.'.$providerIdentifier,
             $languageService->sL(self::LL.'metric.machine.label'),
             $languageService->sL(self::LL.'metric.machine.description'),
-            'tabler-robot',
-            self::MACHINE_SUMMARY_COLOR,
+            MachineSummaryMetric::ICON,
+            MachineSummaryMetric::COLOR,
             MetricUnit::Count,
             $value,
             $this->valueFormatter->format($value, MetricUnit::Count),
