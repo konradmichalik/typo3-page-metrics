@@ -59,21 +59,35 @@ final class DonutChartBuilderTest extends TestCase
         ], $chart->legend);
     }
 
-    public function testCyclesThroughThePaletteRatherThanRunningOutOfColours(): void
+    public function testGivesTheLargestBuiltInBreakdownADistinctColourPerPart(): void
     {
+        // Five named crawlers, "Others (n)" and "Unattributed": what
+        // TileBreakdownBuilder::byAgent() returns at most.
         $breakdown = [];
 
-        for ($i = 0; $i < 8; ++$i) {
+        for ($i = 0; $i < 7; ++$i) {
             $breakdown[] = ['label' => 'Bot'.$i, 'formattedValue' => '1', 'value' => 1];
         }
 
         $chart = $this->subject->build($breakdown);
 
         self::assertNotNull($chart);
-        // Six colours, eight parts - the seventh and eighth wrap back to the
-        // first two rather than the palette running out.
-        self::assertSame('var(--pm-donut-color-0)', $chart->legend[6]['color']);
-        self::assertSame('var(--pm-donut-color-1)', $chart->legend[7]['color']);
+        self::assertCount(7, array_unique(array_column($chart->legend, 'color')));
+    }
+
+    public function testCyclesThroughThePaletteRatherThanRunningOutOfColours(): void
+    {
+        $breakdown = [];
+
+        for ($i = 0; $i < 9; ++$i) {
+            $breakdown[] = ['label' => 'Bot'.$i, 'formattedValue' => '1', 'value' => 1];
+        }
+
+        $chart = $this->subject->build($breakdown);
+
+        self::assertNotNull($chart);
+        self::assertSame('var(--pm-donut-color-0)', $chart->legend[7]['color']);
+        self::assertSame('var(--pm-donut-color-1)', $chart->legend[8]['color']);
     }
 
     public function testIsNullWhenAnyPartCarriesNoValueToSizeASliceBy(): void

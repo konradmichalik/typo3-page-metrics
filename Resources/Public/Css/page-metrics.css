@@ -25,15 +25,16 @@
     /* Qualitative, not sequential: a donut's slices (DonutChartBuilder) name
        different things rather than more or less of one thing, so the
        palette has no order for a reader to misread as a ranking. Cycled by
-       a part's position, which is why there are six rather than exactly as
-       many as any one breakdown has parts - TileBreakdownBuilder's own caps
-       (five named agents, six traffic channels) both fit inside it once. */
+       a part's position. Seven covers the agent breakdown's maximum (five
+       agents, "Others", "Unattributed") without wrapping. A channel breakdown
+       with unknown channels can still exceed it and wrap. */
     --pm-donut-color-0: #0969da;
     --pm-donut-color-1: #8250df;
     --pm-donut-color-2: #1a7f37;
-    --pm-donut-color-3: #bf8700;
+    --pm-donut-color-3: #9a6700;
     --pm-donut-color-4: #cf222e;
     --pm-donut-color-5: #6a7085;
+    --pm-donut-color-6: #1b7c83;
 }
 
 .pagemetrics-header {

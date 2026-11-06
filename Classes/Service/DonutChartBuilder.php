@@ -47,6 +47,7 @@ final readonly class DonutChartBuilder
         'var(--pm-donut-color-3)',
         'var(--pm-donut-color-4)',
         'var(--pm-donut-color-5)',
+        'var(--pm-donut-color-6)',
     ];
 
     /**
