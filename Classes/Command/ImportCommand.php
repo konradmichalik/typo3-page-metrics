@@ -191,7 +191,7 @@ final class ImportCommand extends Command
         $identifier = $provider->getIdentifier();
         $today = new DateTimeImmutable('today');
         $lastImported = $force ? null : $this->importStateRepository->getLastImportedDate($identifier, $site->getIdentifier());
-        $from = null !== $lastImported ? $lastImported->modify('+1 day') : $today->modify(sprintf('-%d days', $configuration->retentionDays));
+        $from = $lastImported?->modify('+1 day') ?? $today->modify(sprintf('-%d days', $configuration->retentionDays));
 
         if ($from > $today) {
             return;
