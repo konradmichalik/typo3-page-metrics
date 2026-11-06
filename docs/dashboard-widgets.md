@@ -9,13 +9,13 @@ conditional: on installations without EXT:dashboard, none of this loads (see
 Each widget lists every site that has a configured metric provider, and is
 skipped entirely for sites without one.
 
-![The Page Metrics dashboard preset: tiles, chart, two compact charts, trend and most viewed pages](img/dashboard-widgets.png)
+![A dashboard created from the Page Metrics preset](img/dashboard-widgets.png)
 
 | Widget | Identifier | Shows | Fixed period | Configurable |
 | --- | --- | --- | --- | --- |
 | What changed | `pageMetricsInsight` | Up to four sentences on the significant movements across all sites, and nothing when nothing moved significantly | 30 days | — |
 | Page metrics | `pageMetrics` | Each site's homepage tiles: page views, visits, avg. time on page, bounce rate | — | Period (7/30/90 days) |
-| Page metrics breakdown | `pageMetricsBreakdown` | One configured metric per site (defaults to each site's primary metric): its curve, its last day/previous day/peak/average/via redirects figures, and its breakdown into parts where it has one (e.g. Bot traffic split by crawler), drawn as a donut where every part can be sized | — | Metric, period (7/30/90 days) |
+| Page metrics breakdown | `pageMetricsBreakdown` | One configured metric of each site's homepage (defaults to the site's primary metric): its curve, its last day/previous day/peak/average/via redirects figures, and its breakdown into parts where it has one (e.g. Bot traffic split by crawler), drawn as a donut where every part can be sized | — | Metric, period (7/30/90 days) |
 | Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers | — | Metric, period (7/30/90 days), marker category |
 | Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days), marker category |
 | Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level, include subpages, goal column |
@@ -30,7 +30,8 @@ skipped entirely for sites without one.
 > pages* and *Page metrics annotations* are registered, and a dashboard preset
 > skips the rest.
 
-Every widget except the two site-homepage tiles widgets reads from the same
+Every widget except What changed and the two homepage widgets (Page metrics,
+Page metrics breakdown) reads from the same
 `SiteMetricsOverviewBuilder`, aggregated across all pages of a site rather
 than a single one. That includes annotations: a dashboard covers the whole
 site, so it shows every marker regardless of the page one may be scoped to
@@ -205,8 +206,8 @@ a new dashboard covering every site's metrics is one click away.
 
 It opens with **What changed**, so the first thing on a new dashboard is a
 sentence rather than a figure. Below the tiles and the large chart, it places two compact charts (Visits,
-Bounce rate), a breakdown of Bot traffic (a site without an access log shows
-its primary metric there instead), then two trend widgets (Biggest
+Bounce rate), a breakdown of the homepage's Bot traffic (a site without that
+metric shows its primary metric there instead), then two trend widgets (Biggest
 improvements, Biggest declines), then Most viewed pages and Not found pages,
 with the annotations widget last.
 The compact chart and trend widgets can each appear more than once with
