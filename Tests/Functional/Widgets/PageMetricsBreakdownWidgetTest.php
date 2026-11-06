@@ -14,7 +14,8 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Tests\Functional\Widgets;
 
 use DateTimeImmutable;
-use KonradMichalik\Typo3PageMetrics\Persistence\{BotAgentDailyRepository, DailyMetricsRepository};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DateRange;
+use KonradMichalik\Typo3PageMetrics\Persistence\{BotAgentDailyRepository, DailyMetricsRepository, ImportStateRepository};
 use KonradMichalik\Typo3PageMetrics\Widgets\PageMetricsBreakdownWidget;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
@@ -124,6 +125,20 @@ final class PageMetricsBreakdownWidgetTest extends FunctionalTestCase
         $series = json_decode(html_entity_decode($matches[1] ?? ''), true, 512, \JSON_THROW_ON_ERROR);
         self::assertCount(1, $series);
         self::assertSame('Page views', $series[0]['label']);
+    }
+
+    public function testSaysSoInsteadOfDrawingAnEmptyCurveForAPeriodWithoutData(): void
+    {
+        $this->writeSiteConfiguration('main', 1, 'https://example.com/');
+        // The import stopped 60 days ago, so not one day of the last 7 is covered.
+        $importEnd = new DateTimeImmutable('-60 days');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $importEnd, 'matomo.pageviews', 42);
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $importEnd, new DateRange($importEnd->modify('-30 days'), $importEnd), true);
+
+        $content = $this->renderWidget(['period' => 7]);
+
+        self::assertStringContainsString('No data in this period', $content);
+        self::assertStringNotContainsString('data-sparkline="', $content);
     }
 
     public function testLoadsTheSparklineJavaScriptModule(): void

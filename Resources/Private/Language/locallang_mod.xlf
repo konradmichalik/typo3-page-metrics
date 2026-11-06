@@ -138,6 +138,9 @@
             <trans-unit id="popover.noData" resname="popover.noData">
                 <source>No data</source>
             </trans-unit>
+            <trans-unit id="widget.noDataInPeriod" resname="widget.noDataInPeriod">
+                <source>No data in this period</source>
+            </trans-unit>
             <trans-unit id="popover.externalLink" resname="popover.externalLink">
                 <source>Open in analytics tool</source>
             </trans-unit>

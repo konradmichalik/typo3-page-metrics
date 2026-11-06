@@ -76,13 +76,20 @@
                                 fed a single-series array built from this one tile's sparkline instead
                                 of a whole SiteMetricsOverview (see PageMetricsBreakdownWidget).
                             </f:comment>
-                            <div
-                                class="pagemetrics-widget-chart pagemetrics-widget-chart-compact"
-                                data-labels="{f:format.json(value: sparklineLabels)}"
-                                data-unit="{siteTile.tile.unit.value}"
-                                data-sparkline="{f:format.json(value: siteTile.series)}"
-                                style="--pm-accent: {siteTile.tile.color}"
-                            ></div>
+                            <f:if condition="{siteTile.hasData}">
+                                <f:then>
+                                    <div
+                                        class="pagemetrics-widget-chart pagemetrics-widget-chart-compact"
+                                        data-labels="{f:format.json(value: sparklineLabels)}"
+                                        data-unit="{siteTile.tile.unit.value}"
+                                        data-sparkline="{f:format.json(value: siteTile.series)}"
+                                        style="--pm-accent: {siteTile.tile.color}"
+                                    ></div>
+                                </f:then>
+                                <f:else>
+                                    <p class="pagemetrics-widget-no-data"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.noDataInPeriod" /></p>
+                                </f:else>
+                            </f:if>
                             <f:if condition="{siteTile.tile.breakdown}">
                                 <div class="pagemetrics-widget-metric-breakdown">
                                     <p class="pagemetrics-widget-metric-breakdown-heading"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.breakdown" default="Made up of" /></p>

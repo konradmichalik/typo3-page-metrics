@@ -149,6 +149,20 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringContainsString('&quot;Release 2.0&quot;', $result->content);
     }
 
+    public function testChartWidgetSaysSoInsteadOfDrawingAnEmptyChartForAPeriodWithoutData(): void
+    {
+        $this->writeSiteConfiguration();
+        // The import stopped 60 days ago, so not one day of the last 7 is covered.
+        $importEnd = new DateTimeImmutable('-60 days');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $importEnd, 'matomo.pageviews', 42);
+        $this->get(ImportStateRepository::class)->markImported('matomo', 'main', $importEnd, new DateRange($importEnd->modify('-30 days'), $importEnd), true);
+
+        $content = $this->renderChartWidgetResult(['period' => 7])->content;
+
+        self::assertStringContainsString('No data in this period', $content);
+        self::assertStringNotContainsString('data-sparkline="', $content);
+    }
+
     public function testChartWidgetDrawsOneMarkerForADaysDerivedPageMarkers(): void
     {
         $this->writeSiteConfiguration();

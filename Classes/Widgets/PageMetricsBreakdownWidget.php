@@ -191,6 +191,7 @@ final readonly class PageMetricsBreakdownWidget implements WidgetRendererInterfa
                 'tile' => $tile,
                 'stats' => $this->statBuilder->build($tile),
                 'donut' => $this->donutBuilder->build($tile->breakdown),
+                'hasData' => [] !== array_filter($tile->sparkline, static fn (?int $value): bool => null !== $value),
                 // The same single-series shape PageMetricsChartWidget builds
                 // from a whole SiteMetricsOverview (see its buildViewVariables()),
                 // here fed straight from this one tile's own sparkline -

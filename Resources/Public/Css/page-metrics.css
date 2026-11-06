@@ -470,6 +470,13 @@
     margin-top: 8px;
 }
 
+/* Instead of a chart, where not one day of the period has data. */
+.pagemetrics-widget-no-data {
+    margin: 8px 0 0;
+    color: var(--typo3-text-color-variant, #6a7085);
+    font-size: 0.75rem;
+}
+
 .pagemetrics-widget-chart .pagemetrics-sparkline {
     display: block;
     width: 100%;
