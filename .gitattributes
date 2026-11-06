@@ -1,6 +1,9 @@
 # Files that are only relevant for development and must not end up in the
 # dist package installed by `composer require` or in the TER upload.
-# `docs/` is deliberately kept — the README links into it.
+# `docs/` is deliberately kept — the README links into it. `docs/superpowers`
+# holds internal AI planning/design notes, not user-facing docs, and is
+# excluded on its own.
+/docs/superpowers       export-ignore
 /.ddev                  export-ignore
 /.editorconfig          export-ignore
 /.gitattributes         export-ignore
