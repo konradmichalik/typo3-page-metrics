@@ -3,32 +3,45 @@
 <f:section name="main">
     <f:if condition="{sites}">
         <f:then>
-            <div class="pagemetrics-widget">
-                <f:for each="{sites}" as="overview" iteration="siteIteration">
-                    <div class="pagemetrics-widget-site">
-                        <f:if condition="{siteIteration.total} > 1">
-                            <h3 class="pagemetrics-widget-site-title">
-                                <span class="pagemetrics-widget-site-icon"><core:icon identifier="{overview.chartIcon}" size="small" alternativeMarkupIdentifier="inline" /></span>
-                                {overview.site.identifier}
-                                <span class="pagemetrics-widget-site-subtitle">{overview.chartLabel}</span>
-                            </h3>
-                        </f:if>
-                        <div
-                            class="pagemetrics-widget-chart"
-                            data-labels="{f:format.json(value: sparklineLabels)}"
-                            data-unit="{overview.chartUnit.value}"
-                            data-sparkline="{f:format.json(value: overview.series)}"
-                            data-annotations="{f:format.json(value: overview.annotations)}"
-                            style="--pm-accent: {overview.chartColor}"
-                        ><f:comment>
-                            Inside the plot rather than under it. The chart is
-                            the whole of a card this small, so a line of its
-                            own underneath cost more height than the mark is
-                            worth. The renderer only appends, so markup put
-                            here survives it.
-                        </f:comment><f:render partial="DataFreshness" arguments="{freshness: overview.dataFreshness}" /></div>
+            <div class="pagemetrics-widget-aside">
+                <f:comment>
+                    Card-level icon, not one per site: signals what the chart
+                    is about at a glance the same way the Trend widget's aside
+                    does. Reads its colour and shape off the first overview -
+                    when several sites resolve to different metrics (see
+                    buildLabel() in PageMetricsChartWidget), each still keeps
+                    its own icon on its h3 below, this one is only the card's
+                    shared anchor.
+                </f:comment>
+                <div class="pagemetrics-widget-aside-icon-col" style="--pm-accent: {sites.0.chartColor}">
+                    <span class="pagemetrics-widget-aside-icon" aria-hidden="true">
+                        <core:icon identifier="{sites.0.chartIcon}" size="large" alternativeMarkupIdentifier="inline" />
+                    </span>
+                    <f:render partial="DataFreshness" arguments="{freshness: dataFreshness}" />
+                </div>
+                <div class="pagemetrics-widget-aside-content">
+                    <div class="pagemetrics-widget">
+                        <f:for each="{sites}" as="overview" iteration="siteIteration">
+                            <div class="pagemetrics-widget-site">
+                                <f:if condition="{siteIteration.total} > 1">
+                                    <h3 class="pagemetrics-widget-site-title">
+                                        <span class="pagemetrics-widget-site-icon"><core:icon identifier="{overview.chartIcon}" size="small" alternativeMarkupIdentifier="inline" /></span>
+                                        {overview.site.identifier}
+                                        <span class="pagemetrics-widget-site-subtitle">{overview.chartLabel}</span>
+                                    </h3>
+                                </f:if>
+                                <div
+                                    class="pagemetrics-widget-chart"
+                                    data-labels="{f:format.json(value: sparklineLabels)}"
+                                    data-unit="{overview.chartUnit.value}"
+                                    data-sparkline="{f:format.json(value: overview.series)}"
+                                    data-annotations="{f:format.json(value: overview.annotations)}"
+                                    style="--pm-accent: {overview.chartColor}"
+                                ></div>
+                            </div>
+                        </f:for>
                     </div>
-                </f:for>
+                </div>
             </div>
         </f:then>
         <f:else>

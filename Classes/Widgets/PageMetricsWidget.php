@@ -14,65 +14,93 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3PageMetrics\Widgets;
 
 use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, PageMetricsViewDataBuilder, SparklineLabelProvider};
-use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
+use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
+use TYPO3\CMS\Core\Settings\SettingDefinition;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
-use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, JavaScriptInterface, RequestAwareWidgetInterface, WidgetConfigurationInterface, WidgetInterface};
+use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, JavaScriptInterface, WidgetConfigurationInterface, WidgetContext, WidgetRendererInterface, WidgetResult};
+
+use function in_array;
 
 /**
  * PageMetricsWidget.
  *
  * A dashboard-level presentation of the same PageMetricsViewData the
  * PageHeader tiles and the tiles AJAX controller already render - one row
- * per site, showing that site's homepage tiles for a fixed, short period.
+ * per site, showing that site's homepage tiles for a configurable period.
  * Only registered as a dashboard widget when EXT:dashboard is installed,
  * see Configuration/Services.php.
  *
+ * Implements WidgetRendererInterface rather than the simpler WidgetInterface
+ * (see AbstractSiteMetricsWidget, used by the other two site-metrics
+ * widgets) because only WidgetRendererInterface widgets get a settings UI -
+ * see getSettingsDefinitions(). That interface is a TYPO3 14 addition, so
+ * this widget, like PageMetricsChartWidget, TopPagesWidget and TrendWidget,
+ * is not registered at all on TYPO3 13.4.
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
+ * @license GPL-2.0-or-later
  */
-final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInterface, AdditionalCssInterface, JavaScriptInterface
+final readonly class PageMetricsWidget implements WidgetRendererInterface, AdditionalCssInterface, JavaScriptInterface
 {
-    private const PERIOD_DAYS = 7;
+    private const DEFAULT_PERIOD_DAYS = 7;
 
-    private ServerRequestInterface $request;
+    /**
+     * @var list<int>
+     */
+    private const PERIOD_OPTIONS = [7, 30, 90];
 
     public function __construct(
-        private readonly WidgetConfigurationInterface $configuration,
-        private readonly PageMetricsViewDataBuilder $viewDataBuilder,
-        private readonly SiteFinder $siteFinder,
-        private readonly BackendViewFactory $backendViewFactory,
-        private readonly SparklineLabelProvider $labelProvider,
-        private readonly AnnotationPayloadBuilder $annotationPayloadBuilder,
+        private WidgetConfigurationInterface $configuration,
+        private PageMetricsViewDataBuilder $viewDataBuilder,
+        private SiteFinder $siteFinder,
+        private BackendViewFactory $backendViewFactory,
+        private SparklineLabelProvider $labelProvider,
+        private AnnotationPayloadBuilder $annotationPayloadBuilder,
     ) {}
 
-    public function setRequest(ServerRequestInterface $request): void
+    /**
+     * @return list<SettingDefinition>
+     */
+    public function getSettingsDefinitions(): array
     {
-        $this->request = $request;
+        return [
+            new SettingDefinition(
+                'period',
+                'int',
+                self::DEFAULT_PERIOD_DAYS,
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.setting.period.label',
+                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.setting.period.description',
+                false,
+                [
+                    7 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.7',
+                    30 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.30',
+                    90 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.90',
+                ],
+            ),
+        ];
     }
 
-    public function renderWidgetContent(): string
+    public function renderWidget(WidgetContext $context): WidgetResult
     {
+        $period = (int) $context->settings->get('period');
+        $period = in_array($period, self::PERIOD_OPTIONS, true) ? $period : self::DEFAULT_PERIOD_DAYS;
+
+        $sites = $this->collectSiteTiles($period);
+
         // 'typo3/cms-dashboard' as a second package lets the template use
         // <f:layout name="Widget/Widget" /> from EXT:dashboard itself, the
         // same layout every core widget renders through.
-        $view = $this->backendViewFactory->create($this->request, ['konradmichalik/typo3-page-metrics', 'typo3/cms-dashboard']);
+        $view = $this->backendViewFactory->create($context->request, ['konradmichalik/typo3-page-metrics', 'typo3/cms-dashboard']);
         $view->assignMultiple([
-            'sites' => $this->collectSiteTiles(),
+            'sites' => $sites,
             'sparklineLabels' => $this->labelProvider->all(),
             'configuration' => $this->configuration,
         ]);
 
-        return $view->render('Widget/PageMetrics');
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function getOptions(): array
-    {
-        return [];
+        return new WidgetResult($view->render('Widget/PageMetrics'), [] !== $sites ? $this->buildLabel($period) : null);
     }
 
     /**
@@ -92,14 +120,34 @@ final class PageMetricsWidget implements WidgetInterface, RequestAwareWidgetInte
     }
 
     /**
+     * Mirrors PageMetricsChartWidget::buildLabel(): the registered widget
+     * title alone doesn't tell two instances of this widget with different
+     * periods apart on the dashboard.
+     */
+    private function buildLabel(int $period): string
+    {
+        $languageService = $this->getLanguageService();
+
+        return implode(' · ', [
+            $languageService->sL($this->configuration->getTitle()),
+            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period),
+        ]);
+    }
+
+    private function getLanguageService(): LanguageService
+    {
+        return $GLOBALS['LANG'];
+    }
+
+    /**
      * @return list<array{site: Site, tiles: list<\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\MetricTile>, annotations: list<array{date: string, dateUntil: ?string, category: string, text: string}>, dataFreshness: ?\KonradMichalik\Typo3PageMetrics\Domain\ValueObject\DataFreshness}>
      */
-    private function collectSiteTiles(): array
+    private function collectSiteTiles(int $period): array
     {
         $result = [];
 
         foreach ($this->siteFinder->getAllSites() as $site) {
-            $viewData = $this->viewDataBuilder->build($site->getRootPageId(), 0, self::PERIOD_DAYS, false, false);
+            $viewData = $this->viewDataBuilder->build($site->getRootPageId(), 0, $period, false, false);
 
             if (!$viewData->hasPage || [] === $viewData->tiles) {
                 continue;

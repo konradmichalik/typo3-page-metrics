@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3PageMetrics;
 
-use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, InsightBuilder, PageMetricsViewDataBuilder, SiteMetricsOverviewBuilder, SparklineLabelProvider};
-use KonradMichalik\Typo3PageMetrics\Widgets\{AnnotationsWidget, InsightWidget, NotFoundPagesWidget, PageMetricsChartWidget, PageMetricsWidget, TopPagesWidget, TrendWidget};
+use KonradMichalik\Typo3PageMetrics\Service\{AnnotationPayloadBuilder, DonutChartBuilder, InsightBuilder, PageMetricsViewDataBuilder, SiteMetricsOverviewBuilder, SparklineLabelProvider, TileStatBuilder};
+use KonradMichalik\Typo3PageMetrics\Widgets\{AnnotationsWidget, InsightWidget, NotFoundPagesWidget, PageMetricsBreakdownWidget, PageMetricsChartWidget, PageMetricsWidget, TopPagesWidget, TrendWidget};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Reference};
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
@@ -35,23 +35,23 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
         return;
     }
 
-    // WidgetRendererInterface - needed by PageMetricsChartWidget,
-    // TopPagesWidget and TrendWidget for their settings UI (metric/period/
-    // direction) - is a TYPO3 14 addition, absent from TYPO3 13.4's
-    // cms-dashboard. Guarding just those three keeps the rest of the
-    // dashboard integration (tiles, not-found pages, annotations - all
-    // still on the older WidgetInterface via AbstractSiteMetricsWidget)
-    // working on both supported TYPO3 versions; a preset referencing one of
-    // the three on TYPO3 13 just omits that tile, see
-    // Dashboard::initializeWidgets() in EXT:dashboard.
+    // WidgetRendererInterface - needed by PageMetricsWidget,
+    // PageMetricsChartWidget, TopPagesWidget and TrendWidget for their
+    // settings UI (period/metric/direction) - is a TYPO3 14 addition,
+    // absent from TYPO3 13.4's cms-dashboard. Guarding just those four
+    // keeps the rest of the dashboard integration (not-found pages,
+    // annotations - still on the older WidgetInterface via
+    // AbstractSiteMetricsWidget) working on both supported TYPO3 versions;
+    // a preset referencing one of the four on TYPO3 13 just omits that
+    // tile, see Dashboard::initializeWidgets() in EXT:dashboard.
     $supportsSettingsAwareWidgets = interface_exists(WidgetRendererInterface::class);
 
     $services = $configurator->services();
 
     // Nothing here is autowired, so each widget names its arguments.
     // First in the preset and first here: it implements the plain widget
-    // interface with no settings, so unlike the ones below it needs no
-    // version gate at all.
+    // interface with no settings, so unlike most of the ones below it needs
+    // no version gate at all.
     $services->set('dashboard.widget.pageMetricsInsight')
         ->class(InsightWidget::class)
         ->arg('$insightBuilder', new Reference(InsightBuilder::class))
@@ -67,22 +67,43 @@ return static function (ContainerConfigurator $configurator, ContainerBuilder $c
             'width' => 'medium',
         ]);
 
-    $services->set('dashboard.widget.pageMetrics')
-        ->class(PageMetricsWidget::class)
-        ->arg('$viewDataBuilder', new Reference(PageMetricsViewDataBuilder::class))
-        ->arg('$siteFinder', new Reference(SiteFinder::class))
-        ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
-        ->arg('$labelProvider', new Reference(SparklineLabelProvider::class))
-        ->arg('$annotationPayloadBuilder', new Reference(AnnotationPayloadBuilder::class))
-        ->tag('dashboard.widget', [
-            'identifier' => 'pageMetrics',
-            'groupNames' => 'pageMetrics',
-            'title' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.title',
-            'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.description',
-            'iconIdentifier' => 'tabler-eye-search',
-            'height' => 'small',
-            'width' => 'large',
-        ]);
+    if ($supportsSettingsAwareWidgets) {
+        $services->set('dashboard.widget.pageMetrics')
+            ->class(PageMetricsWidget::class)
+            ->arg('$viewDataBuilder', new Reference(PageMetricsViewDataBuilder::class))
+            ->arg('$siteFinder', new Reference(SiteFinder::class))
+            ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
+            ->arg('$labelProvider', new Reference(SparklineLabelProvider::class))
+            ->arg('$annotationPayloadBuilder', new Reference(AnnotationPayloadBuilder::class))
+            ->tag('dashboard.widget', [
+                'identifier' => 'pageMetrics',
+                'groupNames' => 'pageMetrics',
+                'title' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.title',
+                'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.description',
+                'iconIdentifier' => 'tabler-eye-search',
+                'height' => 'small',
+                'width' => 'large',
+            ]);
+
+        $services->set('dashboard.widget.pageMetricsBreakdown')
+            ->class(PageMetricsBreakdownWidget::class)
+            ->arg('$viewDataBuilder', new Reference(PageMetricsViewDataBuilder::class))
+            ->arg('$overviewBuilder', new Reference(SiteMetricsOverviewBuilder::class))
+            ->arg('$statBuilder', new Reference(TileStatBuilder::class))
+            ->arg('$donutBuilder', new Reference(DonutChartBuilder::class))
+            ->arg('$labelProvider', new Reference(SparklineLabelProvider::class))
+            ->arg('$siteFinder', new Reference(SiteFinder::class))
+            ->arg('$backendViewFactory', new Reference(BackendViewFactory::class))
+            ->tag('dashboard.widget', [
+                'identifier' => 'pageMetricsBreakdown',
+                'groupNames' => 'pageMetrics',
+                'title' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.breakdown.title',
+                'description' => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.breakdown.description',
+                'iconIdentifier' => 'tabler-list-details',
+                'height' => 'medium',
+                'width' => 'medium',
+            ]);
+    }
 
     if ($supportsSettingsAwareWidgets) {
         $services->set('dashboard.widget.pageMetricsChart')

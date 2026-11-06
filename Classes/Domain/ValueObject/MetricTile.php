@@ -51,59 +51,64 @@ final readonly class MetricTile
     public bool $hasNoComparison;
 
     /**
-     * @param array<string, int|null>                                           $sparkline              Y-m-d => value, covers the same period as the tile
-     *                                                                                                  itself; null for a day with no data at all, which is
-     *                                                                                                  not the same as a day with no traffic
-     * @param int|null                                                          $deltaPercent           null when the previous period's total was zero and the
-     *                                                                                                  current period's is not - there is no meaningful percentage
-     *                                                                                                  base, rendered as "new" rather than a false infinite/undefined
-     *                                                                                                  percentage
-     * @param string                                                            $previousFormattedValue the previous period's own value, formatted the same way as
-     *                                                                                                  $formattedValue - empty when $deltaPercent is null, since
-     *                                                                                                  there is nothing meaningful to show
-     * @param list<array{label: string, formattedValue: string, hint?: string}> $breakdown              what this tile's number is made of, shown in
-     *                                                                                                  its popover. Empty for a tile that stands for one metric,
-     *                                                                                                  which is all of them except the machine-traffic summary:
-     *                                                                                                  that one folds a provider's whole MetricGroup::Machine set
-     *                                                                                                  into a single headline, and the parts are the only way back
-     *                                                                                                  to which crawler did what
-     * @param TileBenchmark|null                                                $benchmark              what the rest of this site did on the same metric over
-     *                                                                                                  the same period, null where the site has too few pages
-     *                                                                                                  with data for the comparison to say anything
-     * @param int                                                               $previousValue          the previous period's own figure as a number rather than
-     *                                                                                                  as the formatted string beside it, because the CSV export
-     *                                                                                                  carries raw values in their own unit and a display string
-     *                                                                                                  taken back apart is a reading aid used as a datum. Zero
-     *                                                                                                  where there is nothing to compare against, which
-     *                                                                                                  $isNew and $hasNoComparison already tell apart
-     * @param bool                                                              $previousPeriodCovered  whether the period compared against lies inside the
-     *                                                                                                  imported window, which is what makes the comparison
-     *                                                                                                  sayable at all (see ImportCoverage::covers()). Defaults
-     *                                                                                                  to true because a tile built by a listener rather than by
-     *                                                                                                  the import pipeline brought its own numbers and knows no
-     *                                                                                                  import window, and because this is an `@api` constructor
-     *                                                                                                  a required parameter here would break every existing
-     *                                                                                                  ModifyMetricTilesEvent listener
-     * @param string                                                            $recordFormattedValue   the part of $formattedValue that arrived on a record
-     *                                                                                                  below this page rather than on the page's own address,
-     *                                                                                                  formatted in the tile's own unit, from the
-     *                                                                                                  via_route_enhancer dimension the import writes beside
-     *                                                                                                  the headline. Empty, and therefore invisible, wherever
-     *                                                                                                  no such traffic exists, which is almost every page: a
-     *                                                                                                  formatted "0" would be a statement about records that
-     *                                                                                                  are not there. A display string rather than the raw/
-     *                                                                                                  formatted pair $value and $previousValue form, because
-     *                                                                                                  nothing reads this as a datum - both surfaces that show
-     *                                                                                                  it show it as text beside the headline, and an `@api`
-     *                                                                                                  constructor is not the place for a field on
-     *                                                                                                  speculation. Describes the tile's own period only and
-     *                                                                                                  is never compared against another, so it has nothing
-     *                                                                                                  to withhold where $hasNoComparison is true
-     * @param string                                                            $source                 the name of the provider this tile's numbers were
-     *                                                                                                  imported from, shown in the popover. Empty for a tile a
-     *                                                                                                  listener built rather than the import pipeline, which
-     *                                                                                                  knows no provider - the popover then names no source
-     *                                                                                                  instead of naming a wrong one
+     * @param array<string, int|null>                                                        $sparkline              Y-m-d => value, covers the same period as the tile
+     *                                                                                                               itself; null for a day with no data at all, which is
+     *                                                                                                               not the same as a day with no traffic
+     * @param int|null                                                                       $deltaPercent           null when the previous period's total was zero and the
+     *                                                                                                               current period's is not - there is no meaningful percentage
+     *                                                                                                               base, rendered as "new" rather than a false infinite/undefined
+     *                                                                                                               percentage
+     * @param string                                                                         $previousFormattedValue the previous period's own value, formatted the same way as
+     *                                                                                                               $formattedValue - empty when $deltaPercent is null, since
+     *                                                                                                               there is nothing meaningful to show
+     * @param list<array{label: string, formattedValue: string, value?: int, hint?: string}> $breakdown              what this tile's number is made of, shown in
+     *                                                                                                               its popover, and as a donut chart where every part
+     *                                                                                                               carries a raw $value to size a slice by (optional,
+     *                                                                                                               since a listener building its own breakdown array
+     *                                                                                                               is not required to - see DonutChartBuilder, which
+     *                                                                                                               simply draws no chart when one is missing). Empty for
+     *                                                                                                               a tile that stands for one metric, which is all of them
+     *                                                                                                               except the machine-traffic summary: that one folds a
+     *                                                                                                               provider's whole MetricGroup::Machine set into a single
+     *                                                                                                               headline, and the parts are the only way back
+     *                                                                                                               to which crawler did what
+     * @param TileBenchmark|null                                                             $benchmark              what the rest of this site did on the same metric over
+     *                                                                                                               the same period, null where the site has too few pages
+     *                                                                                                               with data for the comparison to say anything
+     * @param int                                                                            $previousValue          the previous period's own figure as a number rather than
+     *                                                                                                               as the formatted string beside it, because the CSV export
+     *                                                                                                               carries raw values in their own unit and a display string
+     *                                                                                                               taken back apart is a reading aid used as a datum. Zero
+     *                                                                                                               where there is nothing to compare against, which
+     *                                                                                                               $isNew and $hasNoComparison already tell apart
+     * @param bool                                                                           $previousPeriodCovered  whether the period compared against lies inside the
+     *                                                                                                               imported window, which is what makes the comparison
+     *                                                                                                               sayable at all (see ImportCoverage::covers()). Defaults
+     *                                                                                                               to true because a tile built by a listener rather than by
+     *                                                                                                               the import pipeline brought its own numbers and knows no
+     *                                                                                                               import window, and because this is an `@api` constructor
+     *                                                                                                               a required parameter here would break every existing
+     *                                                                                                               ModifyMetricTilesEvent listener
+     * @param string                                                                         $recordFormattedValue   the part of $formattedValue that arrived on a record
+     *                                                                                                               below this page rather than on the page's own address,
+     *                                                                                                               formatted in the tile's own unit, from the
+     *                                                                                                               via_route_enhancer dimension the import writes beside
+     *                                                                                                               the headline. Empty, and therefore invisible, wherever
+     *                                                                                                               no such traffic exists, which is almost every page: a
+     *                                                                                                               formatted "0" would be a statement about records that
+     *                                                                                                               are not there. A display string rather than the raw/
+     *                                                                                                               formatted pair $value and $previousValue form, because
+     *                                                                                                               nothing reads this as a datum - both surfaces that show
+     *                                                                                                               it show it as text beside the headline, and an `@api`
+     *                                                                                                               constructor is not the place for a field on
+     *                                                                                                               speculation. Describes the tile's own period only and
+     *                                                                                                               is never compared against another, so it has nothing
+     *                                                                                                               to withhold where $hasNoComparison is true
+     * @param string                                                                         $source                 the name of the provider this tile's numbers were
+     *                                                                                                               imported from, shown in the popover. Empty for a tile a
+     *                                                                                                               listener built rather than the import pipeline, which
+     *                                                                                                               knows no provider - the popover then names no source
+     *                                                                                                               instead of naming a wrong one
      */
     public function __construct(
         public string $identifier,

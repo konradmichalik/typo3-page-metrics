@@ -1,0 +1,153 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:layout name="Widget/Widget" />
+<f:section name="main">
+    <f:if condition="{sites}">
+        <f:then>
+            <div class="pagemetrics-widget-aside">
+                <f:comment>
+                    Card-level icon, not one per site: the same "shared anchor,
+                    same reasoning" the Chart widget's aside uses. Reads its
+                    colour and shape off the first site's resolved tile - when
+                    sites fall back to different primary metrics, each still
+                    names its own on its h3 below.
+                </f:comment>
+                <div class="pagemetrics-widget-aside-icon-col" style="--pm-accent: {sites.0.tile.color}">
+                    <span class="pagemetrics-widget-aside-icon" aria-hidden="true">
+                        <core:icon identifier="{sites.0.tile.icon}" size="large" alternativeMarkupIdentifier="inline" />
+                    </span>
+                    <f:render partial="DataFreshness" arguments="{freshness: dataFreshness}" />
+                </div>
+                <div class="pagemetrics-widget-aside-content">
+                    <f:for each="{sites}" as="siteTile" iteration="siteIteration">
+                        <div class="pagemetrics-widget-site">
+                            <f:if condition="{siteIteration.total} > 1">
+                                <h3 class="pagemetrics-widget-site-title">
+                                    <span class="pagemetrics-widget-site-icon"><core:icon identifier="{siteTile.tile.icon}" size="small" alternativeMarkupIdentifier="inline" /></span>
+                                    {siteTile.site.identifier}
+                                    <span class="pagemetrics-widget-site-subtitle">{siteTile.tile.label}</span>
+                                </h3>
+                            </f:if>
+                            <div class="pagemetrics-widget-metric-headline">
+                                <span class="pagemetrics-widget-metric-headline-value">{siteTile.tile.formattedValue}</span>
+                                <f:comment>
+                                    Same rule as the page-header tile and PageMetricsWidget: no badge at
+                                    all where the previous period lies outside the imported window, since
+                                    a percentage against days nobody fetched is not a smaller number, it
+                                    is not a number.
+                                </f:comment>
+                                <f:if condition="{siteTile.tile.hasNoComparison}">
+                                    <f:else>
+                                        <f:if condition="{siteTile.tile.isNew}">
+                                            <f:then><f:variable name="deltaText"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:trend.new" default="new" /></f:variable></f:then>
+                                            <f:else><f:variable name="deltaText">{siteTile.tile.deltaPercent}%</f:variable></f:else>
+                                        </f:if>
+                                        <f:render partial="TrendBadge" arguments="{trend: siteTile.tile.trend, sentiment: siteTile.tile.sentiment, deltaText: deltaText, isNew: siteTile.tile.isNew}" />
+                                    </f:else>
+                                </f:if>
+                            </div>
+                            <f:comment>
+                                What the tile's own popover computes client-side from the same
+                                sparkline (see TileStatBuilder) - the same icon+value chips, spelled
+                                out here instead of behind a hover this widget has no equivalent of
+                                (see the MetricStat partial). A stat is left out entirely where its
+                                own days carry no data, rather than shown as a false zero.
+                            </f:comment>
+                            <div class="pagemetrics-widget-metric-stats">
+                                <f:if condition="{siteTile.stats.lastDayFormattedValue}">
+                                    <f:variable name="lastDayLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.lastDay" default="Last day" /></f:variable>
+                                    <f:variable name="lastDayHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.lastDayHint" default="The most recent day of the selected period" /></f:variable>
+                                    <f:render partial="MetricStat" arguments="{key: 'lastDay', label: lastDayLabel, value: siteTile.stats.lastDayFormattedValue, hint: lastDayHint}" />
+                                </f:if>
+                                <f:if condition="{siteTile.stats.previousDayFormattedValue}">
+                                    <f:variable name="previousDayLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.previousDay" default="Previous day" /></f:variable>
+                                    <f:variable name="previousDayHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.previousDayHint" default="The day before the most recent one" /></f:variable>
+                                    <f:render partial="MetricStat" arguments="{key: 'previousDay', label: previousDayLabel, value: siteTile.stats.previousDayFormattedValue, hint: previousDayHint}" />
+                                </f:if>
+                                <f:if condition="{siteTile.stats.peakFormattedValue}">
+                                    <f:variable name="peakLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.peak" default="Peak" /></f:variable>
+                                    <f:variable name="peakHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.peakHint" default="The highest value a single day reached" /></f:variable>
+                                    <f:render partial="MetricStat" arguments="{key: 'peak', label: peakLabel, value: siteTile.stats.peakFormattedValue, hint: peakHint}" />
+                                </f:if>
+                                <f:if condition="{siteTile.stats.averageFormattedValue}">
+                                    <f:variable name="averageLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.average" default="Average" /></f:variable>
+                                    <f:variable name="averageHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.averageHint" default="The mean across the days that have data" /></f:variable>
+                                    <f:render partial="MetricStat" arguments="{key: 'average', label: averageLabel, value: siteTile.stats.averageFormattedValue, hint: averageHint}" />
+                                </f:if>
+                                <f:if condition="{siteTile.tile.redirectSharePercent} > 0">
+                                    <f:variable name="viaRedirectsLabel"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.viaRedirects" default="Via redirects" /></f:variable>
+                                    <f:variable name="viaRedirectsHint"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.viaRedirectsHint" default="The share of this metric that arrived through a redirect" /></f:variable>
+                                    <f:variable name="viaRedirectsValue">{siteTile.tile.redirectSharePercent}%</f:variable>
+                                    <f:render partial="MetricStat" arguments="{key: 'viaRedirects', label: viaRedirectsLabel, value: viaRedirectsValue, hint: viaRedirectsHint}" />
+                                </f:if>
+                            </div>
+                            <f:comment>
+                                The same curve the tile's own popover charts, drawn by sparkline.js's
+                                initializeStaticCharts() - the exact code PageMetricsChartWidget uses,
+                                fed a single-series array built from this one tile's sparkline instead
+                                of a whole SiteMetricsOverview (see PageMetricsBreakdownWidget).
+                            </f:comment>
+                            <div
+                                class="pagemetrics-widget-chart pagemetrics-widget-chart-compact"
+                                data-labels="{f:format.json(value: sparklineLabels)}"
+                                data-unit="{siteTile.tile.unit.value}"
+                                data-sparkline="{f:format.json(value: siteTile.series)}"
+                                style="--pm-accent: {siteTile.tile.color}"
+                            ></div>
+                            <f:if condition="{siteTile.tile.breakdown}">
+                                <div class="pagemetrics-widget-metric-breakdown">
+                                    <p class="pagemetrics-widget-metric-breakdown-heading"><f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:popover.breakdown" default="Made up of" /></p>
+                                    <f:comment>
+                                        A donut wherever DonutChartBuilder could size every part - the
+                                        plain list otherwise, e.g. for a breakdown a ModifyMetricTilesEvent
+                                        listener built without a raw $value on each part.
+                                    </f:comment>
+                                    <f:if condition="{siteTile.donut}">
+                                        <f:then>
+                                            <div class="pagemetrics-widget-donut-row">
+                                                <div class="pagemetrics-widget-donut" style="background: {siteTile.donut.cssGradient}" aria-hidden="true">
+                                                    <div class="pagemetrics-widget-donut-hole"></div>
+                                                </div>
+                                                <dl class="pagemetrics-widget-donut-legend pagemetrics-widget-metric-breakdown-list">
+                                                    <f:for each="{siteTile.donut.legend}" as="part">
+                                                        <div class="pagemetrics-widget-metric-breakdown-pair">
+                                                            <span class="pagemetrics-widget-donut-legend-swatch" style="--pm-swatch: {part.color}" aria-hidden="true"></span>
+                                                            <dt>{part.label}</dt>
+                                                            <dd>{part.formattedValue}</dd>
+                                                        </div>
+                                                    </f:for>
+                                                </dl>
+                                            </div>
+                                        </f:then>
+                                        <f:else>
+                                            <dl class="pagemetrics-widget-metric-breakdown-list">
+                                                <f:for each="{siteTile.tile.breakdown}" as="part">
+                                                    <div class="pagemetrics-widget-metric-breakdown-pair">
+                                                        <dt>{part.label}</dt>
+                                                        <dd>{part.formattedValue}</dd>
+                                                    </div>
+                                                </f:for>
+                                            </dl>
+                                        </f:else>
+                                    </f:if>
+                                </div>
+                            </f:if>
+                        </div>
+                    </f:for>
+                </div>
+            </div>
+        </f:then>
+        <f:else>
+            <div class="callout callout-info">
+                <div class="callout-icon">
+                    <span class="icon-emphasized"><core:icon identifier="{configuration.iconIdentifier}" /></span>
+                </div>
+                <div class="callout-content">
+                    <div class="callout-title">
+                        <f:translate key="LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.empty" default="No page metrics available yet." />
+                    </div>
+                </div>
+            </div>
+        </f:else>
+    </f:if>
+</f:section>
+</html>

@@ -20,6 +20,7 @@ use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetr
 use KonradMichalik\Typo3PageMetrics\Service\SiteMetricsOverviewBuilder;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
@@ -37,7 +38,8 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
         parent::setUp();
         $this->importCSVDataSet(__DIR__.'/Fixtures/pages.csv');
         $this->importCSVDataSet(__DIR__.'/Fixtures/be_users.csv');
-        $this->setUpBackendUser(1);
+        $backendUser = $this->setUpBackendUser(1);
+        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)->createFromUserPreferences($backendUser);
     }
 
     public function testHasProviderIsFalseWhenNoSiteConfigurationExists(): void
@@ -96,54 +98,51 @@ final class SiteMetricsOverviewBuilderTest extends FunctionalTestCase
         self::assertSame('Page views', $overview->chartLabel);
     }
 
-    public function testAdditionalChartSeriesAreBuiltForEachRequestedMetric(): void
+    public function testAvailableMetricsIncludesTheMachineSummaryWhereThereAreMachineMetrics(): void
+    {
+        $this->writeSiteConfiguration(['accesslog' => ['pathPattern' => '/var/log/nginx/access.log']]);
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $metrics = $this->get(SiteMetricsOverviewBuilder::class)->availableMetrics([$site]);
+
+        self::assertArrayHasKey('machine.summary.accesslog', $metrics);
+        self::assertSame('Bot traffic', $metrics['machine.summary.accesslog']);
+    }
+
+    public function testAvailableMetricsOmitsTheMachineSummaryWhereThereIsNothingToSum(): void
+    {
+        $this->writeSiteConfiguration();
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $metrics = $this->get(SiteMetricsOverviewBuilder::class)->availableMetrics([$site]);
+
+        self::assertArrayNotHasKey('machine.summary.matomo', $metrics);
+    }
+
+    public function testBuildPlotsTheMachineSummaryAcrossEveryBotMetricWhenSelected(): void
+    {
+        $this->writeSiteConfiguration(['accesslog' => ['pathPattern' => '/var/log/nginx/access.log']]);
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'accesslog', $today, 'bot.ai_crawler', 40);
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'accesslog', $today, 'bot.search', 10);
+        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
+
+        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7, 'machine.summary.accesslog');
+
+        self::assertSame('Bot traffic', $overview->chartLabel);
+        self::assertSame(50, $overview->chartSeries[$today->format('Y-m-d')]);
+    }
+
+    public function testBuildFallsBackToThePrimaryMetricWhenTheMachineSummaryHasNothingToSum(): void
     {
         $this->writeSiteConfiguration();
         $today = new DateTimeImmutable('today');
-        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 10);
-        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.visits', 4);
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 42);
         $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
 
-        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7, null, ['matomo.visits']);
+        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7, 'machine.summary.matomo');
 
-        self::assertCount(1, $overview->additionalChartSeries);
-        self::assertSame('Visits', $overview->additionalChartSeries[0]->label);
-        self::assertSame(4, $overview->additionalChartSeries[0]->series[$today->format('Y-m-d')]);
-    }
-
-    public function testAdditionalChartSeriesSupportsARateMetric(): void
-    {
-        $this->writeSiteConfiguration();
-        $today = new DateTimeImmutable('today');
-        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.entry_bounces', 3);
-        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.entries', 4);
-        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
-
-        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7, null, ['matomo.bounce_rate']);
-
-        self::assertSame('Bounce rate', $overview->additionalChartSeries[0]->label);
-        self::assertSame(75, $overview->additionalChartSeries[0]->series[$today->format('Y-m-d')]);
-    }
-
-    public function testAdditionalChartSeriesDropsUnknownAndDuplicateIdentifiers(): void
-    {
-        $this->writeSiteConfiguration();
-        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.visits', 4);
-        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
-
-        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 7, null, ['matomo.visits', 'matomo.visits', 'ga4.sessions']);
-
-        self::assertCount(1, $overview->additionalChartSeries);
-    }
-
-    public function testAdditionalChartSeriesIsEmptyWhenNoSiteConfigurationExists(): void
-    {
-        $this->writeSiteConfigurationWithoutProvider();
-        $site = $this->get(SiteFinder::class)->getSiteByPageId(1);
-
-        $overview = $this->get(SiteMetricsOverviewBuilder::class)->build($site, 0, 30, null, ['matomo.visits']);
-
-        self::assertSame([], $overview->additionalChartSeries);
+        self::assertSame('Page views', $overview->chartLabel);
     }
 
     public function testTopPagesAreRankedHighestFirstWithResolvedTitles(): void

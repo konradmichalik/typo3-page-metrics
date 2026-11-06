@@ -234,15 +234,6 @@
             <trans-unit id="widget.chart.setting.metric.auto" resname="widget.chart.setting.metric.auto">
                 <source>Automatic (site's primary metric)</source>
             </trans-unit>
-            <trans-unit id="widget.chart.setting.metric.none" resname="widget.chart.setting.metric.none">
-                <source>None</source>
-            </trans-unit>
-            <trans-unit id="widget.chart.setting.metric2.label" resname="widget.chart.setting.metric2.label">
-                <source>Second metric</source>
-            </trans-unit>
-            <trans-unit id="widget.chart.setting.metric2.description" resname="widget.chart.setting.metric2.description">
-                <source>An optional second metric, overlaid on the same chart for comparison.</source>
-            </trans-unit>
             <trans-unit id="widget.chart.setting.period.label" resname="widget.chart.setting.period.label">
                 <source>Period</source>
             </trans-unit>
@@ -369,6 +360,18 @@
             <trans-unit id="widget.annotations.empty" resname="widget.annotations.empty">
                 <source>No annotations in this period.</source>
             </trans-unit>
+            <trans-unit id="widget.breakdown.title" resname="widget.breakdown.title">
+                <source>Page metrics breakdown</source>
+            </trans-unit>
+            <trans-unit id="widget.breakdown.description" resname="widget.breakdown.description">
+                <source>One metric per site, spelled out: last day, previous day, peak, average, and its breakdown into parts where it has one, such as bot traffic by crawler.</source>
+            </trans-unit>
+            <trans-unit id="widget.breakdown.setting.metric.label" resname="widget.breakdown.setting.metric.label">
+                <source>Metric</source>
+            </trans-unit>
+            <trans-unit id="widget.breakdown.setting.metric.description" resname="widget.breakdown.setting.metric.description">
+                <source>Which metric to show. Defaults to each site's own primary metric.</source>
+            </trans-unit>
             <trans-unit id="unresolved.reason.foreign-host" resname="unresolved.reason.foreign-host">
                 <source>Foreign host</source>
             </trans-unit>
@@ -455,9 +458,6 @@
             </trans-unit>
             <trans-unit id="widget.insight.pageFall" resname="widget.insight.pageFall">
                 <source>Biggest faller by %1$s: "%2$s", down %3$d%% to %4$s.</source>
-            </trans-unit>
-            <trans-unit id="chart.scaleSeparate" resname="chart.scaleSeparate">
-                <source>Each line is drawn to its own scale, so only the shapes can be compared, not the heights.</source>
             </trans-unit>
             <trans-unit id="popover.onRecords" resname="popover.onRecords">
                 <source>On records below</source>

@@ -1,0 +1,40 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:comment>
+    One stat chip (Metrics breakdown widget) - the same icon, value and hint
+    the tile's own popover shows for last day / previous day / peak / average
+    / via redirects, reused here for a widget with no hover of its own to
+    open that popover from.
+
+    The five icons are sparkline.js's STAT_ICON_PATHS, copied rather than
+    shared: none of them are registered core:icon identifiers, and this
+    extension already makes the same tradeoff for PageHeader/Metrics.html's
+    inline checkmark rather than invent a bridge from a JS constant to PHP
+    for five paths that never change.
+
+    Arguments:
+      key    which stat this is - lastDay, previousDay, peak, average or
+             viaRedirects - selects the icon
+      label  the chip's short label, e.g. "Peak"
+      value  the chip's already formatted value, e.g. "160"
+      hint   the explanation shown on hover, e.g. "The highest value a
+             single day reached"
+</f:comment>
+<div class="pagemetrics-widget-metric-stat" data-hint-title="{label}" data-hint-text="{hint}">
+    <span class="pagemetrics-widget-metric-stat-icon" aria-hidden="true">
+        <f:switch expression="{key}">
+            <f:case value="lastDay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12" /><path d="M16 3l0 4" /><path d="M8 3l0 4" /><path d="M4 11l16 0" /><path d="M8 15h2v2h-2l0 -2" /></svg></f:case>
+            <f:case value="previousDay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v8" /><path d="M16 3v4" /><path d="M8 3v4" /><path d="M4 11h16" /><path d="M16 19h6" /></svg></f:case>
+            <f:case value="peak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l0 10" /><path d="M12 4l4 4" /><path d="M12 4l-4 4" /><path d="M4 20l16 0" /></svg></f:case>
+            <f:case value="average"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l18 -18" /><path d="M4 12a8 8 0 1 0 16 0a8 8 0 1 0 -16 0" /></svg></f:case>
+            <f:case value="viaRedirects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4" /><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5" /></svg></f:case>
+        </f:switch>
+    </span>
+    <span class="pagemetrics-widget-metric-stat-value">{value}</span>
+    <f:comment>
+        The icon and the pill's shape carry nothing on their own for
+        assistive technology or a forced-colours mode - the same reasoning
+        the trend badge's own visually-hidden sentence follows.
+    </f:comment>
+    <span class="pagemetrics-visually-hidden">{label}. {hint}</span>
+</div>
+</html>

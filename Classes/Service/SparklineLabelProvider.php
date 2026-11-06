@@ -73,7 +73,6 @@ final readonly class SparklineLabelProvider
             'slider.page' => 'sliderPage',
             'chart.summary' => 'chartSummary',
             'chart.summaryDates' => 'chartSummaryDates',
-            'chart.scaleSeparate' => 'chartScaleSeparate',
         ];
 
         // The marker tooltip names the kind of event, so the category

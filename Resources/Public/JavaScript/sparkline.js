@@ -61,7 +61,6 @@ const FALLBACK_LABELS = {
   sliderPage: 'Page %1$s',
   chartSummary: 'Chart from %1$s to %2$s, values from %3$s to %4$s',
   chartSummaryDates: 'Chart from %1$s to %2$s',
-  chartScaleSeparate: 'Each line is drawn to its own scale, so only the shapes can be compared, not the heights.',
   'annotationCategory.release': 'Release',
   'annotationCategory.campaign': 'Campaign',
   'annotationCategory.content': 'Content change',
@@ -325,25 +324,16 @@ function buildDateAxis(dates) {
 // The chart's textual equivalent. An SVG of clamped polylines conveys nothing
 // at all without sight, and the axis labels are bare numbers in the corners -
 // this is the one place the range gets stated as a sentence.
-//
-// scaleNote says which scale the heights were drawn to, and is given only
-// where there is more than one line to mistake for another. It is stated
-// rather than left to be inferred from whether a range is quoted: a reader
-// who cannot see the chart is being told what a sighted one can measure off
-// it, and "these two heights are comparable" is the whole difference between
-// the overlay this view draws and the one the dashboard widget draws.
-function buildChartSummary(labels, dates, bounds, unit, scaleNote = null) {
+function buildChartSummary(labels, dates, bounds, unit) {
   const summary = (null !== bounds ? labels.chartSummary : labels.chartSummaryDates)
     .replace('%1$s', dates[0])
     .replace('%2$s', dates[dates.length - 1]);
 
-  const withBounds = null === bounds
+  return null === bounds
     ? summary
     : summary
       .replace('%3$s', formatValueForUnit(bounds[0], unit))
       .replace('%4$s', formatValueForUnit(bounds[1], unit));
-
-  return null === scaleNote ? withBounds : `${withBounds}. ${scaleNote}`;
 }
 
 // One explaining tooltip for the whole file, shared by the popover's figures
@@ -1837,19 +1827,8 @@ function scaleBounds(values) {
   return low === high ? [sorted[0], sorted[sorted.length - 1]] : [low, high];
 }
 
-// Each series is scaled against its own range rather than a shared
-// [0, max]: metrics like "Visits" and "Bounce rate" live on wildly
-// different scales, and overlaying them is about comparing shape/trend
-// over time, not reading them off one shared axis. For a single series
-// this is the same tight-range behaviour the chart always had, just
-// outlier-tolerant now (see scaleBounds()).
-//
-// sharedBounds opts out of that, and only a caller overlaying series of one
-// metric may: two periods of the same number have a common axis, and drawing
-// each to its own bounds would put a period that halved at the same height as
-// one that doubled. It stays opt-in because the dashboard chart widget
-// genuinely overlays different units, where one axis would be the lie
-// instead.
+// Outlier-tolerant rather than a plain min/max (see scaleBounds()), the same
+// tight-range behaviour the chart has always plotted its one series against.
 function computePlottedSeries(seriesList, dates, step) {
   return seriesList.map((series) => {
     const values = dates.map((date) => series.values[date] ?? null);
@@ -1859,19 +1838,14 @@ function computePlottedSeries(seriesList, dates, step) {
 }
 
 function renderSeriesLines(svg, plotted) {
-  const isMultiSeries = plotted.length > 1;
-
   plotted.forEach((series) => {
     appendSeriesPath(svg, series.points, {
-      // A single series still relies on the surrounding --pm-accent CSS
-      // custom property (currentColor) rather than its own color, so it
-      // keeps picking up the overrides other rules apply to that property
-      // (see page-metrics.css) instead of only ever drawing in the metric's
-      // own fixed color.
-      stroke: isMultiSeries ? series.color : 'currentColor',
-      // Overlaid, a fill would just muddy the overlap between series, so it
-      // stays with the single-metric case.
-      withArea: !isMultiSeries,
+      // Relies on the surrounding --pm-accent CSS custom property
+      // (currentColor) rather than the series' own color, so it keeps
+      // picking up the overrides other rules apply to that property (see
+      // page-metrics.css) instead of only ever drawing in one fixed color.
+      stroke: 'currentColor',
+      withArea: true,
     });
   });
 }
@@ -1890,38 +1864,23 @@ function renderAnnotationMarkers(svg, container, dates, step) {
   return annotations;
 }
 
-// One position marker per series - with a single series this is exactly
-// the same lone dot the chart always drew.
+// One position marker per series - the lone dot the chart has always drawn.
 function buildSeriesMarkers(plotted) {
-  const isMultiSeries = plotted.length > 1;
-
-  return plotted.map((series) => {
+  return plotted.map(() => {
     const marker = document.createElement('div');
     marker.className = 'pagemetrics-sparkline-marker';
     marker.hidden = true;
-    if (isMultiSeries) {
-      marker.style.background = series.color;
-    }
     return marker;
   });
 }
 
-// The tooltip's DOM skeleton - a heading (shown only once there's more than
-// one series, to carry the hovered date since the per-series rows show
-// their label instead - see attachChartInteractivity()), one value row per
-// series, and a trailing annotation row. Everything here starts empty and
-// is filled in on each mousemove.
+// The tooltip's DOM skeleton - one value row per series and a trailing
+// annotation row. Everything here starts empty and is filled in on each
+// mousemove.
 function buildTooltip(plotted) {
-  const isMultiSeries = plotted.length > 1;
-
   const tooltip = document.createElement('div');
   tooltip.className = 'pagemetrics-tooltip pagemetrics-tooltip-inverted pagemetrics-sparkline-tooltip';
   tooltip.hidden = true;
-
-  const heading = document.createElement('div');
-  heading.className = 'pagemetrics-sparkline-tooltip-heading';
-  heading.hidden = !isMultiSeries;
-  tooltip.appendChild(heading);
 
   const values = plotted.map(() => {
     const row = document.createElement('div');
@@ -1934,15 +1893,14 @@ function buildTooltip(plotted) {
   annotation.className = 'pagemetrics-sparkline-tooltip-annotation';
   tooltip.appendChild(annotation);
 
-  return { tooltip, heading, values, annotation };
+  return { tooltip, values, annotation };
 }
 
 // Wires up hover interactivity: on mousemove, positions every series'
 // marker and fills in the shared tooltip for whichever date the cursor is
 // nearest to; on mouseleave, hides all of it again.
 function attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotations, dates, step, width, labels }) {
-  const { tooltip, heading, values: tooltipValues, annotation: tooltipAnnotation } = tooltipParts;
-  const isMultiSeries = plotted.length > 1;
+  const { tooltip, values: tooltipValues, annotation: tooltipAnnotation } = tooltipParts;
 
   svg.addEventListener('mousemove', (event) => {
     const rect = svg.getBoundingClientRect();
@@ -1962,26 +1920,21 @@ function attachChartInteractivity({ svg, container, plotted, markers, tooltipPar
       markers[seriesIndex].hidden = point === null;
 
       const value = series.values[index];
-      const tooltipPrefix = isMultiSeries ? series.label : date;
-      tooltipValues[seriesIndex].textContent = `${tooltipPrefix}: ${value === null ? labels.noData : formatValueForUnit(value, series.unit)}`;
+      tooltipValues[seriesIndex].textContent = `${date}: ${value === null ? labels.noData : formatValueForUnit(value, series.unit)}`;
 
       if (0 === seriesIndex && point !== null) {
         centerY = markerCenterY;
       }
     });
 
-    heading.textContent = date;
-
     fillAnnotationLine(tooltipAnnotation, annotations, date, labels);
     tooltip.hidden = false;
     tooltip.style.top = `${centerY}px`;
 
     // Below the cursor by default (see .pagemetrics-sparkline-tooltip),
-    // but a hover point near the chart's own bottom edge - the most common
-    // case with a multi-series tooltip, which is taller than the
-    // single-value one this chart used to only ever show - pushes it past
-    // the widget card's bottom, off-screen until the page is scrolled.
-    // Flip to above only when that would actually happen, mirroring
+    // but a hover point near the chart's own bottom edge pushes it past the
+    // widget card's bottom, off-screen until the page is scrolled. Flip to
+    // above only when that would actually happen, mirroring
     // PageMetricsTile's own popover-edge clamping above.
     //
     // Always measured from the default "below" state, never from whatever
@@ -2005,45 +1958,6 @@ function attachChartInteractivity({ svg, container, plotted, markers, tooltipPar
     });
     tooltip.hidden = true;
   });
-}
-
-// The color-dot + label row shown under the chart once there's more than
-// one series to disambiguate - a single series already carries its label
-// in the widget's own heading, so there's nothing to add here.
-//
-// It also carries scaleNote, the sentence saying whether the heights may be
-// compared at all. The legend is where it belongs: it is the only chrome that
-// exists precisely because there is more than one line, which is the only
-// case in which the question can be asked. Hidden from assistive technology
-// because buildChartSummary() already states it inside the chart's own
-// aria-label, the same split the date axis above already makes.
-function buildLegend(plotted, scaleNote) {
-  if (plotted.length <= 1) {
-    return null;
-  }
-
-  const legend = document.createElement('div');
-  legend.className = 'pagemetrics-sparkline-legend';
-
-  plotted.forEach((series) => {
-    const dot = document.createElement('span');
-    dot.className = 'pagemetrics-sparkline-legend-dot';
-    dot.style.background = series.color;
-
-    const item = document.createElement('div');
-    item.className = 'pagemetrics-sparkline-legend-item';
-    item.appendChild(dot);
-    item.appendChild(document.createTextNode(series.label));
-    legend.appendChild(item);
-  });
-
-  const note = document.createElement('div');
-  note.className = 'pagemetrics-sparkline-legend-note';
-  note.setAttribute('aria-hidden', 'true');
-  note.textContent = scaleNote;
-  legend.appendChild(note);
-
-  return legend;
 }
 
 // The dashboard chart widget's markup is static (server-rendered, no AJAX
@@ -2078,27 +1992,15 @@ function initializeStaticCharts(root) {
     const labels = getLabels(container);
     attachChartInteractivity({ svg, container, plotted, markers, tooltipParts, annotations, dates, step, width, labels });
 
-    // Overlaid series each get their own scale (see computePlottedSeries),
-    // so there is no one axis to label - two numbers in the corners would
-    // belong to whichever series happened to be first and silently misread
-    // the others. The legend tells them apart instead.
-    const bounds = plotted.length > 1 ? null : boundsOf(plotted.flatMap((series) => series.values));
-    // Nothing to say where there is only one line: no second height exists to
-    // mistake it for.
-    const scaleNote = plotted.length > 1 ? labels.chartScaleSeparate : null;
+    const bounds = boundsOf(plotted.flatMap((series) => series.values));
 
     const wrapper = document.createElement('div');
     wrapper.className = 'pagemetrics-sparkline-wrapper';
     wrapper.setAttribute('role', 'img');
-    wrapper.setAttribute('aria-label', buildChartSummary(labels, dates, bounds, plotted[0].unit, scaleNote));
+    wrapper.setAttribute('aria-label', buildChartSummary(labels, dates, bounds, plotted[0].unit));
     wrapper.appendChild(svg);
     markers.forEach((marker) => wrapper.appendChild(marker));
     wrapper.appendChild(tooltipParts.tooltip);
-
-    const legend = buildLegend(plotted, scaleNote);
-    if (legend) {
-      container.appendChild(legend);
-    }
 
     container.appendChild(wrapper);
     container.appendChild(buildDateAxis(dates));

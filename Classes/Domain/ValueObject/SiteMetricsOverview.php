@@ -29,12 +29,11 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 final readonly class SiteMetricsOverview
 {
     /**
-     * @param array<string, int|null>    $chartSeries           Y-m-d => summed value, covers the same period as topPages/unresolvedUrls; null for a day with no data
+     * @param array<string, int|null>    $chartSeries    Y-m-d => summed value, covers the same period as topPages/unresolvedUrls; null for a day with no data
      * @param list<TopPage>              $topPages
      * @param list<UnresolvedUrlSummary> $unresolvedUrls
      * @param list<Annotation>           $annotations
-     * @param list<ChartSeries>          $additionalChartSeries metrics overlaid on the chart alongside the primary one (see PageMetricsChartWidget's metric2 setting) - empty for every other site-metrics widget
-     * @param DataFreshness|null         $dataFreshness         the last day this site's provider has numbers for, null when it has never imported
+     * @param DataFreshness|null         $dataFreshness  the last day this site's provider has numbers for, null when it has never imported
      */
     public function __construct(
         public Site $site,
@@ -47,7 +46,6 @@ final readonly class SiteMetricsOverview
         public array $topPages,
         public array $unresolvedUrls,
         public array $annotations,
-        public array $additionalChartSeries,
         public ?DataFreshness $dataFreshness,
     ) {}
 }

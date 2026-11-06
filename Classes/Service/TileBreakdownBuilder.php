@@ -80,7 +80,7 @@ final readonly class TileBreakdownBuilder
      *
      * @param array<string, int> $channelSums dimension => total, already fetched for every tile at once
      *
-     * @return list<array{label: string, formattedValue: string}>
+     * @return list<array{label: string, formattedValue: string, value: int}>
      */
     public function byChannel(MetricDefinition $definition, int $value, array $channelSums): array
     {
@@ -103,6 +103,7 @@ final readonly class TileBreakdownBuilder
             $parts[] = [
                 'label' => $channel?->label() ?? substr($dimension, strlen(TrafficChannel::DIMENSION_PREFIX)),
                 'formattedValue' => $this->valueFormatter->format($channelValue, $definition->unit),
+                'value' => $channelValue,
             ];
         }
 
@@ -124,7 +125,7 @@ final readonly class TileBreakdownBuilder
      *
      * @param array<string, int> $agentSums agent => hits for this tile's bucket, already fetched for both bot tiles at once
      *
-     * @return list<array{label: string, formattedValue: string, hint?: string}>
+     * @return list<array{label: string, formattedValue: string, value: int, hint?: string}>
      */
     public function byAgent(MetricDefinition $definition, int $value, array $agentSums): array
     {
@@ -143,6 +144,7 @@ final readonly class TileBreakdownBuilder
                 // translated: a crawler is called GPTBot in every language.
                 'label' => $agent,
                 'formattedValue' => $this->valueFormatter->format($hits, $definition->unit),
+                'value' => $hits,
             ];
 
             // What the thing actually is, from the same class that named it.
@@ -168,6 +170,7 @@ final readonly class TileBreakdownBuilder
             $parts[] = [
                 'label' => sprintf($this->getLanguageService()->sL(self::LL.'popover.breakdown.otherAgents'), count($rest)),
                 'formattedValue' => $this->valueFormatter->format(array_sum($rest), $definition->unit),
+                'value' => array_sum($rest),
                 'hint' => implode(', ', array_keys($rest)),
             ];
         }
@@ -189,9 +192,9 @@ final readonly class TileBreakdownBuilder
      * kept deliberately out of step (see BotAgentDetailCollector), so the
      * gap is a fact about the import, not a defect.
      *
-     * @param list<array{label: string, formattedValue: string, hint?: string}> $parts
+     * @param list<array{label: string, formattedValue: string, value: int, hint?: string}> $parts
      *
-     * @return list<array{label: string, formattedValue: string, hint?: string}>
+     * @return list<array{label: string, formattedValue: string, value: int, hint?: string}>
      */
     private function withUnattributed(array $parts, MetricDefinition $definition, int $value, int $attributed): array
     {
@@ -204,6 +207,7 @@ final readonly class TileBreakdownBuilder
         $parts[] = [
             'label' => $this->getLanguageService()->sL(self::LL.'popover.breakdown.unattributed'),
             'formattedValue' => $this->valueFormatter->format($unattributed, $definition->unit),
+            'value' => $unattributed,
         ];
 
         return $parts;

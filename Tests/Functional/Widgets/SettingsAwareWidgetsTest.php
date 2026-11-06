@@ -90,19 +90,17 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertInstanceOf(PageMetricsChartWidget::class, $widget);
 
         $definitions = $widget->getSettingsDefinitions();
-        self::assertCount(4, $definitions);
+        self::assertCount(3, $definitions);
         self::assertSame('metric', $definitions[0]->key);
         self::assertArrayHasKey('matomo.pageviews', $definitions[0]->enum);
         self::assertArrayHasKey('matomo.bounce_rate', $definitions[0]->enum);
-        self::assertSame('metric2', $definitions[1]->key);
-        self::assertArrayHasKey('matomo.pageviews', $definitions[1]->enum);
-        self::assertSame('period', $definitions[2]->key);
-        self::assertArrayHasKey(30, $definitions[2]->enum);
-        self::assertSame('annotationCategory', $definitions[3]->key);
+        self::assertSame('period', $definitions[1]->key);
+        self::assertArrayHasKey(30, $definitions[1]->enum);
+        self::assertSame('annotationCategory', $definitions[2]->key);
         // The empty choice is every kind, so a chart configured before this
         // setting existed keeps showing what it showed.
-        self::assertArrayHasKey('', $definitions[3]->enum);
-        self::assertArrayHasKey('campaign', $definitions[3]->enum);
+        self::assertArrayHasKey('', $definitions[2]->enum);
+        self::assertArrayHasKey('campaign', $definitions[2]->enum);
     }
 
     public function testChartWidgetMetricSettingOnlyOffersMetricsFromConfiguredProviders(): void
@@ -115,6 +113,25 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
 
         self::assertArrayNotHasKey('ga4.sessions', $enum);
         self::assertSame('Page views', $enum['matomo.pageviews']);
+    }
+
+    public function testChartWidgetOffersAndPlotsTheMachineTrafficSummary(): void
+    {
+        $this->writeSiteConfigurationWithAccessLog();
+        $widget = $this->get('dashboard.widget.pageMetricsChart');
+        self::assertInstanceOf(PageMetricsChartWidget::class, $widget);
+
+        $enum = $widget->getSettingsDefinitions()[0]->enum;
+        self::assertArrayHasKey('machine.summary.accesslog', $enum);
+        self::assertSame('Bot traffic', $enum['machine.summary.accesslog']);
+
+        $today = new DateTimeImmutable('today');
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'accesslog', $today, 'bot.ai_crawler', 40);
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'accesslog', $today, 'bot.search', 10);
+
+        $result = $this->renderChartWidgetResult(['metric' => 'machine.summary.accesslog']);
+
+        self::assertStringContainsString('Bot traffic', (string) $result->label);
     }
 
     public function testChartWidgetDefaultsToTheSitesPrimaryMetric(): void
@@ -176,33 +193,31 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         self::assertStringNotContainsString('Page views', (string) $result->label);
     }
 
-    public function testChartWidgetOverlaysAdditionalMetricsWhenConfigured(): void
+    public function testChartWidgetPlotsAConfiguredRateMetricInstead(): void
     {
         $this->writeSiteConfiguration();
         $today = new DateTimeImmutable('today');
         $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.pageviews', 42);
-        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.visits', 7);
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.entry_bounces', 3);
+        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', $today, 'matomo.entries', 4);
 
-        $result = $this->renderChartWidgetResult(['metric2' => 'matomo.visits']);
+        $result = $this->renderChartWidgetResult(['metric' => 'matomo.bounce_rate']);
 
-        self::assertStringContainsString('Page views + Visits', (string) $result->label);
+        self::assertStringContainsString('Bounce rate', (string) $result->label);
+        self::assertStringNotContainsString('Page views', (string) $result->label);
 
         preg_match('/data-sparkline="([^"]*)"/', $result->content, $matches);
         $series = json_decode(html_entity_decode($matches[1] ?? ''), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertCount(2, $series);
-        self::assertSame('Page views', $series[0]['label']);
-        self::assertSame('Visits', $series[1]['label']);
-        self::assertSame(7, $series[1]['values'][$today->format('Y-m-d')]);
+        self::assertSame('Bounce rate', $series[0]['label']);
+        self::assertSame(75, $series[0]['values'][$today->format('Y-m-d')]);
     }
 
     /**
-     * The legend itself is built client-side in sparkline.js's
-     * initializeStaticCharts() from however many series data-sparkline
-     * carries - nothing to assert on server-rendered markup here, only that
-     * a single, unconfigured widget still only ever emits its one primary
-     * series.
+     * Nothing to assert on server-rendered markup beyond the shape itself -
+     * the chart always emits exactly one series now that there is no second
+     * metric to overlay.
      */
-    public function testChartWidgetEmitsOnlyThePrimarySeriesByDefault(): void
+    public function testChartWidgetEmitsExactlyOneSeries(): void
     {
         $this->writeSiteConfiguration();
         $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 42);
@@ -213,17 +228,6 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
         $series = json_decode(html_entity_decode($matches[1] ?? ''), true, 512, \JSON_THROW_ON_ERROR);
         self::assertCount(1, $series);
         self::assertSame('Page views', $series[0]['label']);
-    }
-
-    public function testChartWidgetIgnoresAnUnsupportedSecondMetric(): void
-    {
-        $this->writeSiteConfiguration();
-        $this->get(DailyMetricsRepository::class)->upsert(1, 0, 'matomo', new DateTimeImmutable('today'), 'matomo.pageviews', 42);
-
-        $result = $this->renderChartWidgetResult(['metric2' => 'ga4.sessions']);
-
-        self::assertStringContainsString('Page views', (string) $result->label);
-        self::assertStringNotContainsString('+', (string) $result->label);
     }
 
     public function testChartWidgetRespectsTheConfiguredPeriod(): void
@@ -676,6 +680,28 @@ final class SettingsAwareWidgetsTest extends FunctionalTestCase
             'errorHandling' => [],
             'routes' => [],
             'pageMetrics' => ['providers' => ['matomo' => ['endpoint' => 'https://matomo.example.com/', 'siteId' => 1, 'tokenAuth' => 'x']]],
+        ]);
+    }
+
+    private function writeSiteConfigurationWithAccessLog(): void
+    {
+        $this->get(SiteWriter::class)->write('main', [
+            'rootPageId' => 1,
+            'base' => 'https://example.com/',
+            'languages' => [
+                0 => [
+                    'title' => 'English',
+                    'enabled' => true,
+                    'languageId' => 0,
+                    'base' => '/',
+                    'locale' => 'en_US.UTF-8',
+                    'navigationTitle' => 'English',
+                    'flag' => 'us',
+                ],
+            ],
+            'errorHandling' => [],
+            'routes' => [],
+            'pageMetrics' => ['providers' => ['accesslog' => ['pathPattern' => '/var/log/nginx/access.log']]],
         ]);
     }
 }

@@ -681,15 +681,16 @@ final readonly class PageMetricsViewDataBuilder
      * is. The import writes a via_redirect row for every metric, and folding
      * the buckets together would otherwise drop that share in silence.
      *
-     * @param list<int>                                                         $pageUids
-     * @param array<string, int>                                                $series
-     * @param list<array{label: string, formattedValue: string, hint?: string}> $breakdown
+     * @param list<int>                                                                     $pageUids
+     * @param array<string, int>                                                            $series
+     * @param list<array{label: string, formattedValue: string, value: int, hint?: string}> $breakdown
      *
-     * @return array{0: array<string, int>, 1: int, 2: int, 3: list<array{label: string, formattedValue: string, hint?: string}>}
+     * @return array{0: array<string, int>, 1: int, 2: int, 3: list<array{label: string, formattedValue: string, value: int, hint?: string}>}
      */
     private function foldBucket(MetricDefinition $definition, array $pageUids, int $languageId, DateRange $tileRange, DateRange $previousRange, array $series, int $previousValue, int $redirectValue, array $breakdown, bool $previousPeriodCovered): array
     {
         $bucketSeries = $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $definition->identifier, $tileRange);
+        $bucketTotal = array_sum($bucketSeries);
 
         foreach ($bucketSeries as $date => $value) {
             $series[$date] = ($series[$date] ?? 0) + $value;
@@ -697,7 +698,8 @@ final readonly class PageMetricsViewDataBuilder
 
         $breakdown[] = [
             'label' => $definition->label,
-            'formattedValue' => $this->valueFormatter->format(array_sum($bucketSeries), $definition->unit),
+            'formattedValue' => $this->valueFormatter->format($bucketTotal, $definition->unit),
+            'value' => $bucketTotal,
             // What the bucket counts, in the words its own tile uses. A
             // reader who can tell an AI crawler from a link preview does not
             // need the list explained, and this list exists for the reader

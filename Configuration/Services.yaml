@@ -93,6 +93,11 @@ services:
     KonradMichalik\Typo3PageMetrics\Service\BotAgentDetailCollector:
         public: true
 
+    # Public so functional tests can fetch it directly via $this->get() before
+    # any consuming service references it.
+    KonradMichalik\Typo3PageMetrics\Service\MachineSummaryMetric:
+        public: true
+
     # Public because GeneralUtility::makeInstance() resolves itemsProcFunc
     # classes directly by class name (see the TCA type=select on
     # tx_typo3pagemetrics_manual_annotation's site_identifier field), the same

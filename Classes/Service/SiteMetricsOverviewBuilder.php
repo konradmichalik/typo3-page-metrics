@@ -15,12 +15,11 @@ namespace KonradMichalik\Typo3PageMetrics\Service;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3PageMetrics\Domain\Enum\{AnnotationCategory, MetricUnit, TrendSentiment, UnresolvedReason};
-use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, ChartSeries, DataFreshness, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
+use KonradMichalik\Typo3PageMetrics\Domain\ValueObject\{Annotation, DataFreshness, DateRange, MetricDefinition, RateMetricDefinition, SiteMetricsOverview, TopPage, UnresolvedUrlSummary};
 use KonradMichalik\Typo3PageMetrics\Persistence\{AnnotationRepository, DailyMetricsRepository, ImportStateRepository, ManualAnnotationRepository, SitePageUidRepository, UnresolvedUrlRepository};
 use KonradMichalik\Typo3PageMetrics\Provider\{MetricDefinitionCollector, MetricProviderInterface, SiteAwareMetricProviderInterface};
 use TYPO3\CMS\Core\Site\Entity\Site;
 
-use function in_array;
 use function sprintf;
 use function ucfirst;
 
@@ -58,18 +57,16 @@ final readonly class SiteMetricsOverviewBuilder
         private ImportCoverage $importCoverage,
         private ImportStateRepository $importStateRepository,
         private MetricDefinitionCollector $metricDefinitionCollector,
+        private MachineSummaryMetric $machineSummaryMetric,
         private iterable $providers,
     ) {}
 
-    /**
-     * @param list<string> $additionalMetricIdentifiers overlaid on the chart alongside $preferredMetricIdentifier (see PageMetricsChartWidget's metric2 setting) - an identifier not belonging to this site's own provider is silently dropped, the same fallback buildAdditionalChartSeries() already applies to $preferredMetricIdentifier
-     */
-    public function build(Site $site, int $languageId, int $periodDays, ?string $preferredMetricIdentifier = null, array $additionalMetricIdentifiers = [], ?AnnotationCategory $annotationCategory = null): SiteMetricsOverview
+    public function build(Site $site, int $languageId, int $periodDays, ?string $preferredMetricIdentifier = null, ?AnnotationCategory $annotationCategory = null): SiteMetricsOverview
     {
         $provider = $this->resolveProvider($site);
 
         if (null === $provider) {
-            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], [], null);
+            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], null);
         }
 
         // A site that counts nothing gets the same answer as a site with no
@@ -79,7 +76,7 @@ final readonly class SiteMetricsOverviewBuilder
         $primary = $this->metricDefinitionCollector->primaryFor($this->providers, $site);
 
         if (null === $primary) {
-            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], [], null);
+            return new SiteMetricsOverview($site, false, '', '', '', MetricUnit::Count, [], [], [], [], null);
         }
 
         $chartMetric = $this->resolveChartMetric($provider, $site, $preferredMetricIdentifier) ?? $primary;
@@ -100,11 +97,10 @@ final readonly class SiteMetricsOverviewBuilder
             $chartMetric->icon,
             $chartMetric->color,
             $chartMetric->unit,
-            $this->buildChartSeries($chartMetric, $pageUids, $languageId, $currentRange, $coverage),
+            $this->buildChartSeries($chartMetric, $provider, $site, $pageUids, $languageId, $currentRange, $coverage),
             $this->trendCalculator->rankedByValue($pageUids, $languageId, $primary, $currentRange, $previousRange, self::TOP_PAGES_LIMIT, $this->importCoverage->covers($coverage, $previousRange)),
             $this->buildUnresolvedUrls($site),
             $this->buildAnnotations($site->getIdentifier(), $currentRange, $annotationCategory),
-            $this->buildAdditionalChartSeries($provider, $site, $additionalMetricIdentifiers, $pageUids, $languageId, $currentRange, $coverage),
             $this->dataFreshnessFor($site),
         );
     }
@@ -280,6 +276,16 @@ final readonly class SiteMetricsOverviewBuilder
             foreach ([...$this->metricDefinitionCollector->forSite($provider, $site), ...$provider->getRateMetricDefinitions()] as $definition) {
                 $definitions[$definition->identifier] = ['provider' => $provider, 'label' => $definition->label];
             }
+
+            // One synthetic entry per provider with anything to sum, the
+            // same total the tile's "Bot traffic" summary already shows -
+            // nothing this site's own bot.* metrics couldn't already chart
+            // individually, just added together the way the tile does.
+            $machineSummary = $this->machineSummaryMetric->definitionFor($provider, $site);
+
+            if (null !== $machineSummary) {
+                $definitions[$machineSummary->identifier] = ['provider' => $provider, 'label' => $machineSummary->label];
+            }
         }
 
         $labelCounts = array_count_values(array_column($definitions, 'label'));
@@ -390,6 +396,10 @@ final readonly class SiteMetricsOverviewBuilder
             return null;
         }
 
+        if ($preferredMetricIdentifier === $this->machineSummaryMetric->identifierFor($provider)) {
+            return $this->machineSummaryMetric->definitionFor($provider, $site);
+        }
+
         foreach ($this->metricDefinitionCollector->forSite($provider, $site) as $definition) {
             if ($definition->identifier === $preferredMetricIdentifier) {
                 return $definition;
@@ -439,8 +449,12 @@ final readonly class SiteMetricsOverviewBuilder
      *
      * @return array<string, int|null> Y-m-d => value, null for days with no data
      */
-    private function buildChartSeries(MetricDefinition|RateMetricDefinition $metric, array $pageUids, int $languageId, DateRange $range, ?DateRange $coverage): array
+    private function buildChartSeries(MetricDefinition|RateMetricDefinition $metric, MetricProviderInterface $provider, Site $site, array $pageUids, int $languageId, DateRange $range, ?DateRange $coverage): array
     {
+        if ($metric instanceof MetricDefinition && $metric->identifier === $this->machineSummaryMetric->identifierFor($provider)) {
+            return $this->importCoverage->mask($this->machineSummaryMetric->seriesFor($provider, $site, $pageUids, $languageId, $range), $coverage);
+        }
+
         $series = $metric instanceof MetricDefinition
             ? $this->dailyMetricsRepository->siteSeries($pageUids, $languageId, $metric->identifier, $range)
             : $this->rateSeriesCalculator->series(
@@ -450,41 +464,6 @@ final readonly class SiteMetricsOverviewBuilder
             );
 
         return $this->importCoverage->mask($series, $coverage);
-    }
-
-    /**
-     * Resolves each of $metricIdentifiers against $provider the same way the
-     * primary chart metric is resolved (see resolveChartMetric()) - an
-     * identifier not belonging to this site's own provider, or a duplicate of
-     * one already resolved, is silently dropped rather than surfaced as an
-     * error, matching the existing single-metric fallback behaviour.
-     *
-     * @param list<string> $metricIdentifiers
-     * @param list<int>    $pageUids
-     *
-     * @return list<ChartSeries>
-     */
-    private function buildAdditionalChartSeries(MetricProviderInterface $provider, Site $site, array $metricIdentifiers, array $pageUids, int $languageId, DateRange $range, ?DateRange $coverage): array
-    {
-        $series = [];
-        $seenIdentifiers = [];
-
-        foreach ($metricIdentifiers as $identifier) {
-            if (in_array($identifier, $seenIdentifiers, true)) {
-                continue;
-            }
-
-            $metric = $this->resolveChartMetric($provider, $site, $identifier);
-
-            if (null === $metric) {
-                continue;
-            }
-
-            $seenIdentifiers[] = $identifier;
-            $series[] = new ChartSeries($metric->label, $metric->color, $metric->unit, $this->buildChartSeries($metric, $pageUids, $languageId, $range, $coverage));
-        }
-
-        return $series;
     }
 
     /**

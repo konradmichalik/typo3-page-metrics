@@ -21,6 +21,19 @@
     --pm-sentiment-positive: color-mix(in srgb, var(--typo3-text-color-success, #1a7f37) 80%, var(--typo3-text-color-base, #14213d));
     --pm-sentiment-negative: color-mix(in srgb, var(--typo3-text-color-danger, #c92a2a) 80%, var(--typo3-text-color-base, #14213d));
     --pm-sentiment-neutral: var(--typo3-text-color-variant, #6a7085);
+
+    /* Qualitative, not sequential: a donut's slices (DonutChartBuilder) name
+       different things rather than more or less of one thing, so the
+       palette has no order for a reader to misread as a ranking. Cycled by
+       a part's position, which is why there are six rather than exactly as
+       many as any one breakdown has parts - TileBreakdownBuilder's own caps
+       (five named agents, six traffic channels) both fit inside it once. */
+    --pm-donut-color-0: #0969da;
+    --pm-donut-color-1: #8250df;
+    --pm-donut-color-2: #1a7f37;
+    --pm-donut-color-3: #bf8700;
+    --pm-donut-color-4: #cf222e;
+    --pm-donut-color-5: #6a7085;
 }
 
 .pagemetrics-header {
@@ -297,18 +310,6 @@
     margin-top: 8px;
 }
 
-/* The chart's own mark sits in the plot's top left corner, where a curve
-   drawn from a period's oldest day has the least to say. Above the drawn
-   chart, which is appended after it, and below the hover tooltip, which
-   shares this corner only while the pointer is in it. */
-.pagemetrics-widget-chart .pagemetrics-freshness {
-    position: absolute;
-    z-index: 1;
-    top: 0;
-    left: 0;
-    margin-top: 0;
-}
-
 .pagemetrics-slider {
     display: flex;
     align-items: center;
@@ -456,6 +457,18 @@
     min-height: 0;
 }
 
+/* The Metrics breakdown widget's chart sits below a headline and a row of
+   stat chips rather than being the whole widget the way Chart.html's is, so
+   it must not flex-grow to fill whatever is left (a single site would end up
+   with a chart as tall as the whole card) - a fixed compact height instead,
+   the same floor .pagemetrics-widget-chart already treats as the shortest
+   readable curve. */
+.pagemetrics-widget-chart-compact {
+    flex: 0 0 auto;
+    max-height: 110px;
+    margin-top: 8px;
+}
+
 .pagemetrics-widget-chart .pagemetrics-sparkline {
     display: block;
     width: 100%;
@@ -466,28 +479,6 @@
     height: 100%;
     color: var(--pm-accent);
     cursor: crosshair;
-}
-
-.pagemetrics-sparkline-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    margin-top: 6px;
-    font-size: 0.75rem;
-    color: var(--typo3-text-color-variant, #6a7085);
-}
-
-.pagemetrics-sparkline-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.pagemetrics-sparkline-legend-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
 }
 
 .pagemetrics-tiles::-webkit-scrollbar {
@@ -690,11 +681,6 @@
 
 .pagemetrics-sparkline-tooltip-above {
     transform: translate(-50%, -100%) translateY(-6px);
-}
-
-.pagemetrics-sparkline-tooltip-heading {
-    font-weight: 600;
-    white-space: nowrap;
 }
 
 .pagemetrics-sparkline-tooltip-value {
@@ -1156,6 +1142,149 @@
     margin-left: 0;
 }
 
+/* The configured tile's own headline (Metrics breakdown widget) - its
+   value and trend badge, the same pairing PageMetricsWidget's tile shows,
+   just without the tile's card chrome since this widget already sits
+   inside one row per site. */
+.pagemetrics-widget-metric-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.pagemetrics-widget-metric-headline-value {
+    font-size: 1.375rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--typo3-text-color-base, #14213d);
+}
+
+/* The same icon + value chips the tile's own popover shows (see
+   .pagemetrics-popover-stat) - same pill shape, same "help" cursor, same
+   hint-tooltip attributes, reused here rather than a bulkier label-over-
+   value card, so the two surfaces read as one design rather than two. */
+.pagemetrics-widget-metric-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+}
+
+.pagemetrics-widget-metric-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--typo3-text-color-base, #14213d) 6%, transparent);
+    cursor: help;
+}
+
+.pagemetrics-widget-metric-stat-icon {
+    display: inline-flex;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-widget-metric-stat-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.pagemetrics-widget-metric-stat-value {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--typo3-text-color-base, #14213d);
+}
+
+/* Same shape as .pagemetrics-popover-breakdown, which explains a tile's
+   headline behind a hover this widget has no equivalent of - a heading over
+   either a donut (DonutChartBuilder) or, wherever one cannot be drawn
+   honestly, the plain dt/dd list it falls back to (see
+   .pagemetrics-widget-metric-breakdown-list). The smaller font-size lives
+   here rather than on either child, so both inherit it alike. */
+.pagemetrics-widget-metric-breakdown {
+    margin: 8px 0 0;
+    font-size: 0.6875rem;
+}
+
+.pagemetrics-widget-metric-breakdown-heading {
+    margin: 0 0 2px;
+    color: var(--typo3-text-color-variant, #6a7085);
+}
+
+.pagemetrics-widget-donut-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pagemetrics-widget-donut {
+    position: relative;
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+}
+
+/* The hole: a second, smaller circle in the card's own background colour,
+   centred on top of the conic-gradient one - simpler than clipping the
+   gradient itself, and it costs nothing to keep in sync with the card. */
+.pagemetrics-widget-donut-hole {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--typo3-component-bg, #fff);
+    transform: translate(-50%, -50%);
+}
+
+.pagemetrics-widget-donut-legend {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.pagemetrics-widget-metric-breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pagemetrics-widget-metric-breakdown-pair {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Only the legend's own pairs get a swatch column - the plain fallback list
+   has no colour to explain, since a part without a $value never reached
+   DonutChartBuilder in the first place. */
+.pagemetrics-widget-donut-legend .pagemetrics-widget-metric-breakdown-pair {
+    grid-template-columns: auto 1fr auto;
+}
+
+.pagemetrics-widget-donut-legend-swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--pm-swatch);
+}
+
+.pagemetrics-widget-metric-breakdown-list dt {
+    color: var(--typo3-text-color-variant, #6a7085);
+    font-weight: 400;
+}
+
+.pagemetrics-widget-metric-breakdown-list dd {
+    margin: 0;
+    text-align: right;
+    font-weight: 600;
+    color: var(--typo3-text-color-base, #14213d);
+}
+
 .pagemetrics-widget-trend-sentiment-positive {
     --pm-accent: var(--pm-sentiment-positive);
 }
@@ -1595,12 +1724,4 @@
     flex-shrink: 0;
     font-size: 0.85em;
     opacity: 0.7;
-}
-
-/* The scale caveat under a multi-series legend: its own line rather than a
-   third legend item, which is what it would otherwise wrap as. Whether the
-   heights of two lines may be compared at all is a property of the chart, not
-   one more series in it. */
-.pagemetrics-sparkline-legend-note {
-    flex-basis: 100%;
 }

@@ -1,3 +1,4 @@
 "pages"
 ,"uid","pid","deleted","hidden","sys_language_uid","l10n_parent","slug","title","perms_userid","perms_groupid","perms_user","perms_group","perms_everybody"
 ,1,0,0,0,0,0,"/","Home",1,0,31,0,1
+,2,0,0,0,0,0,"/second","Second",1,0,31,0,1

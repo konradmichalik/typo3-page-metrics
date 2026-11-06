@@ -54,9 +54,9 @@ final class TileBreakdownBuilderTest extends FunctionalTestCase
         ]);
 
         self::assertSame([
-            ['label' => 'Direct', 'formattedValue' => '50'],
-            ['label' => 'Search', 'formattedValue' => '30'],
-            ['label' => 'Social', 'formattedValue' => '20'],
+            ['label' => 'Direct', 'formattedValue' => '50', 'value' => 50],
+            ['label' => 'Search', 'formattedValue' => '30', 'value' => 30],
+            ['label' => 'Social', 'formattedValue' => '20', 'value' => 20],
         ], $parts);
     }
 
@@ -68,8 +68,8 @@ final class TileBreakdownBuilderTest extends FunctionalTestCase
         ]);
 
         self::assertSame([
-            ['label' => 'Direct', 'formattedValue' => '20'],
-            ['label' => 'newsletter', 'formattedValue' => '10'],
+            ['label' => 'Direct', 'formattedValue' => '20', 'value' => 20],
+            ['label' => 'newsletter', 'formattedValue' => '10', 'value' => 10],
         ], $parts);
     }
 
@@ -80,8 +80,8 @@ final class TileBreakdownBuilderTest extends FunctionalTestCase
         ]);
 
         self::assertSame([
-            ['label' => 'Direct', 'formattedValue' => '60'],
-            ['label' => 'Unattributed', 'formattedValue' => '40'],
+            ['label' => 'Direct', 'formattedValue' => '60', 'value' => 60],
+            ['label' => 'Unattributed', 'formattedValue' => '40', 'value' => 40],
         ], $parts);
     }
 
@@ -91,7 +91,7 @@ final class TileBreakdownBuilderTest extends FunctionalTestCase
             TrafficChannel::Direct->dimension() => 60,
         ]);
 
-        self::assertSame([['label' => 'Direct', 'formattedValue' => '60']], $parts);
+        self::assertSame([['label' => 'Direct', 'formattedValue' => '60', 'value' => 60]], $parts);
     }
 
     public function testByChannelIsEmptyWithoutASplit(): void
@@ -107,11 +107,13 @@ final class TileBreakdownBuilderTest extends FunctionalTestCase
             [
                 'label' => 'GPTBot',
                 'formattedValue' => '20',
+                'value' => 20,
                 'hint' => "OpenAI's crawler, collecting web content to train future models.",
             ],
             [
                 'label' => 'ClaudeBot',
                 'formattedValue' => '10',
+                'value' => 10,
                 'hint' => "Anthropic's crawler, collecting web content to train Claude.",
             ],
         ], $parts);
@@ -123,7 +125,7 @@ final class TileBreakdownBuilderTest extends FunctionalTestCase
         // nothing are the same here, and an empty tooltip on hover is worse
         // than no tooltip at all.
         self::assertSame(
-            [['label' => 'SomeVendorBot', 'formattedValue' => '9']],
+            [['label' => 'SomeVendorBot', 'formattedValue' => '9', 'value' => 9]],
             $this->subject->byAgent($this->definition(), 9, ['SomeVendorBot' => 9]),
         );
     }
@@ -144,7 +146,7 @@ final class TileBreakdownBuilderTest extends FunctionalTestCase
         // where the list belongs: it costs no row and answers the only
         // follow-up question the chip raises.
         self::assertSame(
-            ['label' => 'Others (2)', 'formattedValue' => '5', 'hint' => 'Amazonbot, YouBot'],
+            ['label' => 'Others (2)', 'formattedValue' => '5', 'value' => 5, 'hint' => 'Amazonbot, YouBot'],
             $parts[5],
         );
     }

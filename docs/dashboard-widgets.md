@@ -13,7 +13,8 @@ skipped entirely for sites without one.
 
 | Widget | Identifier | Shows | Fixed period | Configurable |
 | --- | --- | --- | --- | --- |
-| Page metrics | `pageMetrics` | Each site's homepage tiles: page views, visits, avg. time on page, bounce rate | 7 days | — |
+| Page metrics | `pageMetrics` | Each site's homepage tiles: page views, visits, avg. time on page, bounce rate | — | Period (7/30/90 days) |
+| Page metrics breakdown | `pageMetricsBreakdown` | One configured metric per site (defaults to each site's primary metric): its curve, its last day/previous day/peak/average/via redirects figures, and its breakdown into parts where it has one (e.g. Bot traffic split by crawler), drawn as a donut where every part can be sized | — | Metric, period (7/30/90 days) |
 | Page metrics chart | `pageMetricsChart` | A daily chart of one metric per site, with annotation markers | — | Metric, period (7/30/90 days), marker category |
 | Page metrics chart (compact) | `pageMetricsChartCompact` | The same chart, sized for compact dashboard layouts | — | Metric, period (7/30/90 days), marker category |
 | Most viewed pages | `pageMetricsTopPages` | The highest-traffic pages per site, linked into the page module | 30 days | Page level, include subpages, goal column |
@@ -21,7 +22,7 @@ skipped entirely for sites without one.
 | Not found pages | `pageMetricsNotFoundPages` | URLs the daily import could not resolve to a page, with the reason. A record detail URL served by a route enhancer resolves to the page that renders it and does not appear here; one below the same page that no record matches still does | 30 days | — |
 | Page metrics annotations | `pageMetricsAnnotations` | Recent annotations with their kind and, for one that ran for a while, its last day | 90 days | — |
 
-Every widget except the site-homepage tiles reads from the same
+Every widget except the two site-homepage tiles widgets reads from the same
 `SiteMetricsOverviewBuilder`, aggregated across all pages of a site rather
 than a single one. That includes annotations: a dashboard covers the whole
 site, so it shows every marker regardless of the page one may be scoped to
@@ -137,8 +138,6 @@ The chart therefore scales to the range its own data occupies rather than from z
 
 Those bounds come from the 5th and 95th percentile rather than the plain extremes, so one freak day cannot flatten every ordinary one into a sliver. A day outside that band is drawn clamped to the edge it exceeds, which keeps the chart readable at the cost of understating that one day. The figure itself is in the popover's peak, and in the chart's spoken summary.
 
-Overlaying a second metric drops the area fill and leaves the two outlines, since two filled shapes would just muddy where they overlap. Each series keeps its own scale, so the legend is what tells them apart.
-
 ## Chart and trend metric selection
 
 The chart and trend widgets' **Metric** setting both default to each
@@ -154,7 +153,7 @@ whole site. Setting **Page level** restricts the ranking to pages at an
 exact depth below the site root (level 1 = the site's top-level sections,
 level 2 = their children, and so on) instead. Combined with **Include
 subpages**, each of those pages' own number becomes its own traffic plus
-everything under it rolled up into one total — useful for seeing which
+everything under it rolled up into one total, useful for seeing which
 top-level section performs best as a whole, not just its own landing
 page. "Include subpages" only has an effect once a page level is set.
 

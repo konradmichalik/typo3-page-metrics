@@ -979,9 +979,9 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
         self::assertSame(100, $tile->value);
         self::assertSame(
             [
-                ['label' => 'Direct', 'formattedValue' => '25'],
-                ['label' => 'Search', 'formattedValue' => '45'],
-                ['label' => 'Unattributed', 'formattedValue' => '30'],
+                ['label' => 'Direct', 'formattedValue' => '25', 'value' => 25],
+                ['label' => 'Search', 'formattedValue' => '45', 'value' => 45],
+                ['label' => 'Unattributed', 'formattedValue' => '30', 'value' => 30],
             ],
             $tile->breakdown,
         );
@@ -1033,7 +1033,7 @@ final class PageMetricsViewDataBuilderTest extends FunctionalTestCase
 
         $tile = $this->tileFor($this->get(PageMetricsViewDataBuilder::class)->build(2, 0, 30), 'matomo.visits');
 
-        self::assertSame([['label' => 'carrier-pigeon', 'formattedValue' => '9']], $tile->breakdown);
+        self::assertSame([['label' => 'carrier-pigeon', 'formattedValue' => '9', 'value' => 9]], $tile->breakdown);
     }
 
     public function testEveryTileNamesTheProviderItsNumbersCameFrom(): void
