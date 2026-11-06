@@ -234,8 +234,11 @@
             <trans-unit id="widget.chart.setting.metric.auto" resname="widget.chart.setting.metric.auto">
                 <source>Automatic (site's primary metric)</source>
             </trans-unit>
-            <trans-unit id="widget.chart.setting.period.label" resname="widget.chart.setting.period.label">
+            <trans-unit id="widget.setting.period.label" resname="widget.setting.period.label">
                 <source>Period</source>
+            </trans-unit>
+            <trans-unit id="widget.setting.period.description" resname="widget.setting.period.description">
+                <source>How many days the figures cover, compared against the period immediately before.</source>
             </trans-unit>
             <trans-unit id="widget.chart.setting.period.description" resname="widget.chart.setting.period.description">
                 <source>How many days the chart covers.</source>
@@ -317,9 +320,6 @@
             </trans-unit>
             <trans-unit id="widget.trend.setting.sentiment.improved" resname="widget.trend.setting.sentiment.improved">
                 <source>Biggest improvements</source>
-            </trans-unit>
-            <trans-unit id="widget.trend.setting.period.label" resname="widget.trend.setting.period.label">
-                <source>Period</source>
             </trans-unit>
             <trans-unit id="widget.trend.setting.period.description" resname="widget.trend.setting.period.description">
                 <source>Compares this period against the one immediately before it.</source>

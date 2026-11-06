@@ -22,8 +22,6 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, JavaScriptInterface, WidgetConfigurationInterface, WidgetContext, WidgetRendererInterface, WidgetResult};
 
-use function in_array;
-
 /**
  * PageMetricsWidget.
  *
@@ -47,11 +45,6 @@ final readonly class PageMetricsWidget implements WidgetRendererInterface, Addit
 {
     private const DEFAULT_PERIOD_DAYS = 7;
 
-    /**
-     * @var list<int>
-     */
-    private const PERIOD_OPTIONS = [7, 30, 90];
-
     public function __construct(
         private WidgetConfigurationInterface $configuration,
         private PageMetricsViewDataBuilder $viewDataBuilder,
@@ -67,26 +60,14 @@ final readonly class PageMetricsWidget implements WidgetRendererInterface, Addit
     public function getSettingsDefinitions(): array
     {
         return [
-            new SettingDefinition(
-                'period',
-                'int',
-                self::DEFAULT_PERIOD_DAYS,
-                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.setting.period.label',
-                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.setting.period.description',
-                false,
-                [
-                    7 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.7',
-                    30 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.30',
-                    90 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.90',
-                ],
-            ),
+            WidgetPeriod::settingDefinition(self::DEFAULT_PERIOD_DAYS, 'widget.setting.period.description'),
         ];
     }
 
     public function renderWidget(WidgetContext $context): WidgetResult
     {
         $period = (int) $context->settings->get('period');
-        $period = in_array($period, self::PERIOD_OPTIONS, true) ? $period : self::DEFAULT_PERIOD_DAYS;
+        $period = WidgetPeriod::resolve($period, self::DEFAULT_PERIOD_DAYS);
 
         $sites = $this->collectSiteTiles($period);
 
@@ -130,7 +111,7 @@ final readonly class PageMetricsWidget implements WidgetRendererInterface, Addit
 
         return implode(' · ', [
             $languageService->sL($this->configuration->getTitle()),
-            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period),
+            $languageService->sL(WidgetPeriod::labelKey($period)),
         ]);
     }
 

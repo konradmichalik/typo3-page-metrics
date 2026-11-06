@@ -23,7 +23,6 @@ use TYPO3\CMS\Core\Site\{Entity\Site, SiteFinder};
 use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, WidgetConfigurationInterface, WidgetContext, WidgetRendererInterface, WidgetResult};
 
 use function count;
-use function in_array;
 use function reset;
 
 /**
@@ -39,11 +38,6 @@ use function reset;
 final readonly class TrendWidget implements WidgetRendererInterface, AdditionalCssInterface
 {
     private const LIMIT = 5;
-
-    /**
-     * @var list<int>
-     */
-    private const PERIOD_OPTIONS = [7, 30, 90];
 
     public function __construct(
         private WidgetConfigurationInterface $configuration,
@@ -82,19 +76,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
                     TrendSentiment::Positive->value => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.sentiment.improved',
                 ],
             ),
-            new SettingDefinition(
-                'period',
-                'int',
-                30,
-                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.label',
-                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.description',
-                false,
-                [
-                    7 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.7',
-                    30 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.30',
-                    90 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.90',
-                ],
-            ),
+            WidgetPeriod::settingDefinition(30, 'widget.trend.setting.period.description'),
         ];
     }
 
@@ -103,7 +85,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
         $metric = (string) $context->settings->get('metric');
         $sentiment = TrendSentiment::tryFrom((string) $context->settings->get('sentiment')) ?? TrendSentiment::Negative;
         $period = (int) $context->settings->get('period');
-        $period = in_array($period, self::PERIOD_OPTIONS, true) ? $period : 30;
+        $period = WidgetPeriod::resolve($period, 30);
 
         $sites = $this->collectTrendPages($metric, $sentiment, $period);
 
@@ -181,7 +163,7 @@ final readonly class TrendWidget implements WidgetRendererInterface, AdditionalC
         }
 
         $parts[] = $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:'.$sentimentKey);
-        $parts[] = $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period);
+        $parts[] = $languageService->sL(WidgetPeriod::labelKey($period));
 
         return implode(' · ', $parts);
     }

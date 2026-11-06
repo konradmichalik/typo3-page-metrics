@@ -26,7 +26,6 @@ use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, JavaScriptInterface, Wi
 use function array_keys;
 use function array_map;
 use function count;
-use function in_array;
 
 /**
  * PageMetricsBreakdownWidget.
@@ -57,11 +56,6 @@ use function in_array;
 final readonly class PageMetricsBreakdownWidget implements WidgetRendererInterface, JavaScriptInterface, AdditionalCssInterface
 {
     private const DEFAULT_PERIOD_DAYS = 7;
-
-    /**
-     * @var list<int>
-     */
-    private const PERIOD_OPTIONS = [7, 30, 90];
 
     public function __construct(
         private WidgetConfigurationInterface $configuration,
@@ -100,19 +94,7 @@ final readonly class PageMetricsBreakdownWidget implements WidgetRendererInterfa
                     ...$availableMetrics,
                 ],
             ),
-            new SettingDefinition(
-                'period',
-                'int',
-                self::DEFAULT_PERIOD_DAYS,
-                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.setting.period.label',
-                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.setting.period.description',
-                false,
-                [
-                    7 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.7',
-                    30 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.30',
-                    90 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.90',
-                ],
-            ),
+            WidgetPeriod::settingDefinition(self::DEFAULT_PERIOD_DAYS, 'widget.setting.period.description'),
         ];
     }
 
@@ -120,7 +102,7 @@ final readonly class PageMetricsBreakdownWidget implements WidgetRendererInterfa
     {
         $metric = (string) $context->settings->get('metric');
         $period = (int) $context->settings->get('period');
-        $period = in_array($period, self::PERIOD_OPTIONS, true) ? $period : self::DEFAULT_PERIOD_DAYS;
+        $period = WidgetPeriod::resolve($period, self::DEFAULT_PERIOD_DAYS);
 
         $sites = $this->collectSiteTiles($metric, $period);
 
@@ -168,7 +150,7 @@ final readonly class PageMetricsBreakdownWidget implements WidgetRendererInterfa
         $languageService = $this->getLanguageService();
         $parts = [
             $languageService->sL($this->configuration->getTitle()),
-            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period),
+            $languageService->sL(WidgetPeriod::labelKey($period)),
         ];
 
         if (1 === count($sites)) {

@@ -24,7 +24,6 @@ use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Dashboard\Widgets\{AdditionalCssInterface, JavaScriptInterface, WidgetConfigurationInterface, WidgetContext, WidgetRendererInterface, WidgetResult};
 
 use function count;
-use function in_array;
 
 /**
  * PageMetricsChartWidget.
@@ -44,11 +43,6 @@ use function in_array;
  */
 final readonly class PageMetricsChartWidget implements WidgetRendererInterface, JavaScriptInterface, AdditionalCssInterface
 {
-    /**
-     * @var list<int>
-     */
-    private const PERIOD_OPTIONS = [7, 30, 90];
-
     public function __construct(
         private WidgetConfigurationInterface $configuration,
         private SiteMetricsOverviewBuilder $overviewBuilder,
@@ -78,19 +72,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
                     ...$availableMetrics,
                 ],
             ),
-            new SettingDefinition(
-                'period',
-                'int',
-                30,
-                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.period.label',
-                'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.chart.setting.period.description',
-                false,
-                [
-                    7 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.7',
-                    30 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.30',
-                    90 => 'LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.90',
-                ],
-            ),
+            WidgetPeriod::settingDefinition(30, 'widget.chart.setting.period.description'),
             new SettingDefinition(
                 'annotationCategory',
                 'string',
@@ -110,7 +92,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
     {
         $metric = (string) $context->settings->get('metric');
         $period = (int) $context->settings->get('period');
-        $period = in_array($period, self::PERIOD_OPTIONS, true) ? $period : 30;
+        $period = WidgetPeriod::resolve($period, 30);
         // An empty setting means every kind, which is what a chart showed
         // before markers had kinds at all.
         $annotationCategory = AnnotationCategory::tryFrom((string) $context->settings->get('annotationCategory'));
@@ -178,7 +160,7 @@ final readonly class PageMetricsChartWidget implements WidgetRendererInterface, 
         $languageService = $this->getLanguageService();
         $parts = [
             $languageService->sL($this->configuration->getTitle()),
-            $languageService->sL('LLL:EXT:typo3_page_metrics/Resources/Private/Language/locallang_mod.xlf:widget.trend.setting.period.'.$period),
+            $languageService->sL(WidgetPeriod::labelKey($period)),
         ];
 
         if (1 === count($overviews)) {
