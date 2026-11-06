@@ -246,7 +246,7 @@ final readonly class SiteMetricsOverviewBuilder
         // array_values() before the spread: SiteFinder keys its sites by
         // identifier, and spreading a string-keyed array into a call is
         // PHP's syntax for named arguments rather than for a variadic list.
-        return array_merge([], ...array_values(array_map(fn (Site $site): array => $this->goalMetricsFor($site), $sites)));
+        return array_merge([], ...array_values(array_map($this->goalMetricsFor(...), $sites)));
     }
 
     /**

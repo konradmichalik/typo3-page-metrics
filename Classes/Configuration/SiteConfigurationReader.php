@@ -31,10 +31,10 @@ use function sprintf;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class SiteConfigurationReader
+final readonly class SiteConfigurationReader
 {
     public function __construct(
-        private readonly GoalConfigurationParser $goalConfigurationParser,
+        private GoalConfigurationParser $goalConfigurationParser,
     ) {}
 
     public function read(Site $site): PageMetricsSiteConfiguration
