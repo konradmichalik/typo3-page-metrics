@@ -34,6 +34,12 @@ return [
                 'identifier' => 'pageMetricsChartCompact',
                 'settings' => ['metric' => 'matomo.bounce_rate'],
             ],
+            // Bot traffic, because it is the metric with parts to draw as a
+            // donut. A site without an access log falls back to its primary metric.
+            [
+                'identifier' => 'pageMetricsBreakdown',
+                'settings' => ['metric' => 'machine.summary.accesslog'],
+            ],
             [
                 'identifier' => 'pageMetricsTrend',
                 'settings' => ['sentiment' => 'positive'],

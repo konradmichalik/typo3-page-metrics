@@ -40,7 +40,7 @@
                 <source>Page Metrics</source>
             </trans-unit>
             <trans-unit id="dashboardPreset.description" resname="dashboardPreset.description">
-                <source>All page metrics widgets: tiles, chart, most viewed pages, trend, not found pages and annotations.</source>
+                <source>All page metrics widgets: what changed, tiles, charts, a metric breakdown, trends, most viewed pages, not found pages and annotations.</source>
             </trans-unit>
             <trans-unit id="freshness.asOf" resname="freshness.asOf">
                 <source>Data through %1$s</source>

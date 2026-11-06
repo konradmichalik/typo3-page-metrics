@@ -204,9 +204,10 @@ a new dashboard covering every site's metrics is one click away.
 
 It opens with **What changed**, so the first thing on a new dashboard is a
 sentence rather than a figure. Below the tiles and the large chart, it places two compact charts (Visits,
-Bounce rate), then two trend widgets (Biggest improvements, Biggest
-declines), then Most viewed pages and Not found pages, with the annotations
-widget last.
+Bounce rate), a breakdown of Bot traffic (a site without an access log shows
+its primary metric there instead), then two trend widgets (Biggest
+improvements, Biggest declines), then Most viewed pages and Not found pages,
+with the annotations widget last.
 The compact chart and trend widgets can each appear more than once with
 different settings pre-configured, see
 [Configuration/Backend/DashboardPresets.php](../Configuration/Backend/DashboardPresets.php).
