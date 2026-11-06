@@ -4,24 +4,28 @@
 
 # TYPO3 extension `typo3_page_metrics`
 
-[![CI](https://github.com/konradmichalik/typo3-page-metrics/actions/workflows/ci.yml/badge.svg)](https://github.com/konradmichalik/typo3-page-metrics/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fkonradmichalik%2Fecbc8f47725de8c7cc37bdd9770c7e74%2Fraw%2Fbadge.json)](https://github.com/konradmichalik/typo3-page-metrics/actions/workflows/ci.yml)
+[![CI](https://github.com/konradmichalik/typo3-page-metrics/actions/workflows/tests.yml/badge.svg)](https://github.com/konradmichalik/typo3-page-metrics/actions/workflows/tests.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fkonradmichalik%2Fecbc8f47725de8c7cc37bdd9770c7e74%2Fraw%2Fbadge.json)](https://github.com/konradmichalik/typo3-page-metrics/actions/workflows/tests.yml)
 [![License](https://poser.pugx.org/konradmichalik/typo3-page-metrics/license)](LICENSE.md)
-[![Supported TYPO3 versions](https://badgen.net/badge/TYPO3/13.4%20%7C%2014.0%2B/orange)](https://extensions.typo3.org/extension/typo3_page_metrics)
+[![Supported TYPO3 versions](https://badgen.net/badge/TYPO3/13.4%20%7C%2014.3/orange)](https://extensions.typo3.org/extension/typo3_page_metrics)
 
 </div>
 
 Page-level metrics inside the TYPO3 backend, from an analytics provider you
 already run.
 
-No tracking code, no third-party service, no subscription: the extension reads
-your existing Matomo or GA4 data — or your web server's own access log,
-without any analytics service at all — and resolves every URL it reports —
-through redirect chains and multilingual slugs — back to a TYPO3 page UID,
+No tracking code, no third-party service, no subscription. The extension
+reads your existing Matomo or GA4 data, or your web server's own access log
+without any analytics service at all. It resolves every URL it reports,
+through redirect chains and multilingual slugs, back to a TYPO3 page UID,
 then stores per-page daily aggregates so editors can see "how is this page
 doing" without leaving the backend.
 
 ![Page metrics tiles below the page title, with the period switch above them](docs/img/page-tiles.png)
+
+> [!WARNING]
+> This extension is still in beta. Configuration, tile behaviour and APIs can
+> change before a stable 1.0 release.
 
 ## ✨ Features
 
@@ -34,41 +38,45 @@ doing" without leaving the backend.
   [Not found pages](docs/dashboard-widgets.md)
 - Metric tiles right in `Web > Page`, below the page title: page views,
   visits, avg. time on page, bounce rate, a period switch (7/30/90 days),
-  and a sparkline popover per tile — see [Page module tiles](docs/page-tiles.md)
+  and a sparkline popover per tile, see [Page module tiles](docs/page-tiles.md)
 - Site-wide [EXT:dashboard](https://docs.typo3.org/permanent/typo3/cms-dashboard/main/en-us/)
-  widgets plus a ready-made dashboard preset — see
+  widgets plus a ready-made dashboard preset, see
   [Dashboard widgets](docs/dashboard-widgets.md)
 - Annotations, derived from TYPO3's own record history (a page edited, a
   redirect created), imported (e.g. Matomo release markers) or created by
   hand, categorised, optionally spanning days or scoped to one page, and
-  marked on every sparkline — see [Annotations](docs/page-tiles.md#annotations)
+  marked on every sparkline, see [Annotations](docs/page-tiles.md#annotations)
 - Goal conversions per page, from Matomo goals or GA4 key events, as a tile
-  of their own beside the traffic ones, with optional revenue — see
+  of their own beside the traffic ones, with optional revenue, see
   [Goal tiles](docs/page-tiles.md#goal-tiles)
 - Bot traffic per page from the access log, folded into one tile, with AI
   chatbots and AI crawlers as tiles of their own that name the bots behind
-  the number — see [Bot traffic](docs/page-tiles.md#bot-traffic)
-- Annotations, imported (e.g. Matomo release markers) or created by hand,
-  categorised, optionally spanning days or scoped to one page, and marked on
-  every sparkline — see [Annotations](docs/page-tiles.md#annotations)
+  the number, see [Bot traffic](docs/page-tiles.md#bot-traffic)
 - Matomo, GA4 and your own web server access log as pluggable providers,
-  extensible with your own — see
+  extensible with your own, see
   [Registering custom tiles](docs/extending.md)
 
 ## 🔥 Installation
 
 ### Requirements
 
-- PHP 8.2, 8.3, 8.4 or 8.5
-- TYPO3 13.4 or 14.0+
-- A Matomo instance with API access, a GA4 property with a service-account
-  key, and/or read access to your web server's own access log
+- TYPO3 13.4 or 14.3
+- PHP 8.2 - 8.5
+- One of the supported providers: [Matomo](docs/providers/matomo.md),
+  [GA4](docs/providers/ga4.md) or the [access log](docs/providers/accesslog.md)
 
-### Composer setup
+### Composer
 
 ```bash
 composer require konradmichalik/typo3-page-metrics
 ```
+
+### TER
+
+[![TER version](https://typo3-badges.dev/badge/typo3_page_metrics/version/shields.svg)](https://extensions.typo3.org/extension/typo3_page_metrics)
+[![TER downloads](https://typo3-badges.dev/badge/typo3_page_metrics/downloads/shields.svg)](https://extensions.typo3.org/extension/typo3_page_metrics)
+
+Download the zip file from [TYPO3 extension repository (TER)](https://extensions.typo3.org/extension/typo3_page_metrics).
 
 Then configure a provider for the site, see [Configuration](#configuration).
 
@@ -85,7 +93,7 @@ Name a storage page under `pageMetrics.annotations.storagePid` and editors can
 add their own markers straight from the page module, see
 [Adding a marker](docs/page-tiles.md#adding-a-marker).
 
-## ⚡ Usage
+## 🚀 Quick start
 
 Run the import (also schedulable via the TYPO3 Scheduler). The same command
 imports both metrics and any annotations from a registered provider (e.g.
@@ -96,7 +104,7 @@ vendor/bin/typo3 page-metrics:import
 vendor/bin/typo3 page-metrics:import --force
 ```
 
-Then open **Web → Page** and select a page in the page tree — the tiles
+Then open **Web → Page** and select a page in the page tree. The tiles
 appear directly below the page title. See
 [Page module tiles](docs/page-tiles.md) for the period switch, the subpages
 toggle and the sparkline popover, or
@@ -114,29 +122,13 @@ widgets.
 | [Page module tiles](docs/page-tiles.md) | The period switch, the subpages toggle, sparkline popovers and annotations |
 | [Security](docs/security.md) | Restricting tile visibility per backend user group |
 | [Registering custom tiles](docs/extending.md) | Contributing an additional tile via `ModifyMetricTilesEvent`, without implementing `MetricProviderInterface` |
-
-## 🧭 Related extensions
-
-`typo3_page_metrics` reads an analytics provider you already operate. It
-tracks nothing itself and sends no data anywhere, which also means it can
-only show what your provider already collects.
-
-- [TYPO3 Analytics](https://analytics.typo3.com/) (`t3g/analytics`) is the
-  opposite trade-off: a hosted analytics service by TYPO3 GmbH that registers
-  your site, injects its own tracking script and shows the results in the
-  backend. Pick it if you want analytics *and* the backend integration in one
-  paid package, rather than a backend view onto an analytics setup you already
-  run.
-- [matomo_widgets](https://github.com/brotkrueml/typo3-matomo-widgets) puts
-  Matomo's own reports on the TYPO3 dashboard, live via the Reporting API.
-  Pick it if you want Matomo's reports as-is; it deliberately stays in Matomo's
-  URL world and does not map anything onto the page tree.
+| [Related extensions](docs/related-extensions.md) | How this compares to TYPO3 Analytics, matomo_widgets and analytics_matomo |
 
 ## 🧑‍💻 Contributing
 
 Please have a look at [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-## 🏅 Credits
+## 💎 Credits
 
 Tile icons are from [Tabler Icons](https://tabler.io/icons), MIT licensed.
 

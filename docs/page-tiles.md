@@ -1,142 +1,73 @@
 # Page module tiles
 
-Opening **Web → Page** and selecting a page injects a lightweight placeholder
-below the page title (via TYPO3 core's `ModifyPageLayoutContentEvent`, the
-same extension point EXT:sys_note uses). Client-side JS then fetches the
-actual tiles from `PageMetricsTilesController` right after the page has
-loaded, so this never sits on the page module's own critical rendering path.
+Opening **Web → Page** and selecting a page shows metric tiles below the page
+title, fetched via AJAX after the page module itself has loaded.
 
 ![Page metrics tiles below the page title, with the period switch above them](img/page-tiles.png)
 
 ## Period switch
 
-A `7 / 30 / 90 days` switch above the tiles controls the period every tile
-and its sparkline cover. The active period is carried in the page module URL
-(`tx_typo3pagemetrics_period`), so it survives a reload or a bookmark.
+A `7 / 30 / 90 days` switch above the tiles controls the period for every
+tile and its sparkline. The choice is carried in the URL, so it survives a
+reload or a bookmark.
 
 ## Including subpages
 
-When the selected page has subpages, an options menu (`⋮`) appears next to
-the period switch with a single **Include subpages** toggle. Turning it on
-aggregates the tiles across the whole subtree instead of just the current
-page, useful for a section landing page where the individual child pages
-carry the actual traffic. The choice is carried in the URL
-(`tx_typo3pagemetrics_includeSubpages`) the same way the period is, and the
-trigger button gets a small badge while the filter is active.
+When the page has subpages, an options menu (`⋮`) offers **Include
+subpages**, aggregating the tiles across the whole subtree instead of just
+the current page. Useful for a section landing page whose traffic sits on
+its children.
 
 ## Sparkline popover
 
-Clicking (or focusing, via keyboard) a tile opens a popover with a
-day-by-day sparkline for that metric over the selected period. Dashed
-vertical markers on the sparkline mark any [annotation](#annotations) that
-falls in the shown range, and an annotation covering several days is drawn
-as a strip along the bottom of the chart spanning them, rather than as a
-tick on the day it started. Along the bottom rather than across the plot:
-the strip says which days without ever sitting between the reader and the
-curve. Both take the chart's own colour, here and in the
-[dashboard chart](dashboard-widgets.md) alike: a marker is context for the
-curve it stands on, and a category hue over that line reads as a second
-series competing with it. Which kind of event it was is in the tooltip, in
-words. Hovering or focusing a marked date shows it there alongside that
-day's value.
+Clicking or focusing a tile opens a popover with a day-by-day sparkline, the
+period's key figures (last day, previous day, peak, average, redirect
+share), a link to the source (e.g. "Open in Matomo"), and a "Typical page"
+comparison: the median across every page of the same site, plus, for count
+metrics, a rough percentile band. Rate metrics get the median but no band,
+since "top fifth" would flip meaning between a page-views tile and a
+bounce-rate tile. Pages or periods with no data are excluded from the
+comparison, which needs at least two pages to appear and five to name a
+band.
 
 ![Sparkline popover for the Visits tile, showing last day/previous day/peak/average and a dated tooltip](img/page-tiles-sparkline-popover.png)
 
-The sparkline carries no scale of its own. It is a filled silhouette of the period with its own outline, and the numbers that give it magnitude are the row of figures directly above it. The first and last day sit above it too, so the chart closes the popover at its own bottom edge.
-
-Above the chart the popover shows the period's figures as an icon and a number each: the most recent day, the day before it, the peak, the average, and the share that arrived through a redirect. Hovering one shows its name and what it counts, in a tooltip of the extension's own rather than the browser's title attribute, which waits about a second and runs both together into one line. Keyboard focus shows the same tooltip, and a tap toggles it, since a touch device has no hover at all. The written name and explanation are in the markup either way, so a screen reader reads "Peak. The highest value a single day reached. 162" rather than a bare number. They are simply not drawn: five two-word labels wrapped the row onto three uneven lines and pushed one value out of alignment with the rest.
-
-In the popover's top right corner sits the answer to where the numbers came from. On a tile whose provider has an interface of its own, that is the link out of the backend, and it names the destination: "Open in Matomo", not "Open in the analytics tool". On a tile without one, an access-log tile or a bot tile, a quieter marker takes the same place and names the source in its tooltip. The question only becomes interesting once a site configures two providers, which is exactly when it becomes unavoidable: Matomo and an access log both count page views, both tiles are called "Page views", and the two numbers differ for reasons that are entirely correct. A tile contributed by a listener names no source, because it comes from no provider.
-
-That tooltip is the house style for every explanation in this extension, not just the popover's figures: the trend badge on a tile names both periods and their values, the date mark names the day the numbers are from, and the fold-away control says which way it will fold. All of them are written the same way in the markup, which is what keeps them behaving the same way. Each one opens with the icon of whatever it explains, cloned from the control itself rather than named a second time, so the tooltip and its subject read as one thing.
-
-The readout that follows the pointer across a chart is the same tooltip, down to the measure, the padding and that icon line. It differs in one thing, its surface: it stands on a drawn curve, where a light card would have nothing but its own border holding it apart from the line it is explaining, so it stays an inverted chip.
-
-The browser's own `title` attribute is not used for any of them. It waits about a second before appearing, cannot be styled to match the backend, and runs a heading and its explanation together into a single line.
-
-The axis does not start at zero. It uses the same percentile band as the [dashboard chart](dashboard-widgets.md#reading-the-chart), for the same reason: a page holding steady between 446 and 457 views a day puts its whole variation into the top two percent of a zero-based chart and draws as a flat line. The magnitude is already spelled out as numbers on the row above; what the chart is there for is the shape.
-
-The lowest value of the period is drawn clear of the bottom edge rather than on it, so a page whose quietest day still had traffic does not read as having dropped to nothing.
-
-## Is that good?
-
-A number on its own does not say whether a page is doing well. "31% bounce rate" only means something once you know whether the rest of the site sits at 20% or at 60%, so the popover carries a "Typical page" figure alongside the others: the median across every page of the same site over the same period. Hovering it says how many pages that median was taken over.
-
-For a count metric the same hover also says roughly where this page sits in that field, as a band rather than a percentile. It is a sentence rather than a chip of its own because it is the one thing here you look up once and not on every scan of the row. On a site with eleven pages the difference between the 63rd and the 72nd percentile is one page changing its mind, and a number that moves that easily invites a reading it cannot support. The five bands are top fifth, above the typical page, the typical page itself, below it, and bottom fifth.
-
-A rate metric gets the median but no band, because "in the top fifth" would mean the best fifth for page views and the worst fifth for a bounce rate, and a phrase that flips its meaning from tile to tile is worse than no phrase.
-
-Pages with no data are left out rather than counted as zero, since a zero would drag the typical page towards a value no page actually had. For a rate the same applies to a page with nothing in its denominator: it has no rate at all. The comparison needs at least two pages with data to appear, and at least five before it names a band, because a fifth of four pages is not a fifth.
-
-While the tiles aggregate a subtree the comparison disappears: the number is then a section total, and the field it would be measured against is made of individual pages.
-
-The dashboard's own tiles widget does not show the comparison at all. It renders synchronously, and the field costs one aggregate over every page of the site per metric; the page module can afford that because its tiles arrive through an AJAX route, and a widget cannot.
+Annotations falling in the shown range are marked as dashed lines (a single
+day) or a strip along the bottom (a range). See [Annotations](#annotations).
 
 ## Bot traffic
 
-A page's tiles answer how it performs with people. Crawler traffic is a different question, and when the access-log provider is configured it used to arrive as five more tiles of the same size and weight beside the two an editor came for, pushing the answer off the end of the row.
-
-Those five now fold into one **Bot traffic** tile carrying their total, in grey rather than a colour of its own, and the popover lists what it is made of. Every bucket is listed, including the ones at zero: a bucket that is absent and a bucket reading zero answer different questions. Each row says what its bucket counts when hovered or focused, in the same words that bucket's own tile uses, because "Social/link previews" is a label rather than an explanation.
-
-The tile sits at the end of the row, after the rate metrics, whatever sort order the buckets themselves declare. It is the one tile that is not about the site's readers, so it reads as a footnote to the row rather than as a member of it.
-
-Its change badge stays grey even when the number rises. Colour says whether a metric got better, and no provider can claim that more crawler hits are an improvement; the arrow still says which way it moved.
-
-Nothing about the import changes. Each bucket is still fetched, resolved and stored under its own identifier exactly as before, and the summary is assembled when the tiles are built. See [bot traffic metrics](providers/accesslog.md#bot-traffic-metrics) for what each bucket counts.
+When the access-log provider is configured, its five bot buckets fold into
+one grey **Bot traffic** tile rather than five extra ones; the popover
+breaks down what each bucket counts. See [bot traffic
+metrics](providers/accesslog.md#bot-traffic-metrics) for what each bucket
+is.
 
 ### AI chatbots and AI crawlers
 
-Two of the five buckets also stand on their own, in tiles directly before the summary: **AI chatbots**, which fetch a page live when someone asks a chatbot about it, and **AI crawlers**, which collect content for model training or an AI search index. Whether AI reads a page, and which one, is a question about the page itself.
-
-The popover names the bots behind the number, strongest first, from the agent detail the import records beside each bucket. Five by name, the rest as one part, under the names the vendors publish (`GPTBot`, `ClaudeBot`, `ChatGPT-User`). Where those fall short of the headline, the gap is listed too: bucket totals and agent detail are written at different moments of an import, and a list of 20 under a headline of 30 would read as a fault instead of as a gap.
-
-A name on its own only helps a reader who has met that bot before, so every row carries what it is: hovering or focusing "CCBot" says it is Common Crawl's crawler and that its archive is widely reused as AI training data. The folded row names the bots it stands for instead. The descriptions are curated per agent and cover all but one of the bots either AI bucket can match; a crawler nobody has written a line for yet carries no tooltip rather than a guessed one.
-
-Both keep counting towards the bot traffic tile, so the same hits appear twice in the row. The AI tiles answer who is coming, the bot traffic tile answers how much of this was not a person, and the second question contains the first. Each tile's description says so.
-
-A tile at zero is still shown. A row whose tiles come and go with the period makes two pages impossible to compare, and "no AI has been here" is an answer.
-
-Neither carries a benchmark against the rest of the site: being crawled more than other pages is not an achievement, and not something an editor can act on.
-
-A provider decides which side of this its metrics fall on, see [Audience and machine metrics](extending.md#audience-and-machine-metrics).
+Two of the five buckets, **AI chatbots** (live per-request fetches) and
+**AI crawlers** (training/index crawls), also get their own tile before the
+summary and count towards it too. Their popovers name the bots behind the
+number (`GPTBot`, `ClaudeBot`, `ChatGPT-User`, ...) with a short description
+on hover, drawn from the agent detail the import records. Neither tile is
+benchmarked against the rest of the site, being crawled more is not an
+achievement. See [Audience and machine
+metrics](extending.md#audience-and-machine-metrics) for how a provider
+marks a metric as one or the other.
 
 ## Goal tiles
 
-Traffic is not business value. A page view count cannot say whether a page did
-what it exists to do, and a goal is the site's own answer to that: a Matomo
-goal or a GA4 key event, configured per site because only the operator knows
-which one counts.
-
-Each configured goal gets a tile of its own, behind the traffic tiles, with
-the label the operator gave it rather than the one the analytics account uses.
-Where a Matomo goal carries revenue, a second tile shows it, formatted as
-money. It behaves like every other tile: its own sparkline, its own trend
-badge against the previous period, its own place in the subpages rollup.
-
-A goal's polarity is configurable too, because not every goal is one to
-maximise. A "form abandoned" goal going up is bad news, and a tile that
-coloured it green would say the opposite of what happened. See
-[Polarity](extending.md#polarity) for what the three values do.
-
-Goals are stored as ordinary metrics, so a site that configures none behaves
-exactly as it did before: no extra tiles, and for Matomo not even a different
-API request. Configuration is per provider:
-[Matomo goals](providers/matomo.md#goals),
-[GA4 key events](providers/ga4.md#key-events).
+A configured Matomo goal or GA4 key event gets its own tile behind the
+traffic tiles, labelled as the operator named it, with a revenue tile
+alongside if the goal carries one. A goal's polarity is configurable, since
+not every goal should read as "more is better", see
+[Polarity](extending.md#polarity). Configuration is per provider: [Matomo
+goals](providers/matomo.md#goals), [GA4 key events](providers/ga4.md#key-events).
 
 ## Where visitors came from
 
-A tile says how much, never where from, and without that there is no way to
-show that an SEO measure or a campaign worked. The popover of the visits tile
-(Matomo) or the sessions tile (GA4) therefore lists what its number was made
-of, under the same "Made up of" heading the bot tile uses.
-
-It is a breakdown inside the popover rather than a row of six more tiles. The
-tile row is already at the limit of what reads as one glance, and a channel
-is a follow-up question about a number, not a number of its own.
-
-Six channels, always in the same order, so a reader finds one in the same
-place every time:
+The visits (Matomo) or sessions (GA4) tile's popover breaks its number down
+by traffic channel, always in the same order:
 
 | Channel | What lands in it |
 | --- | --- |
@@ -144,96 +75,51 @@ place every time:
 | `Search` | A search engine's own results |
 | `Social` | A social network |
 | `Referral` | Another website linking here |
-| `Campaign` | Traffic carrying campaign tagging, which is everything paid |
+| `Campaign` | Traffic carrying campaign tagging |
 | `Other` | Traffic the provider could not place |
 
-Both providers fold their own vocabulary into that one, so switching a site
-from Matomo to GA4 does not silently rename its channels. The mapping and the
-one case where the two can genuinely disagree are documented per provider:
-[Matomo](providers/matomo.md#traffic-channels),
-[GA4](providers/ga4.md#traffic-channels).
-
-The parts are not expected to add up to the headline and are not made to. A
-provider attributes what it can attribute, and the difference is traffic it
-could not place, which is a fact about the analytics source rather than a
-rounding error to hide.
-
-A channel with no traffic in the period is not listed, and a provider that
-returns no referrer data at all leaves the popover exactly as it was, with no
-empty section in it. The split is stored as ordinary dimensions on the metric
-the tile already shows, so nothing about the schema, the tile row or the
-dashboard changes.
+Both providers map their own vocabulary onto this list; provider-specific
+edge cases are documented per provider: [Matomo](providers/matomo.md#traffic-channels),
+[GA4](providers/ga4.md#traffic-channels). A channel with no traffic in the
+period is left out.
 
 ## Data age
 
-The toolbar above the tiles marks which day the numbers are from with a small ⓘ, and hovering it names the date. It is a mark rather than a line of text: on a healthy installation it says the same thing every day, across five surfaces at once, and what it is there for is the day it stops doing that. That day is the last one the import treats as complete, which is not today: a scheduled run may only catch part of today, so it always revisits it and marks the previous day instead. The tiles therefore trail the calendar by a day even when everything is working.
-
-Where a site has more than one provider the earliest of their days is shown, because the row is only as current as its oldest number. A provider that has never run at all contributes no day, since its tiles are empty anyway and letting it decide would hide how fresh the working provider is.
-
-The date comes from the import's own resume cursor, which every run records, rather than from the window described under [Days without data](#days-without-data). That window can legitimately be unknown on a healthy installation, and saying nothing about the data's age is exactly the wrong answer to give about a scheduler that may have stopped.
-
-More than two days behind, the mark changes to a clock and spells the warning out in words beside it. That is the point at which it stops being a footnote, so it stops behaving like one. At that point a scheduled import that simply has not run yet is no longer the likely explanation, and without this the backend would go on showing the last numbers it was given indefinitely, without ever saying they had stopped moving.
-
-This is also why the popover's first two figures are called "Last day" and "Previous day" rather than "Today" and "Yesterday": they are the last two days of the selected period, which is rarely today and yesterday.
+The toolbar marks which day the numbers are from. That is the last day the
+import treats as complete, usually yesterday, since a scheduled run may
+only have caught part of today. With more than one provider, the earliest
+of their days is shown. More than two days behind, the mark turns into a
+warning, the point to check whether the scheduled import is still running.
 
 ## Days without data
 
-A sparkline distinguishes a day with no traffic from a day the extension has
-no number for. The import records the window it has answers for, and days
-outside that window are drawn as a gap in the line rather than a value of
-zero: a 90-day period on a site with 60 days of history starts where the data
-starts instead of climbing out of the floor. Hovering such a day says "No
-data", and those days are left out of the popover's peak and average.
-
-That window starts where the provider's data starts, not where the import
-asked. `retentionDays` defaults to 400, so a first run requests well over a
-year of history even from a site that is three weeks old, and treating the
-request as the answer would put the cliff back.
-
-Inside the imported window a missing day really is zero. A provider only
-reports a URL that had activity, so an ordinary quiet day has no row of its
-own and is shown as the zero it was.
-
-Today is usually outside the window until the day's import has run, so the
-most recent point commonly reads as no data rather than as a drop to zero.
-
-Installations that have never run `page-metrics:import`, or whose data was
-seeded straight into the database, have no window recorded. Nothing is marked
-as missing then, since not knowing what is covered is no basis for claiming a
-gap.
+A sparkline shows a day with no traffic differently from a day the
+extension has no number for at all: the latter is drawn as a gap rather
+than a zero. That window starts where the provider's own data starts, not
+where `retentionDays` (default 400) asked back to.
 
 ## Annotations
 
-Annotations are events worth explaining a change in the numbers by, from three
-independent sources that are always merged together:
+Events worth explaining a change in the numbers by, merged from three
+sources:
 
-- **Automatic**, derived by the `page-metrics:import` command from what TYPO3
-  records anyway: a page whose record or content was edited gets a `content`
-  marker for that day, and a redirect pointing at a page gets an `seo` marker
-  for the day it was created. Nothing has to be set up and nothing has to be
-  maintained, see [Automatic markers](#automatic-markers) below.
-- **Imported**, via the same `page-metrics:import` command, from any
-  registered `AnnotationProviderInterface` (mirroring
-  `MetricProviderInterface`'s extensibility, but for events rather than
-  per-URL metrics). The bundled Matomo provider imports Matomo's own
-  annotations (e.g. release markers) — no extra configuration beyond an
-  already-configured `providers.matomo` is needed. GA4 has no equivalent API
-  to import from.
-- **Manual**, created directly in the TYPO3 backend as a "Page metrics
-  annotation" record: pick the site, a category, a date and a text. Manual
-  annotations are the way to mark events on GA4-only sites, or anything not
-  tied to an external API at all, and appear immediately, without waiting for
-  the next import run. See [Adding a marker](#adding-a-marker) for where those
-  records live and who may create one.
+- **Automatic**, derived by `page-metrics:import` from what TYPO3 already
+  records: a `content` marker when a page or its content changes, an `seo`
+  marker the day a redirect to it is created. See [Automatic
+  markers](#automatic-markers).
+- **Imported**, from a registered `AnnotationProviderInterface`. The
+  bundled Matomo provider imports Matomo's own annotations (e.g. release
+  markers); GA4 has no equivalent API.
+- **Manual**, created in the TYPO3 backend as a "Page metrics annotation"
+  record. The only option for GA4-only sites or events tied to no external
+  API. See [Adding a marker](#adding-a-marker).
 
-Annotations show up in two places: the markers on every sparkline
-(page-tile popovers and the [dashboard chart widget](dashboard-widgets.md)
-alike), and the dedicated
-[annotations dashboard widget](dashboard-widgets.md).
+They appear as markers on every sparkline and in the [annotations dashboard
+widget](dashboard-widgets.md).
 
 ### Adding a marker
 
-Give the site a page for its manual annotations to live on:
+Give the site a page for manual annotations:
 
 ```yaml
 pageMetrics:
@@ -241,85 +127,40 @@ pageMetrics:
     storagePid: 42
 ```
 
-With that set, **Web → Page** offers **Add marker** in the options menu beside
-the tiles. It opens the record form with the site, today's date and the page
-already filled in, and returns to the page module once the record is saved.
-
-A marker created that way is an ordinary record on that page, so the ordinary
-page permissions decide who may create one. An editor needs the "Page metrics
-annotation" table under **Allowed tables** in their backend group, plus
-content-edit permission on the storage page. The menu entry is shown only to a
-user who has both, and TYPO3 checks the same two things again when the form is
-saved.
-
-Without `storagePid` there is no **Add marker** entry and nothing else changes:
-records are still created through **New record** on whichever page you keep
-them on. A marker is found by its "Site" field and never by the page it sits
-on, so everything an installation already has, including the records at the
-page tree's root from before this option existed, keeps appearing on the tiles
-and stays editable where it is. Moving those onto the storage page is optional.
+With that set, **Web → Page** offers **Add marker** in the options menu,
+pre-filled with the site, page and today's date. Creating one needs the
+"Page metrics annotation" table under **Allowed tables** plus content-edit
+permission on the storage page. Without `storagePid`, records are still
+created through **New record** on whichever page you choose.
 
 ### Category
 
-Every annotation has a category, which decides the icon it is drawn with:
-release, campaign, content change, redesign, incident, SEO change or external
-event. The category is carried in words, never in a colour: a marker takes
-the colour of the chart it sits on, and its kind is spelled out in its
-tooltip and in the day panel. The chart widget can filter its markers down to
-a single category.
-
-Annotations that predate this field, and anything imported from a provider
-that has no notion of a kind (Matomo's own annotations, for instance), read
-as "release" — which is what every annotation in this extension meant before
-categories existed.
+Every annotation has a category (release, campaign, content change,
+redesign, incident, SEO change, external event), shown in its icon and
+tooltip, never by colour. Annotations with no category, including all
+pre-existing ones, read as "release".
 
 ### Duration
 
-Leave **Last day** empty for an event that happened on one day and it is
-drawn as a tick. Set it for one that ran for a while, a campaign or a
-freeze, and the chart draws a strip along its bottom edge spanning those
-days instead. A strip that started before the shown period, or has not
-ended within it, is still drawn: it is clamped to the edge of the chart
-rather than dropped, because it is still explaining the days on screen.
+Leave **Last day** empty for a one-day event, drawn as a tick. Set it for a
+campaign or freeze that ran for a while, drawn as a strip.
 
 ### Page scope
 
-Leave **Page** empty and the marker explains the whole site, which is what
-every annotation did before this field existed. Pick a page and it only
-appears on that page's tiles, plus, if **Also applies to subpages** is set,
-on everything below it. Dashboard widgets are site-wide and show every
-marker regardless of its page, since a marker on one page still explains a
-bump in the site's totals.
+Leave **Page** empty for a site-wide marker. Pick a page to scope it to
+that page (and, with **Also applies to subpages**, its subtree). Dashboard
+widgets always show every marker regardless of page.
 
 ### Automatic markers
 
-Annotations that nobody maintains are empty annotations, so the import run
-derives its own from records TYPO3 keeps regardless:
-
 | Marker | Derived from | Says |
 | --- | --- | --- |
-| `content` | `sys_history`, rows for the page record itself and for the content elements on it | This page changed on this day |
-| `seo` | `sys_redirect`, the day a redirect pointing at the page was created | A redirect now leads here |
+| `content` | `sys_history`, for the page record and its content elements | This page changed on this day |
+| `seo` | `sys_redirect`, the day a redirect to the page was created | A redirect now leads here |
 
-They are folded per page and per day, so five edits on one afternoon are one
-marker saying "Page updated, 5 changes", not five markers. They are always
-page-scoped (they explain one page, never the whole site), they never span
-days, and they are owned by the import: editing one by hand is pointless,
-because the next run writes it again. Use a manual annotation for anything
-you want to word yourself.
-
-Only the last 90 days are derived, which is the longest period any tile or
-widget draws. Workspace edits are ignored, since they explain nothing about
-published traffic, and redirects pointing at an external URL or a bare path
-are ignored too, because they name no page.
-
-A marker says that a page changed, never who changed it: the backend user
-`sys_history` records is not read at all.
-
-The `seo` markers need EXT:redirects. Without it there is no `sys_redirect`
-table, and only the `content` markers appear.
-
-To turn the whole thing off for a site:
+Multiple edits on one day fold into one marker. Only the last 90 days are
+derived, workspace edits are ignored, and `seo` markers need EXT:redirects
+installed. Turn them off per site:
 
 ```yaml
 pageMetrics:
@@ -328,55 +169,15 @@ pageMetrics:
     automatic: false
 ```
 
-Markers already written stay in the database; they simply stop being
-refreshed.
-
 ### Opening a marker
 
-A marker is a label until you can ask it what it did. Clicking one on a
-tile's sparkline opens a day panel: every marker that explains that day, and
-what each metric did on that one day rather than over the period. It is
-loaded from its own AJAX route (`PageMetricsDayController`) when the marker
-is clicked, not shipped with the tiles, because it is opened for at most one
-of the days a period covers.
-
-The thing you click is a real button laid over the mark, so the panel is
-reachable by keyboard as well as by pointer. Tab cycles inside the open
-panel, Escape and the close button both dismiss it, and focus returns to the
-marker it was opened from.
-
-A day outside the [imported window](#days-without-data) reads "No data"
-rather than zero here too, and a rate with nothing in its denominator reads
-the same way: nobody arrived that day, so nobody bounced either.
+Clicking a marker on a sparkline opens a day panel with every marker that
+explains that day and what each metric did on it specifically.
 
 ### Before and after
 
-For a marker that belongs to this page, the panel puts the 14 days before it
-against the 14 days after it, metric by metric. "14 days before the rewrite:
-420 views, 14 days after: 680" is the most direct evidence of a change that
-pure tracking data can produce.
-
-The marker's own day counts for neither side. A page rewritten at four in the
-afternoon changed half a day, and that half day is the one thing the claim
-cannot survive being asked about. A marker that spans days is measured from
-the day it ends, since a campaign has no aftermath while it is still running.
-
-Only counts are compared, never rates. The claim is "this many more people",
-and a rate has already divided exactly that away: a bounce rate holding
-steady while traffic doubled is a success the row would print as no change.
-Metrics with nothing on either side are left out rather than listed as zero
-against zero.
-
-Where either window still contains days nobody has imported, the row says so
-instead of showing a figure: "Not enough data yet: 14 of 14 days before and 3
-of 14 days after this marker are imported." Four of fourteen days after a
-marker is not a smaller version of the claim, it is a different and much
-weaker one, and it looks exactly like the real thing on the page. Whether the
-days are missing because the import has not reached them or because they have
-not happened yet makes no difference to what may be shown. Since coverage is
-recorded per provider, a site whose access log was added last week can still
-answer the question for Matomo, and each row says for itself which it is.
-
-A site-wide marker gets no comparison at all. It says nothing about this page
-in particular, and a per-page figure underneath it would read as a causal
-claim nobody made.
+For a page-scoped marker, the panel compares the 14 days before it against
+the 14 days after, metric by metric (never rates, since those already
+divide the change away). The marker's own day counts for neither side. If
+either window still has unimported days, the row says so instead of
+showing a number. Site-wide markers get no comparison.
