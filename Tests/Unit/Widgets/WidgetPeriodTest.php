@@ -15,10 +15,10 @@ namespace KonradMichalik\Typo3PageMetrics\Tests\Unit\Widgets;
 
 use KonradMichalik\Typo3PageMetrics\Widgets\WidgetPeriod;
 use PHPUnit\Framework\TestCase;
-use SimpleXMLElement;
 
 use function array_keys;
 use function file_get_contents;
+use function preg_match_all;
 use function str_replace;
 
 /**
@@ -74,13 +74,8 @@ final class WidgetPeriodTest extends TestCase
      */
     private function translationIds(): array
     {
-        $xml = new SimpleXMLElement((string) file_get_contents(__DIR__.'/../../../Resources/Private/Language/locallang_mod.xlf'));
-        $ids = [];
+        preg_match_all('/<trans-unit id="([^"]+)"/', (string) file_get_contents(__DIR__.'/../../../Resources/Private/Language/locallang_mod.xlf'), $matches);
 
-        foreach ($xml->file->body->{'trans-unit'} as $unit) {
-            $ids[] = (string) $unit['id'];
-        }
-
-        return $ids;
+        return $matches[1];
     }
 }
